@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 data class TvState(
     val playlistUrl: String = "", val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
-    val favorites: Set<String> = emptySet(), val tab: String = "Home"
+    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false
 )
 class MainViewModel : ViewModel() {
     private val repository = PlaylistRepository()
@@ -19,7 +19,8 @@ class MainViewModel : ViewModel() {
     val state: StateFlow<TvState> = _state
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
-    fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel) }
+    fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
+    fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()
         if (!f.add(channel.id)) f.remove(channel.id)
