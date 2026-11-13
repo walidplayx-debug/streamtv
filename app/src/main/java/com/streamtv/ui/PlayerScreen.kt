@@ -73,7 +73,12 @@ fun PlayerScreen(
     var showChannelPanel by remember { mutableStateOf(false) }
     var zapLabel by remember { mutableStateOf(false) }
     val playerFocusRequester = remember { FocusRequester() }
+    val channelListFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
+    LaunchedEffect(showChannelPanel) {
+        if (showChannelPanel && channels.isNotEmpty()) channelListFocusRequester.requestFocus()
+        else if (!showChannelPanel) playerFocusRequester.requestFocus()
+    }
     val favorite = channel.id in favorites
     val current = playerProgram(channel, programs)
     val next = programs.filter { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis > System.currentTimeMillis() }
@@ -128,9 +133,11 @@ fun PlayerScreen(
                             if (showChannelPanel) false else { onZap(-1); zapLabel = true; showOverlay = false; true }
                         }
                         Key.DirectionRight -> {
-                            showChannelPanel = true
-                            showOverlay = false
-                            true
+                            if (showChannelPanel) false else {
+                                showChannelPanel = true
+                                showOverlay = false
+                                true
+                            }
                         }
                         Key.DirectionLeft -> {
                             if (showChannelPanel) { showChannelPanel = false; true } else false
@@ -211,7 +218,7 @@ fun PlayerScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(channels, key = { it.id }) { item ->
                         val selected = item.id == channel.id
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        Row((if (item == channels.firstOrNull()) Modifier.focusRequester(channelListFocusRequester) else Modifier).fillMaxWidth().clip(RoundedCornerShape(14.dp))
                             .background(if (selected) PlayerWhite else Color.White.copy(alpha = .07f))
                             .clickable { onSelect(item); showChannelPanel = false; showOverlay = false }
                             .focusable().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
