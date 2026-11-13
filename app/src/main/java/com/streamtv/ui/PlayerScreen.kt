@@ -142,7 +142,9 @@ fun PlayerScreen(
                         Key.DirectionLeft -> {
                             if (showChannelPanel) { showChannelPanel = false; true } else false
                         }
-                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
+                        Key(AndroidKeyEvent.KEYCODE_DPAD_CENTER.toLong()),
+                        Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
                             if (showChannelPanel) false else { showOverlay = true; true }
                         }
                         else -> false
