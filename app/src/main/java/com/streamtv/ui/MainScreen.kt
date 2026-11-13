@@ -1,5 +1,7 @@
 package com.streamtv.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -27,6 +29,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -370,6 +373,15 @@ private fun SearchContent(state: TvState, model: MainViewModel) {
 
 @Composable
 private fun SettingsContent(state: TvState, model: MainViewModel) {
+    val context = LocalContext.current
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    ?: error("Unable to open the selected M3U file")
+            }.onSuccess(model::importPlaylist).onFailure { model.setError(it.message ?: "Unable to import playlist") }
+        }
+    }
     var section by remember { mutableStateOf("Playlist") }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(270.dp)) {
@@ -397,6 +409,8 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                             model.loadPlaylist()
                         }
                     }
+                    Spacer(Modifier.height(10.dp))
+                    WhiteButton("Import M3U file") { filePicker.launch(arrayOf("*/*")) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(24.dp))
                         Text("Saved playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
