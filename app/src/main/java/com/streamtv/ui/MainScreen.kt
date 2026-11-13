@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamtv.data.Channel
+import com.streamtv.data.EpgProgram
 
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
@@ -42,7 +43,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             when (state.tab) {
                 "Settings" -> SettingsContent(state, model)
                 "Categories" -> CategoryContent(state.channels, model)
-                "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model, state.favorites)
+                "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model, state.favorites, state.programs)
                 else -> {
                     Text(if (state.tab == "Home") "Welcome back" else "Live TV", fontSize = 30.sp)
                     Spacer(Modifier.height(18.dp))
@@ -50,7 +51,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     else {
                         Text("${state.channels.size} channels available", color = Color.LightGray)
                         Spacer(Modifier.height(18.dp))
-                        ChannelList(state.channels, model, state.favorites)
+                        ChannelList(state.channels, model, state.favorites, state.programs)
                     }
                 }
             }
@@ -79,7 +80,12 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     OutlinedTextField(value = state.playlistUrl, onValueChange = model::setUrl, label = { Text("M3U playlist URL") }, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(12.dp))
     Button(onClick = model::loadPlaylist, enabled = state.playlistUrl.isNotBlank() && !state.loading) { Text("Refresh playlist") }
+    Spacer(Modifier.height(18.dp))
+    OutlinedTextField(value = state.epgUrl, onValueChange = model::setEpgUrl, label = { Text("Optional XMLTV / XMLTV.GZ URL") }, modifier = Modifier.fillMaxWidth())
+    Spacer(Modifier.height(10.dp))
+    Button(onClick = model::loadEpg, enabled = state.epgUrl.isNotBlank()) { Text("Load TV guide") }
     state.error?.let { Text(it, color = Color(0xFFFF806F)) }
+    Text("${state.programs.size} guide programmes loaded", color = Color.LightGray)
 }
 
 @Composable private fun CategoryContent(channels: List<Channel>, model: MainViewModel) {
@@ -96,7 +102,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
 }
 
-@Composable private fun ChannelList(channels: List<Channel>, model: MainViewModel, favorites: Set<String>) {
+@Composable private fun ChannelList(channels: List<Channel>, model: MainViewModel, favorites: Set<String>, programs: List<EpgProgram>) {
     if (channels.isEmpty()) Text("Nothing here yet. Add a playlist in Home.", color = Color.LightGray)
     else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(channels, key = { it.id }) { channel ->
@@ -105,6 +111,11 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                 Column(Modifier.weight(1f)) {
                     Text(channel.name, fontSize = 18.sp)
                     Text(channel.group, color = Color.LightGray, fontSize = 13.sp)
+                    val now = System.currentTimeMillis()
+                    val current = programs.firstOrNull { it.channelId == channel.id && it.startEpochMillis <= now && it.endEpochMillis > now }
+                    val next = programs.filter { it.channelId == channel.id && it.startEpochMillis > now }.minByOrNull { it.startEpochMillis }
+                    if (current != null) Text("NOW · ${current.title}", color = Color(0xFFFFB27A), fontSize = 12.sp)
+                    else if (next != null) Text("NEXT · ${next.title}", color = Color.LightGray, fontSize = 12.sp)
                 }
                 Text(if (channel.id in favorites) "★" else "☆", color = Color(0xFFFF8A36), fontSize = 24.sp, modifier = Modifier.clickable { model.toggleFavorite(channel) }.padding(horizontal = 16.dp))
                 Text("▶", color = Color(0xFFFF8A36), fontSize = 20.sp)
