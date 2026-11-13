@@ -16,19 +16,48 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-34" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
       - name: Build, lint and test
         run: gradle --no-daemon lint testDebugUnitTest assembleRelease
+      - name: Sign APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          mkdir -p release
+          APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > release/signing.jks
+            STORE_PASS="$KEYSTORE_PASSWORD"
+            ALIAS="$KEY_ALIAS"
+            PASS="$KEY_PASSWORD"
+          else
+            keytool -genkeypair -v -keystore release/temporary.jks -storepass streamtv-temp -keypass streamtv-temp -alias streamtv -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=streamtv, OU=Build, O=streamtv, L=Unknown, S=Unknown, C=US"
+            STORE_PASS="streamtv-temp"
+            ALIAS="streamtv"
+            PASS="streamtv-temp"
+            mv release/temporary.jks release/signing.jks
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks release/signing.jks --ks-pass "pass:$STORE_PASS" --key-pass "pass:$PASS" --ks-key-alias "$ALIAS" --out release/streamtv.apk "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release/streamtv.apk
+          rm -f release/signing.jks
       - name: Upload APK artifact
+        if: always() && (success() || failure())
         uses: actions/upload-artifact@v4
         with:
           name: streamtv-apk
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
+          path: release/streamtv.apk
+          if-no-files-found: ignore
       - name: Publish latest release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -36,4 +65,4 @@ jobs:
           target_commitish: main
           make_latest: true
           prerelease: false
-          files: app/build/outputs/apk/release/app-release-unsigned.apk
+          files: release/streamtv.apk
