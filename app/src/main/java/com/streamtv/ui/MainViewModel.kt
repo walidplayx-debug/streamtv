@@ -15,8 +15,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+data class PlaylistEntry(val name: String, val url: String)
+
 data class TvState(
-    val playlistUrl: String = "", val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
+    val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
+    val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
     val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false, val searchQuery: String = ""
 )
@@ -57,7 +60,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.favoriteIds.collect { ids -> _state.value = _state.value.copy(favorites = ids) }
         }
     }
+    init {
+        viewModelScope.launch {
+            preferences.savedPlaylists.collect { saved ->
+                val entries = saved.mapNotNull { raw ->
+                    val split = raw.split("\t", limit = 2)
+                    if (split.size == 2) PlaylistEntry(split[0], split[1]) else null
+                }.sortedBy { it.name.lowercase() }
+                _state.value = _state.value.copy(playlists = entries)
+            }
+        }
+    }
+
+    fun setPlaylistName(value: String) { _state.value = _state.value.copy(playlistName = value) }
     fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
+    fun savePlaylistEntry() {
+        val name = _state.value.playlistName.trim().ifBlank { "Playlist ${_state.value.playlists.size + 1}" }
+        val url = _state.value.playlistUrl.trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            _state.value = _state.value.copy(error = "Enter a valid http(s) playlist URL")
+            return
+        }
+        val updated = (_state.value.playlists.filterNot { it.url == url } + PlaylistEntry(name, url))
+        _state.value = _state.value.copy(playlists = updated, playlistName = name)
+        viewModelScope.launch { preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet()) }
+    }
+    fun selectPlaylist(entry: PlaylistEntry) {
+        _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)
+        loadPlaylist(entry.url)
+    }
     fun loadEpg() {
         val url = _state.value.epgUrl
         viewModelScope.launch {
@@ -85,8 +116,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(favorites = f)
         viewModelScope.launch { preferences.saveFavorites(f) }
     }
-    fun loadPlaylist() {
-        val url = _state.value.playlistUrl
+    fun loadPlaylist(urlOverride: String? = null) {
+        val url = (urlOverride ?: _state.value.playlistUrl).trim()
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching { repository.load(url) }.onSuccess { channels ->
