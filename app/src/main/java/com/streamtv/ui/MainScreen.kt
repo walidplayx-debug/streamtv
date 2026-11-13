@@ -426,7 +426,7 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                         Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(10.dp))
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            state.playlists.forEach { entry ->
+                            for (entry in state.playlists) {
                                 Row(
                                     Modifier.clip(RoundedCornerShape(18.dp))
                                         .background(if (entry.url == state.playlistUrl) White.copy(alpha = .16f) else Glass)
