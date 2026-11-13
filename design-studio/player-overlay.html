@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080a0d"><title>STREEM — Player Channel Overlay</title>
+<style>
+:root{color-scheme:dark;--bg:#080a0d;--panel:#11161c;--line:#ffffff18;--muted:#9aa4ad;--white:#f4f6f7}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 50% -30%,#26313b 0,#11171d 40%,#080a0d 78%);color:var(--white);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:26px}
+.shell{width:min(1440px,100%)}.top{display:flex;align-items:center;justify-content:space-between;margin:0 2px 16px}.brand{font-size:14px;font-weight:800;letter-spacing:.24em}.brand small{font-weight:400;letter-spacing:.1em;color:#74808a;margin-left:10px}.tag{font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:#8f9aa4}
+.tv{position:relative;aspect-ratio:16/9;overflow:hidden;border:1px solid #ffffff20;border-radius:15px;background:#070a0e;box-shadow:0 35px 100px #000b,inset 0 1px #ffffff12;isolation:isolate}
+.scene{position:absolute;inset:0;background-image:linear-gradient(90deg,#05080dc9 0%,#05080d35 48%,#05080d20 100%),linear-gradient(0deg,#05080dc9 0%,transparent 36%),url('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=2200&q=90');background-size:cover;background-position:center;filter:saturate(.72)}
+.topbar{position:absolute;z-index:2;top:5%;left:5%;right:5%;display:flex;align-items:center;justify-content:space-between}.logo{font-weight:850;letter-spacing:.24em;font-size:clamp(12px,1.15vw,17px)}.live-label{font-size:clamp(8px,.7vw,11px);letter-spacing:.18em;color:#e0e5e9;display:flex;gap:8px;align-items:center}.dot{width:6px;height:6px;border-radius:50%;background:#d7dce0;box-shadow:0 0 10px #fff8}
+.program{position:absolute;z-index:2;left:5.2%;bottom:10%;width:46%;max-width:560px;transition:opacity .2s}.kicker{font-size:clamp(8px,.7vw,11px);letter-spacing:.22em;color:#c1c9cf;margin-bottom:12px}.program h1{font-size:clamp(27px,4vw,58px);font-weight:580;letter-spacing:-.05em;line-height:1;margin:0 0 13px}.meta{display:flex;gap:13px;align-items:center;color:#c3cbd1;font-size:clamp(9px,.78vw,12px)}.quality{border:1px solid #ffffff55;border-radius:3px;padding:2px 6px}.synopsis{color:#b8c1c8;font-size:clamp(9px,.8vw,12px);line-height:1.6;max-width:390px;margin:13px 0 17px}.progress-head{display:flex;justify-content:space-between;max-width:340px;color:#b9c2c9;font-size:10px;margin-bottom:7px}.progress{height:3px;max-width:340px;background:#ffffff45;border-radius:5px;overflow:hidden}.progress i{display:block;width:62%;height:100%;background:#f2f4f5;border-radius:5px}
+.channel-panel{position:absolute;z-index:4;top:3.2%;right:2.4%;bottom:3.2%;width:31%;min-width:265px;max-width:390px;border:1px solid #ffffff23;border-radius:12px;background:linear-gradient(145deg,#171d23ed,#0c1015f2 72%);backdrop-filter:blur(26px);box-shadow:-22px 0 60px #0007,inset 0 1px #ffffff12;padding:clamp(13px,1.6vw,23px);display:flex;flex-direction:column;transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .22s}
+.channel-panel.hidden{transform:translateX(108%);opacity:0;pointer-events:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}.panel-title{font-size:clamp(12px,1.1vw,16px);font-weight:650;letter-spacing:.015em}.panel-count{font-size:9px;letter-spacing:.16em;color:#8f9aa3}
+.category{font-size:9px;letter-spacing:.18em;color:#929da6;margin:0 0 8px 2px}
+.list{display:flex;flex-direction:column;gap:5px;overflow:hidden;flex:1}
+.channel{width:100%;min-height:clamp(43px,5.2vw,66px);border:1px solid transparent;border-radius:7px;background:transparent;display:flex;align-items:center;gap:10px;padding:7px 9px;color:inherit;text-align:left;cursor:pointer;transition:background .16s,border-color .16s,transform .16s}
+.channel.active{background:linear-gradient(100deg,#ffffff18,#ffffff0a);border-color:#ffffff35;box-shadow:inset 2px 0 #dce1e5}
+.channel:focus-visible{outline:2px solid #f3f5f6;outline-offset:2px}
+.logo-chip{width:clamp(27px,3vw,38px);height:clamp(27px,3vw,38px);flex:0 0 auto;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#47515b,#20272e);border:1px solid #ffffff24;font-size:clamp(9px,.8vw,12px);font-weight:750;letter-spacing:-.03em;color:#f3f5f6}
+.channel:nth-child(2) .logo-chip{background:linear-gradient(145deg,#5d646a,#292f35)}.channel:nth-child(3) .logo-chip{background:linear-gradient(145deg,#56616b,#242c33)}.channel:nth-child(4) .logo-chip{background:linear-gradient(145deg,#4b565e,#20272d)}.channel:nth-child(5) .logo-chip{background:linear-gradient(145deg,#62686d,#2b3035)}.channel:nth-child(6) .logo-chip{background:linear-gradient(145deg,#525d66,#242a30)}
+.channel-info{min-width:0;flex:1}.channel-name{font-size:clamp(10px,.85vw,13px);font-weight:630;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.channel-show{font-size:clamp(8px,.68vw,10px);color:#929da6;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.channel-state{font-size:8px;color:#d9dfe3;letter-spacing:.1em;white-space:nowrap}.channel-state.live:before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#e5e9eb;margin-right:5px;vertical-align:1px}
+.panel-foot{border-top:1px solid #ffffff18;margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;color:#8f9aa3;font-size:9px;letter-spacing:.06em}.foot-live{color:#d4dade;letter-spacing:.13em}
+.hints{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:13px 3px 0;color:#8b96a0;font-size:11px}.hint-group{display:flex;align-items:center;gap:13px;flex-wrap:wrap}.key{display:inline-grid;place-items:center;min-width:22px;height:21px;padding:0 5px;border:1px solid #53606b;border-radius:4px;color:#e0e5e8;font-size:10px;margin-right:5px}.state{color:#aeb7be}
+.toast{position:absolute;z-index:6;left:50%;bottom:5%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border:1px solid #ffffff2b;border-radius:7px;background:#12181eeF;padding:9px 15px;color:#e9edef;font-size:12px;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:700px){body{padding:12px}.top{margin-bottom:10px}.tv{border-radius:8px}.channel-panel{top:2.5%;right:2%;bottom:2.5%;width:42%;min-width:0;padding:8px;border-radius:7px}.panel-head{margin-bottom:7px}.channel{min-height:0;padding:5px;gap:6px}.channel-show{display:none}.channel-state{font-size:7px}.category{margin-bottom:4px}.panel-foot{margin-top:6px;padding-top:6px;font-size:7px}.program{left:4%;bottom:9%;width:48%}.synopsis{display:none}.progress-head{margin-top:10px}.hints{font-size:9px}.key{height:18px;min-width:18px}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header class="top"><div class="brand">STREEM <small>/ PLAYER EXPERIENCE</small></div><div class="tag">INTERACTIVE CONCEPT · 02</div></header>
+<section class="tv" id="tv" aria-label="STREEM player preview">
+<div class="scene"></div>
+<div class="topbar"><div class="logo">STREEM</div><div class="live-label"><span class="dot"></span> LIVE BROADCAST</div></div>
+<section class="program" id="program">
+<div class="kicker">NOW PLAYING · SPORTS</div><h1 id="programTitle">The Match</h1>
+<div class="meta"><span>Live coverage</span><span class="quality">HD</span><span>16:9</span></div>
+<p class="synopsis">Live from the stadium. Stay close to every moment with STREEM.</p>
+<div class="progress-head"><span>LIVE PROGRAM</span><span>62% · 18:42</span></div><div class="progress"><i></i></div>
+</section>
+<aside class="channel-panel" id="panel">
+<div class="panel-head"><div class="panel-title">القنوات</div><div class="panel-count">ALL CHANNELS · 06</div></div>
+<div class="category">LIVE NOW</div>
+<div class="list" id="list">
+<button class="channel active" data-i="0"><span class="logo-chip">S1</span><span class="channel-info"><span class="channel-name">STREEM Sports</span><span class="channel-show">The Match · Live coverage</span></span><span class="channel-state live">LIVE</span></button>
+<button class="channel" data-i="1"><span class="logo-chip">N</span><span class="channel-info"><span class="channel-name">News International</span><span class="channel-show">World Update · 18:00</span></span><span class="channel-state live">LIVE</span></button>
+<button class="channel" data-i="2"><span class="logo-chip">C+</span><span class="channel-info"><span class="channel-name">Cinema Plus</span><span class="channel-show">The Last Journey</span></span><span class="channel-state live">LIVE</span></button>
+<button class="channel" data-i="3"><span class="logo-chip">NAT</span><span class="channel-info"><span class="channel-name">Nature</span><span class="channel-show">Wild Earth · Episode 4</span></span><span class="channel-state live">LIVE</span></button>
+<button class="channel" data-i="4"><span class="logo-chip">K</span><span class="channel-info"><span class="channel-name">Kids World</span><span class="channel-show">Adventure Time</span></span><span class="channel-state live">LIVE</span></button>
+<button class="channel" data-i="5"><span class="logo-chip">M</span><span class="channel-info"><span class="channel-name">Music One</span><span class="channel-show">Non-stop Music</span></span><span class="channel-state live">LIVE</span></button>
+</div>
+<div class="panel-foot"><span>CHOOSE A CHANNEL</span><span class="foot-live">● ON AIR</span></div>
+</aside>
+<div class="toast" id="toast">تم اختيار القناة</div>
+</section>
+<footer class="hints"><div class="hint-group"><span><b class="key">→</b> إظهار القنوات</span><span><b class="key">↑</b><b class="key">↓</b> تنقّل</span><span><b class="key">OK</b> اختيار</span><span><b class="key">←</b> إغلاق</span></div><span class="state" id="state">القائمة ظاهرة للمعاينة</span></footer>
+</main>
+<script>
+const panel=document.getElementById('panel'),items=[...document.querySelectorAll('.channel')],state=document.getElementById('state'),toast=document.getElementById('toast'),title=document.getElementById('programTitle');
+let selected=0,shown=true,toastTimer;
+function render(){items.forEach((el,i)=>el.classList.toggle('active',i===selected));items[selected].scrollIntoView({block:'nearest',behavior:'smooth'});state.textContent=shown?'القائمة ظاهرة':'القائمة مخفية';}
+function show(){shown=true;panel.classList.remove('hidden');render()}
+function hide(){shown=false;panel.classList.add('hidden');render()}
+function choose(){const name=items[selected].querySelector('.channel-name').textContent;title.textContent=name;toast.textContent='تم اختيار '+name;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),1700);hide()}
+function step(n){if(!shown){show();return}selected=(selected+n+items.length)%items.length;render()}
+document.addEventListener('keydown',e=>{if(['ArrowRight','ArrowLeft','ArrowUp','ArrowDown','Enter',' '].includes(e.key))e.preventDefault();if(e.key==='ArrowRight')show();if(e.key==='ArrowLeft'||e.key==='Escape'||e.key==='Backspace')hide();if(e.key==='ArrowDown')step(1);if(e.key==='ArrowUp')step(-1);if(e.key==='Enter'||e.key===' ')choose()});
+items.forEach((el,i)=>el.addEventListener('click',()=>{selected=i;render();choose()}));
+panel.addEventListener('mouseenter',()=>{shown=true;panel.classList.remove('hidden')});
+render();
+</script>
+</body></html>
