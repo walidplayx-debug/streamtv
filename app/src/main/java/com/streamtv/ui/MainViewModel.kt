@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 data class TvState(
     val playlistUrl: String = "", val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
-    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false
+    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false, val searchQuery: String = ""
 )
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
@@ -62,6 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
         }
     }
+    fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
     fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
