@@ -78,9 +78,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importPlaylist(text: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
-            runCatching { M3uParser.parse(text) }
+            runCatching {
+                M3uParser.parse(text).also { require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" } }
+            }
                 .onSuccess { channels ->
-                    if (channels.isEmpty()) error("The selected file contains no playable M3U channels")
                     _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull(), loading = false, tab = "Live TV")
                     dao.clear()
                     dao.insertAll(channels.map { ChannelEntity.from(it) })
