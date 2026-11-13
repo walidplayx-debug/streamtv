@@ -11,7 +11,7 @@ fun Channel.detectedLanguage(): String {
     if (explicit == "ar" || explicit.contains("arab") || explicit.contains("ara")) return "ar"
     if (explicit == "fr" || explicit.contains("french") || explicit.contains("fre") || explicit.contains("français")) return "fr"
     val metadata = "${country} ${group}".lowercase()
-    if (name.any { it in '\\u0600'..'\\u06FF' } || metadata.contains("arab") || metadata.contains("العربية")) return "ar"
+    if (name.any { it in '\u0600'..'\u06FF' } || metadata.contains("arab") || metadata.contains("العربية")) return "ar"
     if (metadata.contains("french") || metadata.contains("français") || metadata.contains("francais") ||
         country.equals("FR", true) || country.contains("France", true) ||
         group.contains("France", true) || group.contains("French", true) ||
