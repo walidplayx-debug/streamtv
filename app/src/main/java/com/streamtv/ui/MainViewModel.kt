@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
 
@@ -29,6 +30,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val epgRepository = EpgRepository()
     private val dao = StreamDatabase.get(application).channelDao()
     private val preferences = PlaylistPreferences(application)
+    private val playlistDirectory = File(application.filesDir, "playlists")
     private val _state = MutableStateFlow(TvState())
     val state: StateFlow<TvState> = _state
     init {
@@ -79,10 +81,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching {
-                M3uParser.parse(text).also { require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" } }
+                val channels = M3uParser.parse(text).also {
+                    require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }
+                }
+                val name = _state.value.playlistName.trim().ifBlank { "Imported playlist ${_state.value.playlists.size + 1}" }
+                val fileName = "import-${System.currentTimeMillis()}.m3u"
+                playlistDirectory.mkdirs()
+                File(playlistDirectory, fileName).writeText(text)
+                Triple(channels, name, fileName)
             }
-                .onSuccess { channels ->
-                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull(), loading = false, tab = "Live TV")
+                .onSuccess { (channels, name, fileName) ->
+                    val localUrl = "local://$fileName"
+                    val updated = (_state.value.playlists.filterNot { it.url == localUrl } + PlaylistEntry(name, localUrl))
+                    _state.value = _state.value.copy(
+                        channels = channels, selected = channels.firstOrNull(), loading = false,
+                        tab = "Live TV", playlistName = name, playlistUrl = localUrl, playlists = updated
+                    )
+                    preferences.savePlaylists(updated.map { "${it.name}\\t${it.url}" }.toSet())
                     dao.clear()
                     dao.insertAll(channels.map { ChannelEntity.from(it) })
                 }
@@ -103,7 +118,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun selectPlaylist(entry: PlaylistEntry) {
         _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)
-        loadPlaylist(entry.url)
+        if (!entry.url.startsWith("local://")) {
+            loadPlaylist(entry.url)
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching {
+                M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
+                    .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
+            }.onSuccess { channels ->
+                _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull(), loading = false, tab = "Live TV")
+                dao.clear()
+                dao.insertAll(channels.map { ChannelEntity.from(it) })
+            }.onFailure { e ->
+                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
+            }
+        }
     }
     fun loadEpg() {
         val url = _state.value.epgUrl

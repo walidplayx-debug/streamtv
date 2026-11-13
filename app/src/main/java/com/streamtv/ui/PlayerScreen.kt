@@ -46,7 +46,7 @@ import java.util.Locale
 
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
-private val PlayerGlass = Color(0xDD252528)
+private val PlayerGlass = Color(0xB8202024)
 private val PlayerAccent = Color(0xFFD5DADF)
 
 @Composable
@@ -207,21 +207,24 @@ fun PlayerScreen(
 
         if (zapLabel) {
             Row(
-                Modifier.align(Alignment.BottomStart).padding(start = 42.dp, bottom = 34.dp)
-                    .clip(RoundedCornerShape(15.dp)).background(PlayerGlass)
-                    .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(15.dp))
-                    .padding(horizontal = 20.dp, vertical = 13.dp),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.62f).padding(bottom = 30.dp)
+                    .clip(RoundedCornerShape(14.dp)).background(PlayerGlass)
+                    .border(1.dp, PlayerWhite.copy(alpha = .18f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 22.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString() },
-                    color = PlayerAccent, fontSize = 18.sp, fontWeight = FontWeight.Bold
-                )
+                Box(Modifier.width(4.dp).height(38.dp).clip(CircleShape).background(PlayerAccent))
                 Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(channel.name, color = PlayerWhite, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(playerProgram(channel, programs)?.title ?: channel.group, color = PlayerMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f)) {
+                    Text("NOW PLAYING", color = PlayerAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                    Text(channel.name, color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                Spacer(Modifier.width(18.dp))
+                Text(
+                    channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString().padStart(2, '0') },
+                    color = PlayerWhite.copy(alpha = .88f), fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
             }
         }
 

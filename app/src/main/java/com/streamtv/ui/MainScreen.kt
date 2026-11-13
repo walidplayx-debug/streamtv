@@ -253,11 +253,11 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
         columns = GridCells.Fixed(4),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp, end = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(22.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         gridItems(channels, key = { it.id }) { channel ->
-            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(82.dp)) { model.select(channel) }
+            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel) }
         }
     }
 }
@@ -284,9 +284,9 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.035f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "cardScale")
     Box(
-        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(14.dp))
+        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(Color(0xFF252A33), Color(0xFF171B22))))
-            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .82f else .07f), RoundedCornerShape(14.dp))
+            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .82f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
@@ -295,7 +295,7 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
             AsyncImage(
                 model = channel.logo,
                 contentDescription = channel.name,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
                 contentScale = ContentScale.Fit
             )
         } else {
