@@ -42,7 +42,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             when (state.tab) {
                 "Settings" -> SettingsContent(state, model)
                 "Categories" -> CategoryContent(state.channels, model)
-                "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model)
+                "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model, state.favorites)
                 else -> {
                     Text(if (state.tab == "Home") "Welcome back" else "Live TV", fontSize = 30.sp)
                     Spacer(Modifier.height(18.dp))
@@ -50,7 +50,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     else {
                         Text("${state.channels.size} channels available", color = Color.LightGray)
                         Spacer(Modifier.height(18.dp))
-                        ChannelList(state.channels, model)
+                        ChannelList(state.channels, model, state.favorites)
                     }
                 }
             }
@@ -62,7 +62,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     Column(Modifier.fillMaxWidth().background(Color(0xFF19171D), RoundedCornerShape(26.dp)).padding(28.dp)) {
         Text("Add your playlist", fontSize = 25.sp)
         Spacer(Modifier.height(8.dp))
-        Text("Paste your M3U / M3U8 link. Add an optional XMLTV guide in Settings.", color = Color.LightGray)
+        Text("Paste your M3U / M3U8 link. XMLTV guide support is being added.", color = Color.LightGray)
         Spacer(Modifier.height(18.dp))
         OutlinedTextField(value = state.playlistUrl, onValueChange = model::setUrl, label = { Text("Playlist URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
@@ -96,7 +96,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
 }
 
-@Composable private fun ChannelList(channels: List<Channel>, model: MainViewModel) {
+@Composable private fun ChannelList(channels: List<Channel>, model: MainViewModel, favorites: Set<String>) {
     if (channels.isEmpty()) Text("Nothing here yet. Add a playlist in Home.", color = Color.LightGray)
     else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(channels, key = { it.id }) { channel ->
@@ -106,6 +106,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     Text(channel.name, fontSize = 18.sp)
                     Text(channel.group, color = Color.LightGray, fontSize = 13.sp)
                 }
+                Text(if (channel.id in favorites) "★" else "☆", color = Color(0xFFFF8A36), fontSize = 24.sp, modifier = Modifier.clickable { model.toggleFavorite(channel) }.padding(horizontal = 16.dp))
                 Text("▶", color = Color(0xFFFF8A36), fontSize = 20.sp)
             }
         }
