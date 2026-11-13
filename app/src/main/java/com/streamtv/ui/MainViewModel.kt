@@ -67,6 +67,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
     fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
     fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
+    fun zap(delta: Int) {
+        val channels = _state.value.channels
+        if (channels.isEmpty()) return
+        val current = channels.indexOfFirst { it.id == _state.value.selected?.id }.let { if (it < 0) 0 else it }
+        val next = (current + delta + channels.size) % channels.size
+        _state.value = _state.value.copy(selected = channels[next])
+    }
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()
         if (!f.add(channel.id)) f.remove(channel.id)
