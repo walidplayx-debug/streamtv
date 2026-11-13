@@ -24,9 +24,9 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '8.14.4'
       - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.13
+        run: gradle wrapper --gradle-version 8.14.4
       - name: Build, lint and test
         run: ./gradlew --no-daemon lint testDebugUnitTest assembleRelease
       - name: Commit generated Gradle wrapper
