@@ -108,14 +108,14 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
         modifier.scale(scale).clip(CircleShape)
             .background(
                 when {
-                    focused -> Brush.verticalGradient(listOf(Color(0xFFF2F5F8), Color(0xFFD4DCE5)))
+                    focused -> Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
                     selected -> Brush.verticalGradient(listOf(White.copy(alpha = .24f), White.copy(alpha = .14f)))
                     else -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
                 }
             )
             .border(
-                width = if (focused) 2.dp else if (selected) 1.dp else 0.dp,
-                color = if (focused) White.copy(alpha = .95f) else White.copy(alpha = .16f),
+                width = if (focused) 1.dp else if (selected) 1.dp else 0.dp,
+                color = if (focused) White.copy(alpha = .48f) else White.copy(alpha = .16f),
                 shape = CircleShape
             )
             .onFocusChanged { focused = it.isFocused }
@@ -124,9 +124,9 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
     ) {
         Text(
             text,
-            color = if (focused) Color(0xFF171B22) else if (selected) White else White.copy(alpha = .72f),
+            color = White.copy(alpha = if (focused || selected) .98f else .72f),
             fontSize = 17.sp,
-            fontWeight = if (focused || selected) FontWeight.Bold else FontWeight.Medium
+            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium
         )
     }
 }
