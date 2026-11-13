@@ -13,10 +13,13 @@ class PlaylistPreferences(private val context: Context) {
     private val playlistKey = stringPreferencesKey("playlist_url")
     private val epgKey = stringPreferencesKey("epg_url")
     private val favoritesKey = stringSetPreferencesKey("favorite_ids")
+    private val playlistsKey = stringSetPreferencesKey("saved_playlists")
     val playlistUrl: Flow<String> = context.dataStore.data.map { it[playlistKey].orEmpty() }
     val epgUrl: Flow<String> = context.dataStore.data.map { it[epgKey].orEmpty() }
     val favoriteIds: Flow<Set<String>> = context.dataStore.data.map { it[favoritesKey] ?: emptySet() }
+    val savedPlaylists: Flow<Set<String>> = context.dataStore.data.map { it[playlistsKey] ?: emptySet() }
     suspend fun savePlaylist(url: String) { context.dataStore.edit { it[playlistKey] = url } }
     suspend fun saveEpg(url: String) { context.dataStore.edit { it[epgKey] = url } }
     suspend fun saveFavorites(ids: Set<String>) { context.dataStore.edit { it[favoritesKey] = ids } }
+    suspend fun savePlaylists(entries: Set<String>) { context.dataStore.edit { it[playlistsKey] = entries } }
 }
