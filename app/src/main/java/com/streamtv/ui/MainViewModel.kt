@@ -8,6 +8,7 @@ import com.streamtv.data.PlaylistRepository
 import com.streamtv.data.StreamDatabase
 import com.streamtv.data.ChannelEntity
 import com.streamtv.data.PlaylistPreferences
+import com.streamtv.data.M3uParser
 import com.streamtv.data.EpgProgram
 import com.streamtv.data.EpgRepository
 import kotlinx.coroutines.flow.collect
@@ -73,6 +74,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setPlaylistName(value: String) { _state.value = _state.value.copy(playlistName = value) }
+    fun setError(value: String) { _state.value = _state.value.copy(error = value) }
+    fun importPlaylist(text: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching { M3uParser.parse(text) }
+                .onSuccess { channels ->
+                    if (channels.isEmpty()) error("The selected file contains no playable M3U channels")
+                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull(), loading = false, tab = "Live TV")
+                    dao.clear()
+                    dao.insertAll(channels.map { ChannelEntity.from(it) })
+                }
+                .onFailure { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist") }
+        }
+    }
     fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
     fun savePlaylistEntry() {
         val name = _state.value.playlistName.trim().ifBlank { "Playlist ${_state.value.playlists.size + 1}" }
