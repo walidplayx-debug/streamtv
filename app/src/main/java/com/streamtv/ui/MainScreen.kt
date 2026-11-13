@@ -63,7 +63,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     Column(Modifier.fillMaxWidth().background(Color(0xFF19171D), RoundedCornerShape(26.dp)).padding(28.dp)) {
         Text("Add your playlist", fontSize = 25.sp)
         Spacer(Modifier.height(8.dp))
-        Text("Paste your M3U / M3U8 link. XMLTV guide support is being added.", color = Color.LightGray)
+        Text("Paste your M3U / M3U8 link. You can add an optional XMLTV guide from Settings.", color = Color.LightGray)
         Spacer(Modifier.height(18.dp))
         OutlinedTextField(value = state.playlistUrl, onValueChange = model::setUrl, label = { Text("Playlist URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
