@@ -31,6 +31,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = StreamDatabase.get(application).channelDao()
     private val preferences = PlaylistPreferences(application)
     private val playlistDirectory = File(application.filesDir, "playlists")
+    private var lastChannelId: String = ""
     private val _state = MutableStateFlow(TvState())
     val state: StateFlow<TvState> = _state
     init {
@@ -48,7 +49,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             dao.observeAll().collect { cached ->
                 if (_state.value.channels.isEmpty() && cached.isNotEmpty()) {
                     val channels = cached.map { it.toChannel() }
-                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull())
+                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull())
                 }
             }
         }
@@ -61,6 +62,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             preferences.favoriteIds.collect { ids -> _state.value = _state.value.copy(favorites = ids) }
+        }
+    }
+    init {
+        viewModelScope.launch {
+            preferences.lastChannelId.collect { id ->
+                lastChannelId = id
+                val last = _state.value.channels.firstOrNull { it.id == id }
+                if (last != null) _state.value = _state.value.copy(selected = last)
+            }
         }
     }
     init {
@@ -94,7 +104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val localUrl = "local://$fileName"
                     val updated = (_state.value.playlists.filterNot { it.url == localUrl } + PlaylistEntry(name, localUrl))
                     _state.value = _state.value.copy(
-                        channels = channels, selected = channels.firstOrNull(), loading = false,
+                        channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false,
                         tab = "Live TV", playlistName = name, playlistUrl = localUrl, playlists = updated
                     )
                     preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
@@ -138,7 +148,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
                     .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
             }.onSuccess { channels ->
-                _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull(), loading = false, tab = "Live TV")
+                _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
                 dao.clear()
                 dao.insertAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
@@ -158,14 +168,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
-    fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
+    fun select(channel: Channel) {
+        lastChannelId = channel.id
+        _state.value = _state.value.copy(selected = channel, playing = true)
+        viewModelScope.launch { preferences.saveLastChannel(channel.id) }
+    }
     fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
     fun zap(delta: Int) {
         val channels = _state.value.channels
         if (channels.isEmpty()) return
         val current = channels.indexOfFirst { it.id == _state.value.selected?.id }.let { if (it < 0) 0 else it }
         val next = (current + delta + channels.size) % channels.size
-        _state.value = _state.value.copy(selected = channels[next])
+        val selected = channels[next]
+        lastChannelId = selected.id
+        _state.value = _state.value.copy(selected = selected)
+        viewModelScope.launch { preferences.saveLastChannel(selected.id) }
     }
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()
