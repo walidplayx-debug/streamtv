@@ -116,6 +116,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(playlists = updated, playlistName = name)
         viewModelScope.launch { preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet()) }
     }
+    fun removePlaylist(entry: PlaylistEntry) {
+        val updated = _state.value.playlists.filterNot { it.url == entry.url }
+        _state.value = _state.value.copy(playlists = updated)
+        viewModelScope.launch {
+            preferences.savePlaylists(updated.map { "${it.name}\\t${it.url}" }.toSet())
+            if (entry.url.startsWith("local://")) {
+                File(playlistDirectory, entry.url.removePrefix("local://")).delete()
+            }
+        }
+    }
     fun selectPlaylist(entry: PlaylistEntry) {
         _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)
         if (!entry.url.startsWith("local://")) {
