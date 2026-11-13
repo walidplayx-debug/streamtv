@@ -44,7 +44,7 @@ import java.util.Locale
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
 private val PlayerGlass = Color(0xDD252528)
-private val PlayerAccent = Color(0xFFFF7130)
+private val PlayerAccent = Color(0xFFD5DADF)
 
 @Composable
 fun PlayerScreen(
@@ -105,8 +105,8 @@ fun PlayerScreen(
                 when (event.key) {
                     Key.DirectionUp -> { onZap(1); showOverlay = true; zapLabel = true; true }
                     Key.DirectionDown -> { onZap(-1); showOverlay = true; zapLabel = true; true }
-                    Key.DirectionLeft -> { showChannelPanel = true; showOverlay = true; true }
-                    Key.DirectionRight -> { if (showChannelPanel) showChannelPanel = false else showOverlay = true; true }
+                    Key.DirectionRight -> { showChannelPanel = true; showOverlay = true; true }
+                    Key.DirectionLeft -> { if (showChannelPanel) showChannelPanel = false else showOverlay = true; true }
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> { showOverlay = !showOverlay; true }
                     else -> { showOverlay = true; false }
                 }
