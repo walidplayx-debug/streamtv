@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamtv.data.Channel
 import com.streamtv.data.EpgProgram
-import coil3.compose.AsyncImage
+import coil.compose.AsyncImage
 
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
