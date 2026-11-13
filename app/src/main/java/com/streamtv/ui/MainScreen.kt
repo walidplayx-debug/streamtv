@@ -165,9 +165,17 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
         Column(Modifier.width(250.dp).fillMaxHeight()) {
             Text("Live TV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(24.dp))
-            val groups = listOf("All channels" to state.channels.size) + state.channels.groupBy { it.country.ifBlank { it.group } }.map { it.key to it.value.size }
-            groups.distinctBy { it.first }.forEachIndexed { index, item ->
-                FocusRow(item.first, item.second.toString(), index == 0) { model.setSearchQuery(if (index == 0) "" else item.first) }
+            val arabicCount = state.channels.count { it.detectedLanguage() == "ar" }
+            val frenchCount = state.channels.count { it.detectedLanguage() == "fr" }
+            val groups = listOf(
+                Triple("All channels", state.channels.size, ""),
+                Triple("العربية", arabicCount, "__language_ar"),
+                Triple("Français", frenchCount, "__language_fr")
+            ) + state.channels.groupBy { it.group.ifBlank { "Other" } }.map { Triple(it.key, it.value.size, it.key) }
+            groups.distinctBy { it.third }.forEachIndexed { index, item ->
+                FocusRow(item.first, item.second.toString(), (index == 0 && state.searchQuery.isBlank()) || state.searchQuery == item.third) {
+                    model.setSearchQuery(item.third)
+                }
             }
         }
         Spacer(Modifier.width(38.dp))
@@ -178,7 +186,20 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
                 Text("${state.channels.size} channels", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(18.dp))
-            val filtered = if (state.searchQuery.isBlank()) state.channels else state.channels.filter { it.country.contains(state.searchQuery, true) || it.group.contains(state.searchQuery, true) }
+            val filtered = when (state.searchQuery) {
+                "", "__all" -> state.channels
+                "__language_ar" -> state.channels.filter { it.detectedLanguage() == "ar" }
+                "__language_fr" -> state.channels.filter { it.detectedLanguage() == "fr" }
+                else -> state.channels.filter { it.group.equals(state.searchQuery, true) }
+            }
+            Text(
+                when (state.searchQuery) {
+                    "__language_ar" -> "Arabic channels"
+                    "__language_fr" -> "French channels"
+                    else -> if (state.searchQuery.isBlank()) "All channels" else state.searchQuery
+                },
+                color = Muted, fontSize = 16.sp
+            )
             ChannelGrid(filtered, state.programs, state.favorites, model)
         }
     }
