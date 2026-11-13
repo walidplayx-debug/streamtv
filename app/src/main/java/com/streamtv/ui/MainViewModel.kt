@@ -38,6 +38,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    init {
+        viewModelScope.launch {
+            preferences.favoriteIds.collect { ids -> _state.value = _state.value.copy(favorites = ids) }
+        }
+    }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
     fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
@@ -46,6 +51,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val f = _state.value.favorites.toMutableSet()
         if (!f.add(channel.id)) f.remove(channel.id)
         _state.value = _state.value.copy(favorites = f)
+        viewModelScope.launch { preferences.saveFavorites(f) }
     }
     fun loadPlaylist() {
         val url = _state.value.playlistUrl
