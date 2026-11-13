@@ -149,7 +149,11 @@ private fun HomeContent(state: TvState, model: MainViewModel) {
             }
         }
         Spacer(Modifier.height(22.dp))
-        Text("Your channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Your channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text("Browse categories  ›", color = Muted, fontSize = 17.sp, modifier = Modifier.clickable { model.selectTab("Categories") }.focusable())
+        }
         Spacer(Modifier.height(14.dp))
         ChannelShelf(state.channels, state.programs, state.favorites, model)
     }
