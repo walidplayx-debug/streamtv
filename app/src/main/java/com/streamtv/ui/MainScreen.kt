@@ -8,6 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -165,7 +168,7 @@ private fun HomeContent(state: TvState, model: MainViewModel) {
                     GlassCircle(if (hero.id in state.favorites) "★" else "+") { model.toggleFavorite(hero) }
                 }
             }
-            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp))) {
+            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp)).clickable { model.select(hero) }.focusable()) {
                 ChannelArtwork(hero, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Ink.copy(alpha = .48f), Color.Transparent))))
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .82f)))))
@@ -299,8 +302,15 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
                 contentScale = ContentScale.Fit
             )
         } else {
-            Text(channel.name, color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp))
+            Box(
+                Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
+                    .background(Brush.linearGradient(channelGradient(channel.name))),
+                contentAlignment = Alignment.Center
+            ) {
+                val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                    .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
+                Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
         }
         if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
     }
@@ -392,7 +402,7 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
             }
         }
         Spacer(Modifier.width(44.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
+        Column(Modifier.weight(1f).fillMaxHeight().imePadding().verticalScroll(rememberScrollState())) {
             Text(section, color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(18.dp))
             when (section) {
@@ -413,11 +423,24 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                     WhiteButton("Import M3U file") { filePicker.launch(arrayOf("*/*")) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(24.dp))
-                        Text("Saved playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(8.dp))
-                        for (entry in state.playlists) {
-                            FocusRow(entry.name, if (entry.url == state.playlistUrl) "ACTIVE" else "LOAD", entry.url == state.playlistUrl) {
-                                model.selectPlaylist(entry)
+                        Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(10.dp))
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            state.playlists.forEach { entry ->
+                                Row(
+                                    Modifier.clip(RoundedCornerShape(18.dp))
+                                        .background(if (entry.url == state.playlistUrl) White.copy(alpha = .16f) else Glass)
+                                        .border(1.dp, White.copy(alpha = if (entry.url == state.playlistUrl) .34f else .10f), RoundedCornerShape(18.dp))
+                                        .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(entry.name, color = White, fontSize = 16.sp,
+                                        modifier = Modifier.clickable { model.selectPlaylist(entry) }.focusable().padding(vertical = 7.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("×", color = Muted, fontSize = 21.sp,
+                                        modifier = Modifier.clip(CircleShape).clickable { model.removePlaylist(entry) }.focusable()
+                                            .padding(horizontal = 8.dp, vertical = 3.dp))
+                                }
                             }
                         }
                     }
