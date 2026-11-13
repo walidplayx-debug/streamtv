@@ -1,6 +1,7 @@
 package com.streamtv.ui
 
 import android.view.ViewGroup
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
@@ -66,7 +68,7 @@ fun PlayerScreen(
         }
     }
     var error by remember(channel.url) { mutableStateOf<String?>(null) }
-    var showOverlay by remember { mutableStateOf(true) }
+    var showOverlay by remember { mutableStateOf(false) }
     var showChannelPanel by remember { mutableStateOf(false) }
     var zapLabel by remember { mutableStateOf(false) }
     val favorite = channel.id in favorites
@@ -84,7 +86,7 @@ fun PlayerScreen(
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
     }
-    LaunchedEffect(showOverlay, channel.url) {
+    LaunchedEffect(showOverlay, channel.url, showChannelPanel) {
         if (showOverlay && !showChannelPanel) {
             delay(6500)
             showOverlay = false
@@ -96,19 +98,39 @@ fun PlayerScreen(
             zapLabel = false
         }
     }
-    BackHandler { if (showChannelPanel) showChannelPanel = false else onBack() }
+    BackHandler {
+        if (showChannelPanel) showChannelPanel = false else onBack()
+    }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> { onZap(1); showOverlay = true; zapLabel = true; true }
-                    Key.DirectionDown -> { onZap(-1); showOverlay = true; zapLabel = true; true }
-                    Key.DirectionRight -> { showChannelPanel = true; showOverlay = true; true }
-                    Key.DirectionLeft -> { if (showChannelPanel) showChannelPanel = false else showOverlay = true; true }
-                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> { showOverlay = !showOverlay; true }
-                    else -> { showOverlay = true; false }
+                when (event.nativeKeyEvent.keyCode) {
+                    AndroidKeyEvent.KEYCODE_CHANNEL_UP -> {
+                        onZap(1); zapLabel = true; showOverlay = false; true
+                    }
+                    AndroidKeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                        onZap(-1); zapLabel = true; showOverlay = false; true
+                    }
+                    AndroidKeyEvent.KEYCODE_BACK -> {
+                        if (showChannelPanel) { showChannelPanel = false; true } else false
+                    }
+                    else -> when (event.key) {
+                        Key.DirectionUp -> { showOverlay = true; showChannelPanel = false; true }
+                        Key.DirectionRight -> { showChannelPanel = true; showOverlay = false; true }
+                        Key.DirectionLeft -> {
+                            if (showChannelPanel) { showChannelPanel = false; true } else false
+                        }
+                        Key.DirectionDown -> {
+                            if (showChannelPanel) false else { showOverlay = false; true }
+                        }
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                            if (!showChannelPanel) showOverlay = !showOverlay
+                            true
+                        }
+                        else -> false
+                    }
                 }
             }
     ) {
@@ -182,7 +204,7 @@ fun PlayerScreen(
                         val selected = item.id == channel.id
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                             .background(if (selected) PlayerWhite else Color.White.copy(alpha = .07f))
-                            .clickable { onSelect(item); showChannelPanel = false; showOverlay = true }
+                            .clickable { onSelect(item); showChannelPanel = false; showOverlay = false }
                             .focusable().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (!item.logo.isNullOrBlank()) AsyncImage(model = item.logo, contentDescription = null, modifier = Modifier.size(42.dp))
                             else Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF45454A)), contentAlignment = Alignment.Center) {
