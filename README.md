@@ -18,14 +18,14 @@ A personal Android TV IPTV player. No channels, playlists, logos, or third-party
 Requires JDK 17, Android SDK platform 34, and Android build tools. From the repository root:
 
 ```bash
-gradle lint testDebugUnitTest assembleRelease
+./gradlew lint testDebugUnitTest assembleRelease
 ```
 
 GitHub Actions runs the same checks and publishes a signed APK as the `latest` GitHub Release when a build on `main` succeeds.
 
 ## Install
 
-Download `streamtv.apk` from the latest release and install it on an Android TV device. Enable installation from the browser/file manager if Android asks.
+Download [streamtv.apk](https://github.com/walidplayx-debug/streamtv/releases/download/latest/streamtv.apk) from the latest release and install it on an Android TV device. Enable installation from the browser/file manager if Android asks.
 
 ## Playlist
 
