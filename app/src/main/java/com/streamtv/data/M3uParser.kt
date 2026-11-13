@@ -26,7 +26,7 @@ object M3uParser {
                     val attrs = attribute.findAll(raw).associate { m ->
                         m.groupValues[1].lowercase() to (m.groupValues[2].ifEmpty { m.groupValues[3].ifEmpty { m.groupValues[4] } })
                     }
-                    val title = displayTitle(raw).ifEmpty { attrs["tvg-name"] ?: "Channel \${result.size + 1}" }
+                    val title = displayTitle(raw).ifEmpty { attrs["tvg-name"] ?: "Channel ${result.size + 1}" }
                     val url = line
                     val id = attrs["tvg-id"]?.takeIf { it.isNotBlank() } ?: "$title|$url"
                     if (result.none { it.id == id && it.url == url }) {
