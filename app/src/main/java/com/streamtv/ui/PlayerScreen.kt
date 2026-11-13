@@ -17,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -70,6 +72,8 @@ fun PlayerScreen(
     var showOverlay by remember { mutableStateOf(false) }
     var showChannelPanel by remember { mutableStateOf(false) }
     var zapLabel by remember { mutableStateOf(false) }
+    val playerFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
     val favorite = channel.id in favorites
     val current = playerProgram(channel, programs)
     val next = programs.filter { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis > System.currentTimeMillis() }
@@ -103,6 +107,7 @@ fun PlayerScreen(
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
+            .focusRequester(playerFocusRequester).focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
@@ -116,17 +121,22 @@ fun PlayerScreen(
                         if (showChannelPanel) { showChannelPanel = false; true } else false
                     }
                     else -> when (event.key) {
-                        Key.DirectionUp -> { showOverlay = true; showChannelPanel = false; true }
-                        Key.DirectionRight -> { showChannelPanel = true; showOverlay = false; true }
+                        Key.DirectionUp -> {
+                            if (showChannelPanel) false else { onZap(1); zapLabel = true; showOverlay = false; true }
+                        }
+                        Key.DirectionDown -> {
+                            if (showChannelPanel) false else { onZap(-1); zapLabel = true; showOverlay = false; true }
+                        }
+                        Key.DirectionRight -> {
+                            showChannelPanel = true
+                            showOverlay = false
+                            true
+                        }
                         Key.DirectionLeft -> {
                             if (showChannelPanel) { showChannelPanel = false; true } else false
                         }
-                        Key.DirectionDown -> {
-                            if (showChannelPanel) false else { showOverlay = false; true }
-                        }
                         Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                            if (!showChannelPanel) showOverlay = !showOverlay
-                            true
+                            if (showChannelPanel) false else { showOverlay = true; true }
                         }
                         else -> false
                     }
