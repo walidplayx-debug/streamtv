@@ -415,7 +415,7 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                         Spacer(Modifier.height(24.dp))
                         Text("Saved playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
-                        state.playlists.forEach { entry ->
+                        for (entry in state.playlists) {
                             FocusRow(entry.name, if (entry.url == state.playlistUrl) "ACTIVE" else "LOAD", entry.url == state.playlistUrl) {
                                 model.selectPlaylist(entry)
                             }
