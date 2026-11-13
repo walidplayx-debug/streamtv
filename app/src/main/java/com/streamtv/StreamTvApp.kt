@@ -1,14 +1,14 @@
 package com.streamtv
 
 import android.app.Application
-import coil3.ImageLoader
-import coil3.SingletonImageLoader
-import coil3.disk.DiskCache
+import coil.Coil
+import coil.ImageLoader
+import coil.disk.DiskCache
 
 class StreamTvApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        SingletonImageLoader.setSafe {
+        Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .diskCache {
                     DiskCache.Builder()
@@ -18,6 +18,6 @@ class StreamTvApp : Application() {
                 }
                 .crossfade(true)
                 .build()
-        }
+        )
     }
 }
