@@ -1,177 +1,429 @@
 package com.streamtv.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.streamtv.data.Channel
 import com.streamtv.data.EpgProgram
-import coil.compose.AsyncImage
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private val Ink = Color(0xFF000000)
+private val Surface = Color(0xFF0C0C0E)
+private val Raised = Color(0xFF1C1C1E)
+private val White = Color(0xFFFFFFFF)
+private val Muted = Color(0xFF99999E)
+private val Accent = Color(0xFFFF7130)
+private val Glass = Color(0xFF29292C)
 
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
     if (state.playing && state.selected != null) {
-        PlayerScreen(state.selected, model::stopPlaying, model::zap)
+        PlayerScreen(
+            channel = state.selected,
+            channels = state.channels,
+            programs = state.programs,
+            favorites = state.favorites,
+            onBack = model::stopPlaying,
+            onZap = model::zap,
+            onSelect = model::select,
+            onFavorite = model::toggleFavorite
+        )
         return
     }
-    Row(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF17131B), Color(0xFF07070B)))).padding(28.dp)) {
-        Column(Modifier.width(210.dp).fillMaxHeight()) {
-            Text("streamtv", fontSize = 30.sp, color = Color(0xFFFF8A36))
-            Spacer(Modifier.height(28.dp))
-            listOf("Home", "Live TV", "Categories", "Favorites", "Search", "Settings").forEach { tab ->
-                Surface(
-                    color = if (state.tab == tab) Color(0x33FF7A32) else Color.Transparent,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable { model.selectTab(tab) }.focusable()
-                ) { Text(tab, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), fontSize = 18.sp) }
+
+    Column(Modifier.fillMaxSize().background(Ink).padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)) {
+        TopNavigation(state.tab, model::selectTab)
+        Spacer(Modifier.height(30.dp))
+        when (state.tab) {
+            "Live TV" -> LiveContent(state, model)
+            "Categories" -> CategoryContent(state.channels, model)
+            "Favorites" -> {
+                ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} saved channels")
+                Spacer(Modifier.height(20.dp))
+                ChannelGrid(state.channels.filter { it.id in state.favorites }, state.programs, state.favorites, model)
             }
-            Spacer(Modifier.weight(1f))
-            Text("Your playlist. Your TV.", color = Color.LightGray, fontSize = 12.sp)
-        }
-        Spacer(Modifier.width(28.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            when (state.tab) {
-                "Settings" -> SettingsContent(state, model)
-                "Categories" -> CategoryContent(state.channels, model)
-                "Search" -> SearchContent(state, model)
-                "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model, state.favorites, state.programs)
-                else -> {
-                    Text(if (state.tab == "Home") "Welcome back" else "Live TV", fontSize = 30.sp)
-                    Spacer(Modifier.height(18.dp))
-                    if (state.channels.isEmpty()) SetupCard(state, model)
-                    else {
-                        Text("${state.channels.size} channels available", color = Color.LightGray)
-                        if (state.tab == "Home") {
-                            Spacer(Modifier.height(14.dp))
-                            HomeHero(state.channels.firstOrNull(), model)
-                            Spacer(Modifier.height(18.dp))
-                            Text("Your channels", fontSize = 21.sp)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        ChannelList(state.channels, model, state.favorites, state.programs)
-                    }
-                }
-            }
+            "Search" -> SearchContent(state, model)
+            "Settings" -> SettingsContent(state, model)
+            else -> HomeContent(state, model)
         }
     }
 }
 
+@Composable
+private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("streamtv", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("Home", "Live TV", "Favorites", "Search", "Settings").forEach { item ->
+                val selected = tab == item || (tab == "Categories" && item == "Live TV")
+                FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()), color = Muted, fontSize = 19.sp)
+    }
+}
 
-@Composable private fun HomeHero(channel: Channel?, model: MainViewModel) {
-    if (channel == null) return
-    Row(
-        Modifier.fillMaxWidth().height(190.dp)
-            .background(Brush.horizontalGradient(listOf(Color(0xFF30201B), Color(0xFF17151D), Color(0xFF111018))), RoundedCornerShape(26.dp))
-            .padding(24.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+@Composable
+private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 500f), label = "pillScale")
+    Box(
+        modifier.scale(scale).clip(CircleShape)
+            .background(if (selected) White.copy(alpha = .18f) else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick).focusable().padding(horizontal = 20.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) { Text(text, color = if (selected) White else White.copy(alpha = .65f), fontSize = 17.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) }
+}
+
+@Composable
+private fun HomeContent(state: TvState, model: MainViewModel) {
+    if (state.channels.isEmpty()) {
+        EmptyState(
+            title = "Your TV starts here",
+            message = "Add an M3U playlist to bring your channels together.",
+            button = if (state.loading) "Loading…" else "Add your playlist",
+            onClick = { model.selectTab("Settings") }
+        )
+        return
+    }
+    val hero = state.selected ?: state.channels.first()
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 32.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(Accent))
+                    Spacer(Modifier.width(10.dp))
+                    Text("LIVE  ·  ${hero.name}", color = Muted, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(hero.name, color = White, fontSize = 54.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(10.dp))
+                Text(currentProgram(hero, state.programs)?.title ?: hero.group, color = Muted, fontSize = 21.sp, maxLines = 2)
+                Spacer(Modifier.height(24.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    WhiteButton("Watch live") { model.select(hero) }
+                    Spacer(Modifier.width(14.dp))
+                    GlassCircle(if (hero.id in state.favorites) "★" else "+") { model.toggleFavorite(hero) }
+                }
+            }
+            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp))) {
+                ChannelArtwork(hero, Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Ink.copy(alpha = .48f), Color.Transparent))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .82f)))))
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        Text("Your channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(14.dp))
+        ChannelShelf(state.channels, state.programs, state.favorites, model)
+    }
+}
+
+@Composable
+private fun LiveContent(state: TvState, model: MainViewModel) {
+    Row(Modifier.fillMaxSize()) {
+        Column(Modifier.width(250.dp).fillMaxHeight()) {
+            Text("Live TV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(24.dp))
+            val groups = listOf("All channels" to state.channels.size) + state.channels.groupBy { it.country.ifBlank { it.group } }.map { it.key to it.value.size }
+            groups.distinctBy { it.first }.forEachIndexed { index, item ->
+                FocusRow(item.first, item.second.toString(), index == 0) { model.setSearchQuery(if (index == 0) "" else item.first) }
+            }
+        }
+        Spacer(Modifier.width(38.dp))
         Column(Modifier.weight(1f)) {
-            Text("LIVE NOW", color = Color(0xFFFF9A56), fontSize = 12.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(channel.name, fontSize = 30.sp, color = Color.White)
-            Text(channel.group, color = Color.LightGray, fontSize = 15.sp)
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = { model.select(channel) }) { Text("Watch live") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("All channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Text("${state.channels.size} channels", color = Muted, fontSize = 17.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+            val filtered = if (state.searchQuery.isBlank()) state.channels else state.channels.filter { it.country.contains(state.searchQuery, true) || it.group.contains(state.searchQuery, true) }
+            ChannelGrid(filtered, state.programs, state.favorites, model)
         }
-        Text("▶", color = Color(0xFFFF8A36), fontSize = 48.sp, modifier = Modifier.padding(horizontal = 36.dp))
     }
 }
 
-@Composable private fun SetupCard(state: TvState, model: MainViewModel) {
-    Column(Modifier.fillMaxWidth().background(Color(0xFF19171D), RoundedCornerShape(26.dp)).padding(28.dp)) {
-        Text("Add your playlist", fontSize = 25.sp)
-        Spacer(Modifier.height(8.dp))
-        Text("Paste your M3U / M3U8 link. You can add an optional XMLTV guide from Settings.", color = Color.LightGray)
-        Spacer(Modifier.height(18.dp))
-        OutlinedTextField(value = state.playlistUrl, onValueChange = model::setUrl, label = { Text("Playlist URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = model::loadPlaylist, enabled = !state.loading && state.playlistUrl.isNotBlank()) {
-            Text(if (state.loading) "Loading…" else "Load channels")
+@Composable
+private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
+    if (channels.isEmpty()) {
+        EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 24.dp, end = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(22.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        gridItems(channels, key = { it.id }) { channel ->
+            ChannelCard(channel, programs, channel.id in favorites) { model.select(channel) }
         }
-        state.error?.let { Text(it, color = Color(0xFFFF806F), modifier = Modifier.padding(top = 12.dp)) }
     }
 }
 
-
-@Composable private fun SearchContent(state: TvState, model: MainViewModel) {
-    Text("Search channels", fontSize = 30.sp)
-    Spacer(Modifier.height(14.dp))
-    OutlinedTextField(value = state.searchQuery, onValueChange = model::setSearchQuery, label = { Text("Channel name or category") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    Spacer(Modifier.height(14.dp))
-    val query = state.searchQuery.trim()
-    val matches = if (query.isEmpty()) emptyList() else state.channels.filter {
-        it.name.contains(query, true) || it.group.contains(query, true) || it.country.contains(query, true)
+@Composable
+private fun ChannelShelf(channels: List<Channel>, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(end = 30.dp, bottom = 12.dp)
+    ) {
+        items(channels.take(18), key = { it.id }) { channel ->
+            Column(Modifier.width(232.dp)) {
+                ChannelCard(channel, programs, channel.id in favorites, Modifier.width(232.dp).height(130.dp)) { model.select(channel) }
+                Spacer(Modifier.height(8.dp))
+                Text(channel.name, color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(currentProgram(channel, programs)?.title ?: channel.group, color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
-    Text("${matches.size} matches", color = Color.LightGray)
-    Spacer(Modifier.height(8.dp))
-    ChannelList(matches, model, state.favorites, state.programs)
 }
 
-@Composable private fun SettingsContent(state: TvState, model: MainViewModel) {
-    Text("Settings", fontSize = 30.sp)
-    Spacer(Modifier.height(18.dp))
-    OutlinedTextField(value = state.playlistUrl, onValueChange = model::setUrl, label = { Text("M3U playlist URL") }, modifier = Modifier.fillMaxWidth())
-    Spacer(Modifier.height(12.dp))
-    Button(onClick = model::loadPlaylist, enabled = state.playlistUrl.isNotBlank() && !state.loading) { Text("Refresh playlist") }
-    Spacer(Modifier.height(18.dp))
-    OutlinedTextField(value = state.epgUrl, onValueChange = model::setEpgUrl, label = { Text("Optional XMLTV / XMLTV.GZ URL") }, modifier = Modifier.fillMaxWidth())
-    Spacer(Modifier.height(10.dp))
-    Button(onClick = model::loadEpg, enabled = state.epgUrl.isNotBlank()) { Text("Load TV guide") }
-    state.error?.let { Text(it, color = Color(0xFFFF806F)) }
-    Text("${state.programs.size} guide programmes loaded", color = Color.LightGray)
+@Composable
+private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.07f else 1f, spring(dampingRatio = .72f, stiffness = 360f), label = "cardScale")
+    Box(
+        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(20.dp))
+            .border(if (focused) 1.dp else 0.dp, White.copy(alpha = if (focused) .30f else 0f), RoundedCornerShape(20.dp))
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick).focusable()
+    ) {
+        ChannelArtwork(channel, Modifier.fillMaxSize())
+        Box(Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(10.dp)).background(Glass.copy(alpha = .88f)).padding(7.dp)) {
+            if (!channel.logo.isNullOrBlank()) AsyncImage(model = channel.logo, contentDescription = null, modifier = Modifier.size(width = 58.dp, height = 30.dp))
+            else Text(channel.name.take(1).uppercase(), color = White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        }
+        if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(10.dp), color = Accent, fontSize = 19.sp)
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(White.copy(alpha = .22f)))
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(.62f).height(3.dp).background(White.copy(alpha = .9f)))
+    }
 }
 
-@Composable private fun CategoryContent(channels: List<Channel>, model: MainViewModel) {
-    Text("Categories", fontSize = 30.sp)
+@Composable
+private fun ChannelArtwork(channel: Channel, modifier: Modifier = Modifier) {
+    if (!channel.logo.isNullOrBlank()) {
+        Box(modifier.background(channelColor(channel.name))) {
+            AsyncImage(model = channel.logo, contentDescription = channel.name, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .22f)))))
+        }
+    } else {
+        Box(modifier.background(Brush.linearGradient(channelGradient(channel.name)))) {
+            Box(Modifier.align(Alignment.TopEnd).offset(x = 20.dp, y = (-18).dp).size(110.dp).background(White.copy(alpha = .10f), CircleShape))
+            Text(channel.name.take(1).uppercase(), Modifier.align(Alignment.Center), color = White.copy(alpha = .72f), fontSize = 54.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+private fun channelColor(name: String): Color {
+    val colors = listOf(Color(0xFF25272B), Color(0xFF292624), Color(0xFF25292A), Color(0xFF2B282D), Color(0xFF292A25))
+    return colors[(name.hashCode().ushr(1) % colors.size)]
+}
+private fun channelGradient(name: String): List<Color> {
+    val palettes = listOf(
+        listOf(Color(0xFF30363B), Color(0xFF202428), Color(0xFF141719)),
+        listOf(Color(0xFF3A3430), Color(0xFF29231F), Color(0xFF171513)),
+        listOf(Color(0xFF34343A), Color(0xFF25252B), Color(0xFF151519)),
+        listOf(Color(0xFF303A39), Color(0xFF222B2A), Color(0xFF141A19))
+    )
+    return palettes[name.hashCode().ushr(1) % palettes.size]
+}
+
+@Composable
+private fun CategoryContent(channels: List<Channel>, model: MainViewModel) {
+    ScreenHeading("Browse", "Explore channels by category")
+    Spacer(Modifier.height(22.dp))
+    val groups = channels.groupBy { it.group.ifBlank { "Other" } }.toList()
+    if (groups.isEmpty()) {
+        EmptyState("Nothing to browse", "Add a playlist to see your channel categories.", "Add playlist") { model.selectTab("Settings") }
+    } else {
+        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            gridItems(groups, key = { it.first }) { (name, items) ->
+                var focused by remember { mutableStateOf(false) }
+                val scale by animateFloatAsState(if (focused) 1.06f else 1f, spring(stiffness = 360f), label = "categoryScale")
+                Column(Modifier.scale(scale).fillMaxWidth().height(160.dp).clip(RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(channelGradient(name))).onFocusChanged { focused = it.isFocused }
+                    .clickable { model.selectTab("Live TV"); model.setSearchQuery(name) }.focusable().padding(18.dp), verticalArrangement = Arrangement.Bottom) {
+                    Text(name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${items.size} channels", color = White.copy(alpha = .62f), fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchContent(state: TvState, model: MainViewModel) {
+    ScreenHeading("Search", "Find a channel or category")
     Spacer(Modifier.height(16.dp))
-    val groups = channels.groupBy { it.group }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(groups.keys.toList()) { group ->
-            Row(Modifier.fillMaxWidth().background(Color(0xFF1A181F), RoundedCornerShape(14.dp)).clickable { model.selectTab("Live TV") }.padding(16.dp)) {
-                Text(group, modifier = Modifier.weight(1f))
-                Text("${groups[group]?.size ?: 0} channels", color = Color.LightGray)
+    GlassInput(state.searchQuery, "Search channels", model::setSearchQuery, Modifier.fillMaxWidth(.62f))
+    Spacer(Modifier.height(16.dp))
+    val q = state.searchQuery.trim()
+    val matches = if (q.isEmpty()) emptyList() else state.channels.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
+    Text(if (q.isEmpty()) "Start typing to search" else "${matches.size} results", color = Muted, fontSize = 17.sp)
+    Spacer(Modifier.height(14.dp))
+    ChannelGrid(matches, state.programs, state.favorites, model)
+}
+
+@Composable
+private fun SettingsContent(state: TvState, model: MainViewModel) {
+    var section by remember { mutableStateOf("Playlist") }
+    Row(Modifier.fillMaxSize()) {
+        Column(Modifier.width(270.dp)) {
+            Text("Settings", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(26.dp))
+            listOf("Playback", "Playlist", "Language", "Parental control", "TV guide", "Appearance", "About").forEach { item ->
+                FocusRow(item, if (item == section) "●" else "", item == section) { section = item }
+            }
+        }
+        Spacer(Modifier.width(44.dp))
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            Text(section, color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(18.dp))
+            when (section) {
+                "Playlist" -> {
+                    SettingsRow("M3U playlist URL", "Paste your playlist address") {
+                        GlassInput(state.playlistUrl, "https://…", model::setUrl, Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    WhiteButton(if (state.loading) "Loading…" else "Load playlist") { if (!state.loading) model.loadPlaylist() }
+                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
+                    Text("${state.channels.size} channels loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
+                }
+                "TV guide" -> {
+                    SettingsRow("XMLTV guide URL", "Optional programme guide") {
+                        GlassInput(state.epgUrl, "https://…", model::setEpgUrl, Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    WhiteButton("Load TV guide") { model.loadEpg() }
+                    Text("${state.programs.size} programmes loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
+                }
+                "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
+                "Language" -> SettingsRow("Interface language", "System default")
+                "Parental control" -> SettingsRow("Parental lock", "Not configured")
+                "Appearance" -> SettingsRow("Theme", "Dark · tvOS inspired")
+                else -> SettingsRow("streamtv", "Version 1.0.0")
             }
         }
     }
 }
 
-@Composable private fun ChannelList(channels: List<Channel>, model: MainViewModel, favorites: Set<String>, programs: List<EpgProgram>) {
-    if (channels.isEmpty()) Text("Nothing here yet. Add a playlist in Home.", color = Color.LightGray)
-    else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(channels, key = { it.id }) { channel ->
-            Row(Modifier.fillMaxWidth().background(Color(0xFF1A181F), RoundedCornerShape(16.dp))
-                .clickable { model.select(channel) }.focusable().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!channel.logo.isNullOrBlank()) {
-                    AsyncImage(model = channel.logo, contentDescription = channel.name, modifier = Modifier.size(54.dp))
-                } else {
-                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF302B33), modifier = Modifier.size(54.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Text(channel.name.take(1).uppercase(), color = Color(0xFFFFA06B), fontSize = 22.sp) }
-                    }
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(channel.name, fontSize = 18.sp)
-                    Text(channel.group, color = Color.LightGray, fontSize = 13.sp)
-                    val now = System.currentTimeMillis()
-                    val current = programs.firstOrNull { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis <= now && it.endEpochMillis > now }
-                    val next = programs.filter { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis > now }.minByOrNull { it.startEpochMillis }
-                    if (current != null) Text("NOW · ${current.title}", color = Color(0xFFFFB27A), fontSize = 12.sp)
-                    else if (next != null) Text("NEXT · ${next.title}", color = Color.LightGray, fontSize = 12.sp)
-                }
-                Text(if (channel.id in favorites) "★" else "☆", color = Color(0xFFFF8A36), fontSize = 24.sp, modifier = Modifier.clickable { model.toggleFavorite(channel) }.padding(horizontal = 16.dp))
-                Text("▶", color = Color(0xFFFF8A36), fontSize = 20.sp)
+@Composable
+private fun SettingsRow(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit = {}) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(White.copy(alpha = .07f)).padding(20.dp)) {
+        Text(title, color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        Text(subtitle, color = Muted, fontSize = 16.sp)
+        Spacer(Modifier.height(12.dp))
+        content()
+    }
+}
+
+@Composable
+private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
+        .background(if (focused) White else if (selected) White.copy(alpha = .10f) else Color.Transparent)
+        .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick).focusable()
+        .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), color = if (focused) Ink else if (selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(trailing, color = if (focused) Ink.copy(alpha = .55f) else Muted, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun ScreenHeading(title: String, subtitle: String) {
+    Column {
+        Text(title, color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
+        Text(subtitle, color = Muted, fontSize = 17.sp)
+    }
+}
+
+@Composable
+private fun EmptyState(title: String, message: String, button: String, onClick: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 620.dp)) {
+            Box(Modifier.size(112.dp).clip(CircleShape).background(Glass), contentAlignment = Alignment.Center) {
+                Text("＋", color = White, fontSize = 48.sp)
             }
+            Spacer(Modifier.height(24.dp))
+            Text(title, color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(message, color = Muted, fontSize = 19.sp)
+            Spacer(Modifier.height(22.dp))
+            WhiteButton(button, onClick)
         }
     }
+}
+
+@Composable
+private fun WhiteButton(text: String, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 430f), label = "buttonScale")
+    Box(Modifier.scale(scale).clip(CircleShape).background(White).onFocusChanged { focused = it.isFocused }
+        .clickable(onClick = onClick).focusable().padding(horizontal = 26.dp, vertical = 14.dp)) {
+        Text(text, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun GlassCircle(text: String, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Box(Modifier.size(58.dp).scale(if (focused) 1.06f else 1f).clip(CircleShape).background(Glass)
+        .border(1.dp, White.copy(alpha = .12f), CircleShape).onFocusChanged { focused = it.isFocused }
+        .clickable(onClick = onClick).focusable(), contentAlignment = Alignment.Center) {
+        Text(text, color = if (text == "★") Accent else White, fontSize = 25.sp)
+    }
+}
+
+@Composable
+private fun GlassInput(value: String, hint: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.clip(RoundedCornerShape(16.dp)).background(Glass).border(1.dp, White.copy(alpha = .10f), RoundedCornerShape(16.dp)).padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(value = value, onValueChange = onValueChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp), modifier = Modifier.fillMaxWidth(), decorationBox = { inner ->
+            if (value.isEmpty()) Text(hint, color = Muted, fontSize = 18.sp)
+            inner()
+        })
+    }
+}
+
+private fun currentProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
+    val now = System.currentTimeMillis()
+    return programs.firstOrNull { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis <= now && it.endEpochMillis > now }
 }
