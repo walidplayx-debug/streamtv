@@ -106,11 +106,29 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
     val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 500f), label = "pillScale")
     Box(
         modifier.scale(scale).clip(CircleShape)
-            .background(if (selected) White.copy(alpha = .18f) else Color.Transparent)
+            .background(
+                when {
+                    focused -> Brush.verticalGradient(listOf(Color(0xFFF2F5F8), Color(0xFFD4DCE5)))
+                    selected -> Brush.verticalGradient(listOf(White.copy(alpha = .24f), White.copy(alpha = .14f)))
+                    else -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                }
+            )
+            .border(
+                width = if (focused) 2.dp else if (selected) 1.dp else 0.dp,
+                color = if (focused) White.copy(alpha = .95f) else White.copy(alpha = .16f),
+                shape = CircleShape
+            )
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick).focusable().padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
-    ) { Text(text, color = if (selected) White else White.copy(alpha = .65f), fontSize = 17.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) }
+    ) {
+        Text(
+            text,
+            color = if (focused) Color(0xFF171B22) else if (selected) White else White.copy(alpha = .72f),
+            fontSize = 17.sp,
+            fontWeight = if (focused || selected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
 }
 
 @Composable
