@@ -65,4 +65,5 @@ jobs:
           target_commitish: main
           make_latest: true
           prerelease: false
+          overwrite_files: true
           files: release/streamtv.apk
