@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -162,45 +163,60 @@ private fun HomeContent(state: TvState, model: MainViewModel) {
 
 @Composable
 private fun LiveContent(state: TvState, model: MainViewModel) {
+    val countryGroups = state.channels.filter { it.country.isNotBlank() }
+        .groupBy { it.country.trim().uppercase() }.toSortedMap()
+    val categoryGroups = state.channels.groupBy { it.group.ifBlank { "Other" } }.toSortedMap()
+    val languageGroups = listOf(
+        Triple("العربية", "__language_ar", state.channels.count { it.detectedLanguage() == "ar" }),
+        Triple("Français", "__language_fr", state.channels.count { it.detectedLanguage() == "fr" })
+    ).filter { it.third > 0 }
+    val filtered = when {
+        state.searchQuery.isBlank() || state.searchQuery == "__all" -> state.channels
+        state.searchQuery == "__language_ar" -> state.channels.filter { it.detectedLanguage() == "ar" }
+        state.searchQuery == "__language_fr" -> state.channels.filter { it.detectedLanguage() == "fr" }
+        state.searchQuery.startsWith("__country:") -> state.channels.filter { it.country.equals(state.searchQuery.removePrefix("__country:"), true) }
+        else -> state.channels.filter { it.group.equals(state.searchQuery, true) }
+    }
+    val heading = when {
+        state.searchQuery == "__language_ar" -> "العربية"
+        state.searchQuery == "__language_fr" -> "Français"
+        state.searchQuery.startsWith("__country:") -> state.searchQuery.removePrefix("__country:")
+        state.searchQuery.isBlank() || state.searchQuery == "__all" -> "All channels"
+        else -> state.searchQuery
+    }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(250.dp).fillMaxHeight()) {
             Text("Live TV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(24.dp))
-            val arabicCount = state.channels.count { it.detectedLanguage() == "ar" }
-            val frenchCount = state.channels.count { it.detectedLanguage() == "fr" }
-            val groups = listOf(
-                Triple("All channels", state.channels.size, ""),
-                Triple("العربية", arabicCount, "__language_ar"),
-                Triple("Français", frenchCount, "__language_fr")
-            ) + state.channels.groupBy { it.group.ifBlank { "Other" } }.map { Triple(it.key, it.value.size, it.key) }
-            groups.distinctBy { it.third }.forEachIndexed { index, item ->
-                FocusRow(item.first, item.second.toString(), (index == 0 && state.searchQuery.isBlank()) || state.searchQuery == item.third) {
-                    model.setSearchQuery(item.third)
+            Spacer(Modifier.height(18.dp))
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item { FocusRow("All channels", state.channels.size.toString(), state.searchQuery.isBlank() || state.searchQuery == "__all") { model.setSearchQuery("__all") } }
+                if (languageGroups.isNotEmpty()) {
+                    item { Text("BY LANGUAGE", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    items(languageGroups) { item ->
+                        FocusRow(item.first, item.third.toString(), state.searchQuery == item.second) { model.setSearchQuery(item.second) }
+                    }
+                }
+                if (countryGroups.isNotEmpty()) {
+                    item { Text("BY COUNTRY", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    items(countryGroups.toList()) { (country, channels) ->
+                        val token = "__country:$country"
+                        FocusRow(country, channels.size.toString(), state.searchQuery == token) { model.setSearchQuery(token) }
+                    }
+                }
+                item { Text("BY CATEGORY", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                items(categoryGroups.toList()) { (name, channels) ->
+                    FocusRow(name, channels.size.toString(), state.searchQuery == name) { model.setSearchQuery(name) }
                 }
             }
         }
-        Spacer(Modifier.width(38.dp))
+        Spacer(Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("All channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
+                Text(heading, color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                Text("${state.channels.size} channels", color = Muted, fontSize = 17.sp)
+                Text("${filtered.size} channels", color = Muted, fontSize = 17.sp)
             }
-            Spacer(Modifier.height(18.dp))
-            val filtered = when (state.searchQuery) {
-                "", "__all" -> state.channels
-                "__language_ar" -> state.channels.filter { it.detectedLanguage() == "ar" }
-                "__language_fr" -> state.channels.filter { it.detectedLanguage() == "fr" }
-                else -> state.channels.filter { it.group.equals(state.searchQuery, true) }
-            }
-            Text(
-                when (state.searchQuery) {
-                    "__language_ar" -> "Arabic channels"
-                    "__language_fr" -> "French channels"
-                    else -> if (state.searchQuery.isBlank()) "All channels" else state.searchQuery
-                },
-                color = Muted, fontSize = 16.sp
-            )
+            Spacer(Modifier.height(14.dp))
             ChannelGrid(filtered, state.programs, state.favorites, model)
         }
     }
@@ -220,7 +236,7 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         gridItems(channels, key = { it.id }) { channel ->
-            ChannelCard(channel, programs, channel.id in favorites) { model.select(channel) }
+            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(82.dp)) { model.select(channel) }
         }
     }
 }
@@ -245,21 +261,27 @@ private fun ChannelShelf(channels: List<Channel>, programs: List<EpgProgram>, fa
 @Composable
 private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.07f else 1f, spring(dampingRatio = .72f, stiffness = 360f), label = "cardScale")
+    val scale by animateFloatAsState(if (focused) 1.035f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "cardScale")
     Box(
-        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(20.dp))
-            .border(if (focused) 1.dp else 0.dp, White.copy(alpha = if (focused) .30f else 0f), RoundedCornerShape(20.dp))
+        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(14.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF252A33), Color(0xFF171B22))))
+            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .82f else .07f), RoundedCornerShape(14.dp))
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick).focusable()
+            .clickable(onClick = onClick).focusable(),
+        contentAlignment = Alignment.Center
     ) {
-        ChannelArtwork(channel, Modifier.fillMaxSize())
-        Box(Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(10.dp)).background(Glass.copy(alpha = .88f)).padding(7.dp)) {
-            if (!channel.logo.isNullOrBlank()) AsyncImage(model = channel.logo, contentDescription = null, modifier = Modifier.size(width = 58.dp, height = 30.dp))
-            else Text(channel.name.take(1).uppercase(), color = White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        if (!channel.logo.isNullOrBlank()) {
+            AsyncImage(
+                model = channel.logo,
+                contentDescription = channel.name,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Text(channel.name, color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp))
         }
-        if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(10.dp), color = Accent, fontSize = 19.sp)
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(White.copy(alpha = .22f)))
-        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(.62f).height(3.dp).background(White.copy(alpha = .9f)))
+        if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
     }
 }
 
