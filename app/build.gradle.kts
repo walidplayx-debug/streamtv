@@ -8,10 +8,11 @@ android {
     namespace = "com.streamtv"
     compileSdk = 34
     defaultConfig {
+        val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         applicationId = "com.streamtv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
+        versionCode = ciVersionCode
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
