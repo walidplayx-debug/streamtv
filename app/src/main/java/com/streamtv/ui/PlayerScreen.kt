@@ -62,7 +62,10 @@ fun PlayerScreen(channel: Channel, onBack: () -> Unit, onZap: (Int) -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(channel.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
                 Text(channel.group, color = Color.LightGray)
-                error?.let { Text(it, color = Color(0xFFFF806F)) }
+                error?.let {
+                    Text(it, color = Color(0xFFFF806F))
+                    TextButton(onClick = { error = null; player.prepare(); player.playWhenReady = true }) { Text("Retry") }
+                }
             }
             TextButton(onClick = onBack) { Text("Back to channels") }
         }
