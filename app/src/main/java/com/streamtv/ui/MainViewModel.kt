@@ -21,6 +21,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
     private val dao = StreamDatabase.get(application).channelDao()
     private val preferences = PlaylistPreferences(application)
+    private val _state = MutableStateFlow(TvState())
+    val state: StateFlow<TvState> = _state
     init {
         viewModelScope.launch {
             preferences.playlistUrl.collect { saved ->
@@ -36,8 +38,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    private val _state = MutableStateFlow(TvState())
-    val state: StateFlow<TvState> = _state
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
     fun select(channel: Channel) { _state.value = _state.value.copy(selected = channel, playing = true) }
