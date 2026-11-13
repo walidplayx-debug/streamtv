@@ -21,7 +21,7 @@ import com.streamtv.data.EpgProgram
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
     if (state.playing && state.selected != null) {
-        PlayerScreen(state.selected, model::stopPlaying)
+        PlayerScreen(state.selected, model::stopPlaying, model::zap)
         return
     }
     Row(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF17131B), Color(0xFF07070B)))).padding(28.dp)) {
