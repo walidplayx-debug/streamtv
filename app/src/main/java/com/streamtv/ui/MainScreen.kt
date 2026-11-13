@@ -28,7 +28,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         Column(Modifier.width(210.dp).fillMaxHeight()) {
             Text("streamtv", fontSize = 30.sp, color = Color(0xFFFF8A36))
             Spacer(Modifier.height(28.dp))
-            listOf("Home", "Live TV", "Favorites", "Categories", "Settings").forEach { tab ->
+            listOf("Home", "Live TV", "Categories", "Favorites", "Search", "Settings").forEach { tab ->
                 Surface(
                     color = if (state.tab == tab) Color(0x33FF7A32) else Color.Transparent,
                     shape = RoundedCornerShape(14.dp),
@@ -43,6 +43,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             when (state.tab) {
                 "Settings" -> SettingsContent(state, model)
                 "Categories" -> CategoryContent(state.channels, model)
+                "Search" -> SearchContent(state, model)
                 "Favorites" -> ChannelList(state.channels.filter { it.id in state.favorites }, model, state.favorites, state.programs)
                 else -> {
                     Text(if (state.tab == "Home") "Welcome back" else "Live TV", fontSize = 30.sp)
@@ -72,6 +73,21 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         }
         state.error?.let { Text(it, color = Color(0xFFFF806F), modifier = Modifier.padding(top = 12.dp)) }
     }
+}
+
+
+@Composable private fun SearchContent(state: TvState, model: MainViewModel) {
+    Text("Search channels", fontSize = 30.sp)
+    Spacer(Modifier.height(14.dp))
+    OutlinedTextField(value = state.searchQuery, onValueChange = model::setSearchQuery, label = { Text("Channel name or category") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Spacer(Modifier.height(14.dp))
+    val query = state.searchQuery.trim()
+    val matches = if (query.isEmpty()) emptyList() else state.channels.filter {
+        it.name.contains(query, true) || it.group.contains(query, true) || it.country.contains(query, true)
+    }
+    Text("${matches.size} matches", color = Color.LightGray)
+    Spacer(Modifier.height(8.dp))
+    ChannelList(matches, model, state.favorites, state.programs)
 }
 
 @Composable private fun SettingsContent(state: TvState, model: MainViewModel) {
