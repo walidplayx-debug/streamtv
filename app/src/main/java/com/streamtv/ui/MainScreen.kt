@@ -112,7 +112,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     Text(channel.name, fontSize = 18.sp)
                     Text(channel.group, color = Color.LightGray, fontSize = 13.sp)
                     val now = System.currentTimeMillis()
-                    val current = programs.firstOrNull { it.channelId == channel.id && it.startEpochMillis <= now && it.endEpochMillis > now }
+                    val current = programs.firstOrNull { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis <= now && it.endEpochMillis > now }
                     val next = programs.filter { it.channelId == channel.id && it.startEpochMillis > now }.minByOrNull { it.startEpochMillis }
                     if (current != null) Text("NOW · ${current.title}", color = Color(0xFFFFB27A), fontSize = 12.sp)
                     else if (next != null) Text("NEXT · ${next.title}", color = Color.LightGray, fontSize = 12.sp)
