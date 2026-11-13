@@ -42,7 +42,7 @@ private val Surface = Color(0xFF0C0C0E)
 private val Raised = Color(0xFF1C1C1E)
 private val White = Color(0xFFFFFFFF)
 private val Muted = Color(0xFF99999E)
-private val Accent = Color(0xFFFF7130)
+private val Accent = Color(0xFFD5DADF)
 private val Glass = Color(0xFF29292C)
 
 @Composable
@@ -82,14 +82,14 @@ fun MainScreen(state: TvState, model: MainViewModel) {
 @Composable
 private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("streamtv", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
+        Text("STREEM", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
         Spacer(Modifier.weight(1f))
         Row(
             Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Home", "Live TV", "Favorites", "Search", "Settings").forEach { item ->
-                val selected = tab == item || (tab == "Categories" && item == "Live TV")
+            listOf("Home", "Live TV", "Categories", "Favorites", "Search", "Settings").forEach { item ->
+                val selected = tab == item
                 FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
             }
         }
