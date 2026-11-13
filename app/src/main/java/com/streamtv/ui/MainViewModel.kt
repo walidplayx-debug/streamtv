@@ -8,6 +8,7 @@ import com.streamtv.data.PlaylistRepository
 import com.streamtv.data.StreamDatabase
 import com.streamtv.data.ChannelEntity
 import com.streamtv.data.PlaylistPreferences
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
