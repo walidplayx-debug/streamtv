@@ -51,12 +51,39 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     if (state.channels.isEmpty()) SetupCard(state, model)
                     else {
                         Text("${state.channels.size} channels available", color = Color.LightGray)
-                        Spacer(Modifier.height(18.dp))
+                        if (state.tab == "Home") {
+                            Spacer(Modifier.height(14.dp))
+                            HomeHero(state.channels.firstOrNull(), model)
+                            Spacer(Modifier.height(18.dp))
+                            Text("Your channels", fontSize = 21.sp)
+                        }
+                        Spacer(Modifier.height(12.dp))
                         ChannelList(state.channels, model, state.favorites, state.programs)
                     }
                 }
             }
         }
+    }
+}
+
+
+@Composable private fun HomeHero(channel: Channel?, model: MainViewModel) {
+    if (channel == null) return
+    Row(
+        Modifier.fillMaxWidth().height(190.dp)
+            .background(Brush.horizontalGradient(listOf(Color(0xFF30201B), Color(0xFF17151D), Color(0xFF111018))), RoundedCornerShape(26.dp))
+            .padding(24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("LIVE NOW", color = Color(0xFFFF9A56), fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(channel.name, fontSize = 30.sp, color = Color.White)
+            Text(channel.group, color = Color.LightGray, fontSize = 15.sp)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { model.select(channel) }) { Text("Watch live") }
+        }
+        Text("▶", color = Color(0xFFFF8A36), fontSize = 48.sp, modifier = Modifier.padding(horizontal = 36.dp))
     }
 }
 
