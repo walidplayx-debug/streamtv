@@ -97,7 +97,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         channels = channels, selected = channels.firstOrNull(), loading = false,
                         tab = "Live TV", playlistName = name, playlistUrl = localUrl, playlists = updated
                     )
-                    preferences.savePlaylists(updated.map { "${it.name}\\t${it.url}" }.toSet())
+                    preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
                     dao.clear()
                     dao.insertAll(channels.map { ChannelEntity.from(it) })
                 }
