@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.streamtv.data.Channel
 import com.streamtv.data.EpgProgram
+import coil3.compose.AsyncImage
 
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
@@ -151,6 +152,14 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         items(channels, key = { it.id }) { channel ->
             Row(Modifier.fillMaxWidth().background(Color(0xFF1A181F), RoundedCornerShape(16.dp))
                 .clickable { model.select(channel) }.focusable().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (!channel.logo.isNullOrBlank()) {
+                    AsyncImage(model = channel.logo, contentDescription = channel.name, modifier = Modifier.size(54.dp))
+                } else {
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF302B33), modifier = Modifier.size(54.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Text(channel.name.take(1).uppercase(), color = Color(0xFFFFA06B), fontSize = 22.sp) }
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(channel.name, fontSize = 18.sp)
                     Text(channel.group, color = Color.LightGray, fontSize = 13.sp)
