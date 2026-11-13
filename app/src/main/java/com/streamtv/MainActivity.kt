@@ -1,6 +1,7 @@
 package com.streamtv
 import android.os.Bundle
 import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -14,6 +15,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.setSoftInputMode(SOFT_INPUT_ADJUST_RESIZE)
         setContent { StreamTheme { val state by model.state.collectAsState(); MainScreen(state, model) } }
     }
 }
