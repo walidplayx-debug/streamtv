@@ -42,7 +42,10 @@ object XmlTvParser {
                 }
                 XmlPullParser.TEXT -> if (tag == "title") title += parser.text else if (tag == "desc") desc += parser.text
                 XmlPullParser.END_TAG -> if (parser.name == "programme" && channel.isNotBlank() && title.isNotBlank()) {
-                    result += EpgProgram(channel, title.trim(), desc.trim(), start, end)
+                    val now = System.currentTimeMillis()
+                    if (end > now - 2 * 60 * 60 * 1000L && start < now + 24 * 60 * 60 * 1000L) {
+                        result += EpgProgram(channel, title.trim(), desc.trim(), start, end)
+                    }
                 }
             }
             event = parser.next()
