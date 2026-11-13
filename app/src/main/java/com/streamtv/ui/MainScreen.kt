@@ -247,7 +247,7 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
         return
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Fixed(4),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp, end = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(22.dp),
@@ -385,11 +385,28 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
             Spacer(Modifier.height(18.dp))
             when (section) {
                 "Playlist" -> {
-                    SettingsRow("M3U playlist URL", "Paste your playlist address") {
+                    SettingsRow("Add M3U playlist", "Give your playlist a name and paste its M3U address") {
+                        GlassInput(state.playlistName, "Playlist name", model::setPlaylistName, Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(10.dp))
                         GlassInput(state.playlistUrl, "https://…", model::setUrl, Modifier.fillMaxWidth())
                     }
                     Spacer(Modifier.height(14.dp))
-                    WhiteButton(if (state.loading) "Loading…" else "Load playlist") { if (!state.loading) model.loadPlaylist() }
+                    WhiteButton(if (state.loading) "Loading…" else "Save & load playlist") {
+                        if (!state.loading) {
+                            model.savePlaylistEntry()
+                            model.loadPlaylist()
+                        }
+                    }
+                    if (state.playlists.isNotEmpty()) {
+                        Spacer(Modifier.height(24.dp))
+                        Text("Saved playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        state.playlists.forEach { entry ->
+                            FocusRow(entry.name, if (entry.url == state.playlistUrl) "ACTIVE" else "LOAD", entry.url == state.playlistUrl) {
+                                model.selectPlaylist(entry)
+                            }
+                        }
+                    }
                     state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.channels.size} channels loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
