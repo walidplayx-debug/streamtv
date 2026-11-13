@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
@@ -106,14 +105,14 @@ fun PlayerScreen(
         Modifier.fillMaxSize().background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.nativeKeyEvent.keyCode) {
-                    AndroidKeyEvent.KEYCODE_CHANNEL_UP -> {
+                when (event.key) {
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> {
                         onZap(1); zapLabel = true; showOverlay = false; true
                     }
-                    AndroidKeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> {
                         onZap(-1); zapLabel = true; showOverlay = false; true
                     }
-                    AndroidKeyEvent.KEYCODE_BACK -> {
+                    Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
                         if (showChannelPanel) { showChannelPanel = false; true } else false
                     }
                     else -> when (event.key) {
