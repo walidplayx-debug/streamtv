@@ -172,6 +172,7 @@ fun PlayerScreen(
                     Text("NOW PLAYING", color = PlayerMuted.copy(alpha = .76f), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
                     Text(channel.name, color = PlayerWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 Spacer(Modifier.width(18.dp))
                 Column(horizontalAlignment = Alignment.End) {
