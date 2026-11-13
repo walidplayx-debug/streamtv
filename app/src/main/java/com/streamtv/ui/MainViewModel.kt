@@ -34,7 +34,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val initial = saved.ifBlank { "https://iptv-org.github.io/iptv/countries/be.m3u" }
                     _state.value = _state.value.copy(playlistUrl = initial)
                     if (saved.isBlank()) preferences.savePlaylist(initial)
-                    if (_state.value.channels.isEmpty()) loadPlaylist()\n                }
+                    if (_state.value.channels.isEmpty()) loadPlaylist()
+                }
             }
         }
         viewModelScope.launch {
