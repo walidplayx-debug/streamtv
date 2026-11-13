@@ -206,10 +206,22 @@ fun PlayerScreen(
         }
 
         if (zapLabel) {
-            Row(Modifier.align(Alignment.TopStart).padding(36.dp).clip(RoundedCornerShape(16.dp)).background(PlayerGlass).padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString() }, color = PlayerAccent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(12.dp))
-                Text(channel.name, color = PlayerWhite, fontSize = 18.sp)
+            Row(
+                Modifier.align(Alignment.BottomStart).padding(start = 42.dp, bottom = 34.dp)
+                    .clip(RoundedCornerShape(15.dp)).background(PlayerGlass)
+                    .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(15.dp))
+                    .padding(horizontal = 20.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString() },
+                    color = PlayerAccent, fontSize = 18.sp, fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text(channel.name, color = PlayerWhite, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(playerProgram(channel, programs)?.title ?: channel.group, color = PlayerMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
 
@@ -220,8 +232,11 @@ fun PlayerScreen(
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(channels, key = { it.id }) { item ->
                         val selected = item.id == channel.id
+                        var focused by remember(item.id) { mutableStateOf(false) }
                         Row((if (item == channels.firstOrNull()) Modifier.focusRequester(channelListFocusRequester) else Modifier).fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                            .background(if (selected) PlayerWhite else Color.White.copy(alpha = .07f))
+                            .background(if (focused) Color(0xFFE2E7ED) else if (selected) PlayerWhite.copy(alpha = .18f) else Color.White.copy(alpha = .09f))
+                            .border(if (focused) 1.5.dp else 1.dp, if (focused) PlayerWhite.copy(alpha = .95f) else PlayerWhite.copy(alpha = .12f), RoundedCornerShape(14.dp))
+                            .onFocusChanged { focused = it.isFocused }
                             .clickable { onSelect(item); showChannelPanel = false; showOverlay = false }
                             .focusable().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (!item.logo.isNullOrBlank()) AsyncImage(model = item.logo, contentDescription = null, modifier = Modifier.size(42.dp))
@@ -230,8 +245,8 @@ fun PlayerScreen(
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(item.name, color = if (selected) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(playerProgram(item, programs)?.title ?: item.group, color = if (selected) Color.DarkGray else PlayerMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.name, color = if (focused || selected) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(playerProgram(item, programs)?.title ?: item.group, color = if (focused || selected) Color.DarkGray else PlayerMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
