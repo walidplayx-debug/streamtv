@@ -8,18 +8,21 @@ import com.streamtv.data.PlaylistRepository
 import com.streamtv.data.StreamDatabase
 import com.streamtv.data.ChannelEntity
 import com.streamtv.data.PlaylistPreferences
+import com.streamtv.data.EpgProgram
+import com.streamtv.data.EpgRepository
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 data class TvState(
-    val playlistUrl: String = "", val channels: List<Channel> = emptyList(),
+    val playlistUrl: String = "", val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
     val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false
 )
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
+    private val epgRepository = EpgRepository()
     private val dao = StreamDatabase.get(application).channelDao()
     private val preferences = PlaylistPreferences(application)
     private val _state = MutableStateFlow(TvState())
@@ -41,7 +44,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     init {
         viewModelScope.launch {
+            preferences.epgUrl.collect { saved -> if (saved.isNotBlank() && _state.value.epgUrl.isBlank()) _state.value = _state.value.copy(epgUrl = saved) }
+        }
+    }
+    init {
+        viewModelScope.launch {
             preferences.favoriteIds.collect { ids -> _state.value = _state.value.copy(favorites = ids) }
+        }
+    }
+    fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
+    fun loadEpg() {
+        val url = _state.value.epgUrl
+        viewModelScope.launch {
+            runCatching { epgRepository.load(url) }.onSuccess { items ->
+                _state.value = _state.value.copy(programs = items)
+                preferences.saveEpg(url)
+            }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
         }
     }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
