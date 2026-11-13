@@ -69,7 +69,6 @@ fun PlayerScreen(
         }
     }
     var error by remember(channel.url) { mutableStateOf<String?>(null) }
-    var showOverlay by remember { mutableStateOf(false) }
     var showChannelPanel by remember { mutableStateOf(false) }
     var zapLabel by remember { mutableStateOf(false) }
     val playerFocusRequester = remember { FocusRequester() }
@@ -88,18 +87,13 @@ fun PlayerScreen(
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onPlayerError(exception: androidx.media3.common.PlaybackException) {
                 error = exception.message ?: "Playback error"
-                showOverlay = true
+                zapLabel = true
             }
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
     }
-    LaunchedEffect(showOverlay, channel.url, showChannelPanel) {
-        if (showOverlay && !showChannelPanel) {
-            delay(6500)
-            showOverlay = false
-        }
-    }
+    LaunchedEffect(channel.id) { zapLabel = true }
     LaunchedEffect(zapLabel, channel.id) {
         if (zapLabel) {
             delay(1800)
@@ -117,25 +111,24 @@ fun PlayerScreen(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> {
-                        onZap(1); zapLabel = true; showOverlay = false; true
+                        onZap(1); zapLabel = true; true
                     }
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> {
-                        onZap(-1); zapLabel = true; showOverlay = false; true
+                        onZap(-1); zapLabel = true; true
                     }
                     Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
                         if (showChannelPanel) { showChannelPanel = false; true } else false
                     }
                     else -> when (event.key) {
                         Key.DirectionUp -> {
-                            if (showChannelPanel) false else { onZap(1); zapLabel = true; showOverlay = false; true }
+                            if (showChannelPanel) false else { onZap(1); zapLabel = true; true }
                         }
                         Key.DirectionDown -> {
-                            if (showChannelPanel) false else { onZap(-1); zapLabel = true; showOverlay = false; true }
+                            if (showChannelPanel) false else { onZap(-1); zapLabel = true; true }
                         }
                         Key.DirectionRight -> {
                             if (showChannelPanel) false else {
                                 showChannelPanel = true
-                                showOverlay = false
                                 true
                             }
                         }
@@ -145,7 +138,7 @@ fun PlayerScreen(
                         Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
                         Key(AndroidKeyEvent.KEYCODE_DPAD_CENTER.toLong()),
                         Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                            if (showChannelPanel) false else { showOverlay = true; true }
+                            if (showChannelPanel) false else { zapLabel = true; true }
                         }
                         else -> false
                     }
@@ -165,66 +158,29 @@ fun PlayerScreen(
             update = { it.player = player }
         )
 
-        if (showOverlay) {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .28f), Color.Black.copy(alpha = .88f))))) {
-                Row(Modifier.align(Alignment.TopEnd).padding(36.dp).clip(CircleShape).background(PlayerGlass).padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()), color = PlayerWhite, fontSize = 18.sp)
-                }
-                Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 58.dp, end = 58.dp, bottom = 42.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(8.dp).background(PlayerAccent, CircleShape))
-                        Spacer(Modifier.width(9.dp))
-                        Text("LIVE  ·  ${channel.name}", color = PlayerMuted, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Text(channel.name, color = PlayerWhite, fontSize = 42.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        if (next != null) "Next  ·  ${next.title}  ·  ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(next.startEpochMillis))}" else current?.title ?: channel.group,
-                        color = PlayerMuted, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                    error?.let {
-                        Text(it, color = Color(0xFFFF9B8F), fontSize = 16.sp)
-                        PlayerAction("Retry") { error = null; player.prepare(); player.playWhenReady = true }
-                    }
-                    Spacer(Modifier.height(22.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("LIVE", color = PlayerMuted, fontSize = 14.sp)
-                        Spacer(Modifier.width(14.dp))
-                        Box(Modifier.weight(1f).height(4.dp).clip(CircleShape).background(PlayerWhite.copy(alpha = .24f))) {
-                            Box(Modifier.fillMaxWidth(.82f).fillMaxHeight().background(PlayerWhite, CircleShape))
-                        }
-                        Spacer(Modifier.width(14.dp))
-                        Text("− LIVE", color = PlayerMuted, fontSize = 14.sp)
-                        Spacer(Modifier.width(26.dp))
-                        PlayerAction("CC") { showOverlay = true }
-                        PlayerAction("AUDIO") { showOverlay = true }
-                        PlayerAction(if (favorite) "★" else "☆", favorite) { onFavorite(channel); showOverlay = true }
-                        PlayerAction("•••") { showOverlay = true }
-                    }
-                }
-            }
-        }
-
         if (zapLabel) {
             Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.62f).padding(bottom = 30.dp)
-                    .clip(RoundedCornerShape(14.dp)).background(PlayerGlass)
-                    .border(1.dp, PlayerWhite.copy(alpha = .18f), RoundedCornerShape(14.dp))
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.56f).padding(bottom = 34.dp)
+                    .clip(RoundedCornerShape(18.dp)).background(Color(0xD916191E))
+                    .border(1.dp, PlayerWhite.copy(alpha = .12f), RoundedCornerShape(18.dp))
                     .padding(horizontal = 22.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.width(4.dp).height(38.dp).clip(CircleShape).background(PlayerAccent))
+                Box(Modifier.width(3.dp).height(42.dp).clip(CircleShape).background(PlayerAccent.copy(alpha = .9f)))
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("NOW PLAYING", color = PlayerAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                    Text(channel.name, color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("NOW PLAYING", color = PlayerMuted.copy(alpha = .76f), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
+                    Text(channel.name, color = PlayerWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.width(18.dp))
-                Text(
-                    channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString().padStart(2, '0') },
-                    color = PlayerWhite.copy(alpha = .88f), fontSize = 22.sp, fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("CHANNEL", color = PlayerMuted.copy(alpha = .72f), fontSize = 8.sp, letterSpacing = 1.sp)
+                    Text(
+                        channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString().padStart(2, '0') },
+                        color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
 
@@ -240,7 +196,7 @@ fun PlayerScreen(
                             .background(if (focused) Color(0xFFE2E7ED) else if (selected) PlayerWhite.copy(alpha = .18f) else Color.White.copy(alpha = .09f))
                             .border(if (focused) 1.5.dp else 1.dp, if (focused) PlayerWhite.copy(alpha = .95f) else PlayerWhite.copy(alpha = .12f), RoundedCornerShape(14.dp))
                             .onFocusChanged { focused = it.isFocused }
-                            .clickable { onSelect(item); showChannelPanel = false; showOverlay = false }
+                            .clickable { onSelect(item); showChannelPanel = false; }
                             .focusable().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (!item.logo.isNullOrBlank()) AsyncImage(model = item.logo, contentDescription = null, modifier = Modifier.size(42.dp))
                             else Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF45454A)), contentAlignment = Alignment.Center) {
