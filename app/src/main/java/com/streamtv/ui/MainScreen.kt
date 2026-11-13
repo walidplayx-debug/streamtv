@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.streamtv.data.Channel
+import com.streamtv.data.detectedLanguage
 import com.streamtv.data.EpgProgram
 import java.text.SimpleDateFormat
 import java.util.Date
