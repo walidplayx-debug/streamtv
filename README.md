@@ -8,8 +8,10 @@ A personal Android TV IPTV player. No channels, playlists, logos, or third-party
 - M3U parser with quoted/unquoted metadata attributes and duplicate filtering
 - Playlist loading over HTTP(S) off the main thread
 - Media3 playback for HLS, DASH, and progressive media
-- Basic channel browsing, categories, favorites for the current session, and settings entry
-- Room channel cache models, DataStore URL preferences, and XMLTV parser foundations
+- Channel browsing, categories, and favorites persisted across restarts
+- Room-backed channel cache and DataStore-backed playlist/favorites preferences
+- Optional XMLTV/XMLTV.GZ loading with a rolling now/next programme window
+- Room channel cache and DataStore preferences
 
 ## Build
 
