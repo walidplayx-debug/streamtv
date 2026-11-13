@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -17,7 +22,7 @@ import androidx.media3.ui.PlayerView
 import com.streamtv.data.Channel
 
 @Composable
-fun PlayerScreen(channel: Channel, onBack: () -> Unit) {
+fun PlayerScreen(channel: Channel, onBack: () -> Unit, onZap: (Int) -> Unit) {
     val context = LocalContext.current
     val player = remember(channel.url) {
         ExoPlayer.Builder(context).build().apply {
@@ -37,7 +42,11 @@ fun PlayerScreen(channel: Channel, onBack: () -> Unit) {
         onDispose { player.removeListener(listener); player.release() }
     }
     BackHandler { onBack() }
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
+    Column(Modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) { onZap(1); true }
+        else if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) { onZap(-1); true }
+        else false
+    }) {
         AndroidView(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             factory = {
