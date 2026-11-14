@@ -96,91 +96,59 @@ fun PlayerScreen(
     LaunchedEffect(channel.id) { zapLabel = true }
     LaunchedEffect(zapLabel, channel.id) {
         if (zapLabel) {
-            delay(1800)
-            zapLabel = false
-        }
-    }
-    BackHandler {
-        if (showChannelPanel) showChannelPanel = false else onBack()
-    }
-
-    Box(
-        Modifier.fillMaxSize().background(Color.Black)
-            .focusRequester(playerFocusRequester).focusable()
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> {
-                        onZap(1); zapLabel = true; true
-                    }
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> {
-                        onZap(-1); zapLabel = true; true
-                    }
-                    Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
-                        if (showChannelPanel) { showChannelPanel = false; true } else false
-                    }
-                    else -> when (event.key) {
-                        Key.DirectionUp -> {
-                            if (showChannelPanel) false else { onZap(1); zapLabel = true; true }
-                        }
-                        Key.DirectionDown -> {
-                            if (showChannelPanel) false else { onZap(-1); zapLabel = true; true }
-                        }
-                        Key.DirectionRight -> {
-                            if (showChannelPanel) false else {
-                                showChannelPanel = true
-                                true
-                            }
-                        }
-                        Key.DirectionLeft -> {
-                            if (showChannelPanel) { showChannelPanel = false; true } else false
-                        }
-                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
-                        Key(AndroidKeyEvent.KEYCODE_DPAD_CENTER.toLong()),
-                        Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                            if (showChannelPanel) false else { zapLabel = true; true }
-                        }
-                        else -> false
-                    }
-                }
+            val progress = current?.let {
+                ((System.currentTimeMillis() - it.startEpochMillis).toFloat() /
+                    (it.endEpochMillis - it.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
+            } ?: 0f
+            val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+            val channelNumber = channels.indexOfFirst { it.id == channel.id }.let {
+                if (it < 0) "—" else (it + 1).toString()
             }
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = {
-                PlayerView(it).apply {
-                    this.player = player
-                    useController = false
-                    setShutterBackgroundColor(android.graphics.Color.BLACK)
-                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                }
-            },
-            update = { it.player = player }
-        )
-
-        if (zapLabel) {
             Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.56f).padding(bottom = 34.dp)
-                    .clip(RoundedCornerShape(18.dp)).background(Color(0xD916191E))
-                    .border(1.dp, PlayerWhite.copy(alpha = .12f), RoundedCornerShape(18.dp))
-                    .padding(horizontal = 22.dp, vertical = 13.dp),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.92f).padding(bottom = 28.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xD9161A22))
+                    .border(1.dp, PlayerWhite.copy(alpha = .13f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.width(3.dp).height(42.dp).clip(CircleShape).background(PlayerAccent.copy(alpha = .9f)))
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("NOW PLAYING", color = PlayerMuted.copy(alpha = .76f), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp)
-                    Text(channel.name, color = PlayerWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                if (!channel.logo.isNullOrBlank()) {
+                    AsyncImage(model = channel.logo, contentDescription = channel.name,
+                        modifier = Modifier.width(112.dp).height(62.dp))
+                } else {
+                    Box(Modifier.width(112.dp).height(62.dp), contentAlignment = Alignment.Center) {
+                        Text(channel.name.take(2).uppercase(), color = PlayerWhite,
+                            fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
                 }
                 Spacer(Modifier.width(18.dp))
+                Box(Modifier.width(1.dp).height(66.dp).background(PlayerWhite.copy(alpha = .35f)))
+                Spacer(Modifier.width(20.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    Text(channel.name, color = PlayerWhite, fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (current != null) {
+                        Spacer(Modifier.height(9.dp))
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape)
+                            .background(PlayerWhite.copy(alpha = .25f))) {
+                            Box(Modifier.fillMaxWidth(progress).height(4.dp).clip(CircleShape)
+                                .background(Color(0xFFE33445)))
+                        }
+                    }
+                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                Spacer(Modifier.width(22.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("CHANNEL", color = PlayerMuted.copy(alpha = .72f), fontSize = 8.sp, letterSpacing = 1.sp)
-                    Text(
-                        channels.indexOfFirst { it.id == channel.id }.let { if (it < 0) "—" else (it + 1).toString().padStart(2, '0') },
-                        color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.SemiBold
-                    )
+                    if (current != null) {
+                        Text(timeFormat.format(Date(current.startEpochMillis)) + "  |  " +
+                            timeFormat.format(Date(current.endEpochMillis)),
+                            color = PlayerMuted, fontSize = 12.sp)
+                    }
+                    Text("CH " + channelNumber, color = PlayerWhite, fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold)
                 }
             }
         }
