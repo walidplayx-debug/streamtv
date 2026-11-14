@@ -10,4 +10,5 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.jks
+!keystore/stv-public.jks
 *.keystore

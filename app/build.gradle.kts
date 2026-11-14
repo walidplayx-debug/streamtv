@@ -16,9 +16,22 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    signingConfigs {
+        // One fixed key for every build, so a new APK always installs over the previous one.
+        // CI uses the private keystore from the repository secrets when they exist; otherwise the
+        // public key committed in keystore/ is used (fine for a personal, side-loaded app).
+        create("stv") {
+            val ciStore = System.getenv("STV_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+            storeFile = if (ciStore != null) file(ciStore) else rootProject.file("keystore/stv-public.jks")
+            storePassword = if (ciStore != null) System.getenv("STV_KEYSTORE_PASSWORD") else "stvpublic"
+            keyAlias = if (ciStore != null) System.getenv("STV_KEY_ALIAS") else "stv"
+            keyPassword = if (ciStore != null) System.getenv("STV_KEY_PASSWORD") else "stvpublic"
+        }
+    }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
+            signingConfig = signingConfigs.getByName("stv")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
