@@ -164,7 +164,7 @@ fun PlayerScreen(
 
         AnimatedVisibility(
             visible = zapLabel,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(.68f),
             enter = fadeIn(animationSpec = tween(280)),
             exit = fadeOut(animationSpec = tween(500))
         ) {
@@ -177,7 +177,7 @@ fun PlayerScreen(
                 if (it < 0) "—" else (it + 1).toString()
             }
             Row(
-                Modifier.fillMaxWidth(.84f).heightIn(min = 82.dp).padding(bottom = 30.dp)
+                Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(bottom = 30.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(Brush.linearGradient(listOf(Color(0xE6222429), Color(0xE00D0E11), Color(0xE61B1D22))))
                     .border(1.dp, PlayerWhite.copy(alpha = .11f), RoundedCornerShape(20.dp))
