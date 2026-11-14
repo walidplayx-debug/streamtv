@@ -20,6 +20,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -82,10 +84,14 @@ fun PlayerScreen(
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
     val playerFocusRequester = remember { FocusRequester() }
     val channelListFocusRequester = remember { FocusRequester() }
+    val channelListState = rememberLazyListState()
+    val currentChannelIndex = channels.indexOfFirst { it.id == channel.id }.coerceAtLeast(0)
 
     LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
-    LaunchedEffect(overlayState) {
+    LaunchedEffect(overlayState, channel.id) {
         if (overlayState == OverlayState.ChannelList && channels.isNotEmpty()) {
+            channelListState.scrollToItem(currentChannelIndex)
+            kotlinx.coroutines.delay(80)
             channelListFocusRequester.requestFocus()
         } else if (overlayState != OverlayState.ChannelList) {
             playerFocusRequester.requestFocus()
@@ -105,7 +111,7 @@ fun PlayerScreen(
         onDispose { player.removeListener(listener); player.release() }
     }
 
-    LaunchedEffect(channel.id) { overlayState = OverlayState.InfoBar }
+    LaunchedEffect(channel.id) { if (overlayState != OverlayState.ChannelList) overlayState = OverlayState.InfoBar }
     LaunchedEffect(overlayState, channel.id) {
         if (overlayState == OverlayState.InfoBar) {
             delay(4000)
@@ -180,7 +186,7 @@ fun PlayerScreen(
             update = { it.player = player }
         )
 
-        AnimatedVisibility(
+        if (overlayState != OverlayState.ChannelList) AnimatedVisibility(
             visible = overlayState == OverlayState.InfoBar,
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(.65f).padding(bottom = 32.dp),
             enter = fadeIn(animationSpec = tween(260)) +
@@ -191,11 +197,11 @@ fun PlayerScreen(
             val channelNumber = channels.indexOfFirst { it.id == channel.id }
                 .let { if (it < 0) "—" else (it + 1).toString() }
             Row(
-                Modifier.fillMaxWidth().height(86.dp)
+                Modifier.fillMaxWidth().height(72.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
                     .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(horizontalAlignment = Alignment.Start) {
@@ -226,9 +232,9 @@ fun PlayerScreen(
                 Spacer(Modifier.width(18.dp))
                 if (!channel.logo.isNullOrBlank()) {
                     AsyncImage(model = channel.logo, contentDescription = channel.name,
-                        modifier = Modifier.width(76.dp).height(48.dp))
+                        modifier = Modifier.width(60.dp).height(40.dp).clip(RoundedCornerShape(10.dp)))
                 } else {
-                    Box(Modifier.size(width = 76.dp, height = 48.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(width = 60.dp, height = 40.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                         Text(channel.name.take(2).uppercase(), color = PlayerWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -244,60 +250,97 @@ fun PlayerScreen(
         ) {
             Column(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xED202329), Color(0xE8101115))))
-                    .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
+                    .background(Color(0xB81C1C1E))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
                     .padding(horizontal = 22.dp, vertical = 20.dp)
             ) {
-                Text("Channels", color = PlayerWhite, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                Text("Channels", color = PlayerWhite, fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Start)
                 Spacer(Modifier.height(16.dp))
                 LazyColumn(
+                    state = channelListState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(bottom = 20.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(channels, key = { it.id }) { item ->
                         val selected = item.id == channel.id
                         var focused by remember(item.id) { mutableStateOf(false) }
                         val itemScale by animateFloatAsState(
-                            if (focused) 1.035f else 1f,
+                            if (focused) 1.04f else 1f,
                             spring(dampingRatio = .78f, stiffness = 420f),
                             label = "channelItemScale"
                         )
                         Row(
-                            (if (item == channels.firstOrNull()) Modifier.focusRequester(channelListFocusRequester) else Modifier)
-                                .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(17.dp))
-                                .background(
-                                    if (focused) PlayerWhite.copy(alpha = .94f)
-                                    else if (selected) PlayerWhite.copy(alpha = .16f)
-                                    else PlayerWhite.copy(alpha = .055f)
-                                )
+                            (if (selected) Modifier.focusRequester(channelListFocusRequester) else Modifier)
+                                .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(20.dp))
+                                .background(if (focused) Color(0x2EFFFFFF) else Color.Transparent)
                                 .border(
                                     1.dp,
-                                    if (focused) PlayerWhite.copy(alpha = .9f)
-                                    else PlayerWhite.copy(alpha = if (selected) .35f else .08f),
-                                    RoundedCornerShape(17.dp)
+                                    if (focused) Color(0x66FFFFFF) else Color.Transparent,
+                                    RoundedCornerShape(20.dp)
                                 )
                                 .onFocusChanged { focused = it.isFocused }
-                                .clickable { onSelect(item); overlayState = OverlayState.InfoBar }
-                                .focusable().padding(horizontal = 13.dp, vertical = 11.dp),
+                                .clickable {
+                                    overlayState = OverlayState.None
+                                    onSelect(item)
+                                }
+                                .focusable()
+                                .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (!item.logo.isNullOrBlank()) {
-                                AsyncImage(model = item.logo, contentDescription = null, modifier = Modifier.size(46.dp))
+                                AsyncImage(
+                                    model = item.logo,
+                                    contentDescription = item.name,
+                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp))
+                                )
                             } else {
-                                Box(Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF383C43)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text(item.name.trim().take(2).uppercase(), color = PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                Box(
+                                    Modifier.size(48.dp).clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF38383A)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(item.name.trim().take(2).uppercase(), color = PlayerWhite,
+                                        fontSize = 17.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
-                            Spacer(Modifier.width(13.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(item.name, color = if (focused) Color(0xFF101114) else PlayerWhite,
-                                    fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        channelDisplayName(item.name),
+                                        modifier = Modifier.weight(1f),
+                                        color = PlayerWhite,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Start,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val quality = channelQuality(item.name)
+                                    if (quality.isNotBlank()) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Box(
+                                            Modifier.clip(RoundedCornerShape(20.dp))
+                                                .background(Color(0x1FFFFFFF))
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(quality, color = Color(0xCCFFFFFF),
+                                                fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
                                 Text(
-                                    listOf(item.group, channelQuality(item.name)).filter { it.isNotBlank() }.joinToString("  ·  "),
-                                    color = if (focused) Color.DarkGray else PlayerMuted,
-                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    item.group,
+                                    color = Color(0x99FFFFFF),
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Start,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -315,6 +358,9 @@ private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProg
             it.startEpochMillis <= now && it.endEpochMillis > now
     }
 }
+
+private fun channelDisplayName(name: String): String =
+    name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
 
 private fun channelQuality(name: String): String =
     Regex("\\b(\\d{3,4}p|4K|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()
