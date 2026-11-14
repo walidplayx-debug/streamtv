@@ -1,5 +1,7 @@
 package com.streamtv.ui
 
+import android.content.ActivityNotFoundException
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -294,6 +296,15 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
+                .background(Brush.linearGradient(channelGradient(channel.name))),
+            contentAlignment = Alignment.Center
+        ) {
+            val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
+            Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
         if (!channel.logo.isNullOrBlank()) {
             AsyncImage(
                 model = channel.logo,
@@ -301,16 +312,6 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
                 modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
                 contentScale = ContentScale.Fit
             )
-        } else {
-            Box(
-                Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
-                    .background(Brush.linearGradient(channelGradient(channel.name))),
-                contentAlignment = Alignment.Center
-            ) {
-                val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-                    .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
-                Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
         }
         if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
     }
@@ -420,7 +421,13 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    WhiteButton("Import M3U file") { filePicker.launch(arrayOf("*/*")) }
+                    WhiteButton("Import M3U file") {
+                        try {
+                            filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
+                        } catch (_: ActivityNotFoundException) {
+                            model.setError("No file picker is available on this TV. Paste your M3U URL above and choose Save & load playlist.")
+                        }
+                    }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(24.dp))
                         Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
