@@ -500,27 +500,6 @@ private fun SettingsContent(
                 "Playlist" -> {
                     val counts = remember(state.channels) { state.channels.groupingBy { it.kind() }.eachCount() }
                     val activeName = state.playlists.firstOrNull { it.url == state.playlistUrl }?.name
-                    var summaryFocused by remember { mutableStateOf(false) }
-                    Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                            .background(White.copy(alpha = if (summaryFocused) .13f else .07f))
-                            .border(1.dp, White.copy(alpha = if (summaryFocused) .5f else 0f), RoundedCornerShape(18.dp))
-                            .onFocusChanged { summaryFocused = it.isFocused }.focusable()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(2.dp))
-                        Text(activeName ?: t("Playlist"), color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(t(playlistLabel(state.playlistUrl)), color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            if (state.loading) t("Loading…")
-                            else "${counts[ChannelKind.Live] ?: 0} ${t("live")}  ·  ${counts[ChannelKind.Movie] ?: 0} ${t("movies")}  ·  ${counts[ChannelKind.Series] ?: 0} ${t("series")}",
-                            color = White.copy(alpha = .86f), fontSize = 16.sp
-                        )
-                        state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
-                    }
-                    Spacer(Modifier.height(22.dp))
                     Text(t("Add a playlist"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     Row(
@@ -541,6 +520,28 @@ private fun SettingsContent(
                             FocusPill("Reload", false, Modifier.weight(1f)) { if (!state.loading) model.loadPlaylist() }
                         }
                     }
+                    Spacer(Modifier.height(16.dp))
+                    // Slim summary of the active playlist, the same width as the bar above it.
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .background(White.copy(alpha = .07f))
+                            .border(1.dp, White.copy(alpha = .10f), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Spacer(Modifier.width(12.dp))
+                        Text(activeName ?: t("Playlist"), color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Spacer(Modifier.width(12.dp))
+                        Text(t(playlistLabel(state.playlistUrl)), Modifier.weight(1f), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            if (state.loading) t("Loading…")
+                            else "${counts[ChannelKind.Live] ?: 0} ${t("live")}  ·  ${counts[ChannelKind.Movie] ?: 0} ${t("movies")}  ·  ${counts[ChannelKind.Series] ?: 0} ${t("series")}",
+                            color = White.copy(alpha = .86f), fontSize = 14.sp, maxLines = 1
+                        )
+                    }
+                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
                         Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
