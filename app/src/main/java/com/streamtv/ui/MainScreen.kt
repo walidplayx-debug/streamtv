@@ -155,7 +155,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
     Column(Modifier.fillMaxSize().background(Ink).padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)) {
         TopNavigation(state.tab, model::selectTab)
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(if (state.tab == "Live TV") 18.dp else 30.dp))
         when (state.tab) {
             "Movies" -> LibraryContent("Movies", ChannelKind.Movie, state, model)
             "Series" -> LibraryContent("Series", ChannelKind.Series, state, model)
@@ -274,8 +274,6 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
     }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(250.dp).fillMaxHeight()) {
-            Text(t("Live TV"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(18.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), state.searchQuery == "__recent") { model.setSearchQuery("__recent") } }
@@ -302,9 +300,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
         }
         Spacer(Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(t(heading), color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 Text("${filtered.size} ${t("channels")}", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(14.dp))
