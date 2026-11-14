@@ -332,6 +332,36 @@ fun PinPadScreen(title: String, error: String?, onSubmit: (String) -> Unit, onCa
     }
 }
 
+/** Floating "are you sure?" card. Focus starts on Cancel so a stray OK press deletes nothing. */
+@Composable
+fun ConfirmScreen(question: String, subject: String, confirmLabel: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    val cancel = remember { FocusRequester() }
+    BackHandler { onCancel() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { cancel.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    Box(Modifier.fillMaxSize().background(Color(0xFF050506)), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.width(440.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xF01C1C1E))
+                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(t(question), color = EntryWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+            Spacer(Modifier.height(8.dp))
+            Text(subject, color = EntryMuted, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                EntryButton("Cancel", primary = true, modifier = Modifier.focusRequester(cancel)) { onCancel() }
+                EntryButton(confirmLabel) { onConfirm() }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PinKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }

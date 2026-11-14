@@ -23,7 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,9 +87,14 @@ fun AppUpdateSection() {
         }
         androidx.compose.foundation.layout.Box(
             Modifier.clip(RoundedCornerShape(50))
-                .background(if (focused) Color.White else Color.White.copy(alpha = .88f))
+                .background(
+                    if (focused) Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
+                    else SolidColor(Color.White.copy(alpha = .82f))
+                )
                 .onFocusChanged { focused = it.isFocused }
-                .clickable(enabled = !busy) {
+                // Stays focusable while busy: a disabled button drops focus and it jumps to the tabs.
+                .clickable {
+                    if (busy) return@clickable
                     val ready = downloaded
                     if (ready != null) {
                         try {
@@ -150,7 +157,7 @@ fun AppUpdateSection() {
         ) {
             Text(
                 translate(language, buttonLabel),
-                color = Color(0xFF101014),
+                color = if (focused) Color.White else Color(0xFF101014),
                 fontSize = 17.sp
             )
         }

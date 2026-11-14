@@ -84,7 +84,8 @@ private val French = mapOf(
     "Enter PIN" to "Saisir le code PIN", "Choose a 4-digit PIN" to "Choisissez un code PIN à 4 chiffres",
     "Wrong PIN" to "Code PIN incorrect", "The PIN must be 4 digits" to "Le code PIN doit comporter 4 chiffres",
     "PIN" to "Code PIN", "Set" to "Défini", "Not set" to "Non défini", "Set PIN" to "Définir le code PIN", "Change PIN" to "Changer le code PIN",
-    "Locked channels" to "Chaînes verrouillées", "Hidden channels" to "Chaînes masquées", "Restore hidden channels" to "Restaurer les chaînes masquées"
+    "Locked channels" to "Chaînes verrouillées", "Hidden channels" to "Chaînes masquées", "Restore hidden channels" to "Restaurer les chaînes masquées",
+    "Remove this playlist?" to "Supprimer cette playlist ?", "Hide this channel?" to "Masquer cette chaîne ?"
 )
 
 private val Arabic = mapOf(
@@ -148,5 +149,6 @@ private val Arabic = mapOf(
     "Enter PIN" to "أدخل الرمز السري", "Choose a 4-digit PIN" to "اختر رمزاً سرياً من 4 أرقام",
     "Wrong PIN" to "الرمز السري غير صحيح", "The PIN must be 4 digits" to "الرمز السري يجب أن يكون 4 أرقام",
     "PIN" to "الرمز السري", "Set" to "محدّد", "Not set" to "غير محدّد", "Set PIN" to "تحديد الرمز السري", "Change PIN" to "تغيير الرمز السري",
-    "Locked channels" to "القنوات المقفلة", "Hidden channels" to "القنوات المخفية", "Restore hidden channels" to "استرجاع القنوات المخفية"
+    "Locked channels" to "القنوات المقفلة", "Hidden channels" to "القنوات المخفية", "Restore hidden channels" to "استرجاع القنوات المخفية",
+    "Remove this playlist?" to "حذف هذه القائمة؟", "Hide this channel?" to "إخفاء هذه القناة؟"
 )

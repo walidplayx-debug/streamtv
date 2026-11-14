@@ -22,7 +22,7 @@ import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
 
-/** A PIN question on screen. purpose: "set", "open", "unlock" or "verify". */
+/** A PIN question on screen. purpose: "set", "open", "unlock", "verify" or "confirm". */
 data class PinPrompt(val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null)
 
 data class TvState(
@@ -80,6 +80,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val channelsView = ChannelView()
     private val queueView = ChannelView()
     private var pinCode: String = ""
+    private var pendingAction: (() -> Unit)? = null
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
@@ -320,7 +321,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun changePin() {
         _state.value = _state.value.copy(pin = PinPrompt(if (pinCode.isBlank()) "set" else "verify"), pinError = false)
     }
-    fun cancelPin() { _state.value = _state.value.copy(pin = null, pinError = false) }
+    /** Runs [action] straight away when no PIN is set, otherwise only after the PIN is entered. */
+    fun protect(action: () -> Unit) {
+        if (pinCode.isBlank()) { action(); return }
+        pendingAction = action
+        _state.value = _state.value.copy(pin = PinPrompt("confirm"), pinError = false)
+    }
+    fun cancelPin() {
+        pendingAction = null
+        _state.value = _state.value.copy(pin = null, pinError = false)
+    }
     fun submitPin(value: String) {
         val prompt = _state.value.pin ?: return
         if (prompt.purpose == "set") {
@@ -337,6 +347,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
             "unlock" -> prompt.channel?.let { setLocked(_state.value.locked - it.key) }
             "verify" -> _state.value = _state.value.copy(pin = PinPrompt("set"))
+            "confirm" -> { val action = pendingAction; pendingAction = null; action?.invoke() }
         }
     }
     fun toggleFavorite(channel: Channel) {

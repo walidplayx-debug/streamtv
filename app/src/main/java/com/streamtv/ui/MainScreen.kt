@@ -74,6 +74,9 @@ private val Accent = Color(0xFFD5DADF)
 private val Glass = Color(0xFF29292C)
 private const val ExamplePlaylistUrl = "https://iptv-org.github.io/iptv/countries/be.m3u"
 
+/** Something destructive waiting for the viewer to say yes. */
+private class ConfirmRequest(val question: String, val subject: String, val confirmLabel: String, val action: () -> Unit)
+
 /** One focus colour for every control: the soft sky blue of the tab pills. */
 private val FocusBrush = Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
 private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)))
@@ -108,6 +111,16 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         )
         return
     }
+    // "Are you sure?" before anything is removed; the PIN (when one is set) is asked right after.
+    var confirm by remember { mutableStateOf<ConfirmRequest?>(null) }
+    confirm?.let { request ->
+        ConfirmScreen(
+            question = request.question, subject = request.subject, confirmLabel = request.confirmLabel,
+            onConfirm = { confirm = null; model.protect(request.action) },
+            onCancel = { confirm = null }
+        )
+        return
+    }
     var renaming by remember { mutableStateOf<Channel?>(null) }
     renaming?.let { target ->
         SingleFieldScreen(
@@ -134,7 +147,10 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             locked = state.selected.key in state.locked,
             onOption = { option ->
                 when (option) {
-                    "hide" -> model.hideChannel(state.selected)
+                    "hide" -> {
+                        val target = state.selected
+                        confirm = ConfirmRequest("Hide this channel?", target.name, "Hide channel") { model.hideChannel(target) }
+                    }
                     "lock" -> model.toggleLock(state.selected)
                     "rename" -> renaming = state.selected
                 }
@@ -224,7 +240,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                 ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model, returnKey) { returnKey = null }
             }
             "Search" -> SearchContent(state, model, returnKey) { returnKey = null }
-            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }) { entry = it }
+            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { confirm = it }) { entry = it }
             else -> LiveContent(state, model, returnKey) { returnKey = null }
         }
     }
@@ -576,7 +592,8 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
 
 @Composable
 private fun SettingsContent(
-    state: TvState, model: MainViewModel, section: String, onSection: (String) -> Unit, onEntry: (String) -> Unit
+    state: TvState, model: MainViewModel, section: String, onSection: (String) -> Unit,
+    onConfirm: (ConfirmRequest) -> Unit, onEntry: (String) -> Unit
 ) {
     val context = LocalContext.current
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -653,7 +670,9 @@ private fun SettingsContent(
                         Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
                         for (item in state.playlists) {
-                            PlaylistRow(item, item.url == state.playlistUrl, { model.selectPlaylist(item) }) { model.removePlaylist(item) }
+                            PlaylistRow(item, item.url == state.playlistUrl, { model.selectPlaylist(item) }) {
+                                onConfirm(ConfirmRequest("Remove this playlist?", item.name, "Remove") { model.removePlaylist(item) })
+                            }
                         }
                     }
                     Spacer(Modifier.height(24.dp))
