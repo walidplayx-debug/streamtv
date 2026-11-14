@@ -42,7 +42,8 @@ fun ChannelLogo(
     fontSize: TextUnit,
     corner: Dp = 10.dp,
     placeholder: Brush = Brush.linearGradient(listOf(Color(0xFF3A3A3D), Color(0xFF242426))),
-    logoPadding: Dp = 0.dp
+    logoPadding: Dp = 0.dp,
+    contentScale: ContentScale = ContentScale.Fit
 ) {
     var loaded by remember(logo) { mutableStateOf(false) }
     var failed by remember(logo) { mutableStateOf(false) }
@@ -58,7 +59,7 @@ fun ChannelLogo(
                 model = logo,
                 contentDescription = name,
                 modifier = Modifier.fillMaxSize().padding(logoPadding),
-                contentScale = ContentScale.Fit,
+                contentScale = contentScale,
                 onSuccess = { loaded = true },
                 onError = { failed = true }
             )

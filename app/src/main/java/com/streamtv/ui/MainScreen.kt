@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -168,20 +169,21 @@ fun MainScreen(state: TvState, model: MainViewModel) {
 @Composable
 private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(150.dp), contentAlignment = Alignment.CenterStart) { Clock() }
-        Spacer(Modifier.weight(1f))
-        Row(
-            Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            listOf("Live TV", "Movies", "Series", "Favorites", "Search", "Settings").forEach { item ->
-                val selected = tab == item
-                FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
+        Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Row(
+                Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("Live TV", "Movies", "Series", "Favorites", "Search", "Settings").forEach { item ->
+                    val selected = tab == item
+                    FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
+                }
             }
         }
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.width(150.dp), contentAlignment = Alignment.CenterEnd) {
-            Text("STREEM", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, maxLines = 1)
+        Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
+            Text("STREEM", color = Accent, fontSize = 25.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp,
+                maxLines = 1, softWrap = false)
         }
     }
 }
@@ -222,13 +224,15 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
                 shape = CircleShape
             )
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick).focusable().padding(horizontal = 20.dp, vertical = 12.dp),
+            .clickable(onClick = onClick).focusable().padding(horizontal = 15.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text,
             color = White.copy(alpha = if (focused || selected) .98f else .72f),
-            fontSize = 17.sp,
+            fontSize = 16.sp,
+            maxLines = 1,
+            softWrap = false,
             fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium
         )
     }
@@ -315,7 +319,43 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
             model.selectTab("Settings")
         }
     } else {
-        ChannelGrid(items, state.programs, state.favorites, model)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(6),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 6.dp, top = 6.dp, end = 6.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            gridItems(items, key = { it.key }) { item ->
+                PosterCard(item, item.id in state.favorites) { model.select(item, items) }
+            }
+        }
+    }
+}
+
+/** Poster-shaped card with the title underneath, for movies and series. */
+@Composable
+private fun PosterCard(channel: Channel, favorite: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.05f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "posterScale")
+    Column(
+        Modifier.scale(scale).onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+    ) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp))
+                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
+        ) {
+            ChannelLogo(
+                channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,
+                placeholder = Brush.linearGradient(channelGradient(channel.name)), contentScale = ContentScale.Crop
+            )
+            if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = White, fontSize = 15.sp)
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(channel.name, color = if (focused) White else White.copy(alpha = .78f), fontSize = 14.sp,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
     }
 }
 
