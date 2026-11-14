@@ -134,10 +134,12 @@ fun PlayerScreen(
     // False right after opening (focus goes to the playing channel); true once the user pages.
     var listPaged by remember { mutableStateOf(false) }
     val listNameFocusRequester = remember { FocusRequester() }
+    var nameFocused by remember { mutableStateOf(false) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         listTitle = queueTitle
         listPaged = false
+        nameFocused = false
         listTick++
         overlayState = OverlayState.ChannelList
     }
@@ -239,12 +241,18 @@ fun PlayerScreen(
                     }
                     Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
                     Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
+                    // On the list name, left/right page between lists; on the channels they close the panel.
                     Key.DirectionLeft -> when {
-                        listOpen -> { stepList(-1); true }
+                        listOpen && nameFocused -> { stepList(-1); true }
+                        listOpen -> { overlayState = OverlayState.None; true }
                         showErrorCard -> false
                         else -> { openList(); true }
                     }
-                    Key.DirectionRight -> if (listOpen) { stepList(1); true } else false
+                    Key.DirectionRight -> when {
+                        listOpen && nameFocused -> { stepList(1); true }
+                        listOpen -> { overlayState = OverlayState.None; true }
+                        else -> false
+                    }
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
                     Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
                         if (listOpen || showErrorCard) false else { openList(); true }
@@ -360,7 +368,6 @@ fun PlayerScreen(
                     .padding(top = 18.dp)
             ) {
                 val many = lists.size > 1
-                var nameFocused by remember { mutableStateOf(false) }
                 val pop = remember { Animatable(1f) }
                 LaunchedEffect(listTitle) {
                     if (listPaged) {
