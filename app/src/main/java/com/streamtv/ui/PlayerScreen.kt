@@ -140,11 +140,15 @@ fun PlayerScreen(
     var listPaged by remember { mutableStateOf(false) }
     val listNameFocusRequester = remember { FocusRequester() }
     var nameFocused by remember { mutableStateOf(false) }
+    // The list of lists, opened with OK on the list name.
+    var pickerOpen by remember { mutableStateOf(false) }
+    val lastBack = remember { longArrayOf(0L) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         listTitle = queueTitle
         listPaged = false
         nameFocused = false
+        pickerOpen = false
         listTick++
         overlayState = OverlayState.ChannelList
     }
@@ -229,8 +233,24 @@ fun PlayerScreen(
 
     // Back from the channels goes to the list name, from the list name it closes the panel.
     fun backInList() {
-        if (nameFocused) overlayState = OverlayState.None
-        else if (runCatching { listNameFocusRequester.requestFocus() }.isFailure) overlayState = OverlayState.None
+        // The same press can arrive twice (as a key and as a system back); count it once.
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastBack[0] < 300L) return
+        lastBack[0] = now
+        when {
+            pickerOpen -> {
+                pickerOpen = false
+                listPaged = true
+                nameFocused = true
+                runCatching { listNameFocusRequester.requestFocus() }
+            }
+            nameFocused -> overlayState = OverlayState.None
+            else -> {
+                // Set directly so the next Back always closes, even if focus could not move.
+                nameFocused = true
+                runCatching { listNameFocusRequester.requestFocus() }
+            }
+        }
     }
     BackHandler {
         if (overlayState == OverlayState.ChannelList) backInList() else onBack()
@@ -257,6 +277,7 @@ fun PlayerScreen(
                         val towardsPanel = (event.key == Key.DirectionLeft) != rtl
                         val step = if ((event.key == Key.DirectionRight) != rtl) 1 else -1
                         when {
+                            listOpen && pickerOpen -> true
                             listOpen && nameFocused -> { stepList(step); true }
                             listOpen -> { overlayState = OverlayState.None; true }
                             showErrorCard -> false
@@ -266,8 +287,11 @@ fun PlayerScreen(
                     }
                     // OK only brings up the info bar; the channel list opens with the arrow key.
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
-                    Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                        if (listOpen || showErrorCard) false else { showInfoBar(); true }
+                    Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> when {
+                        // OK on the list name opens the list of lists.
+                        listOpen && nameFocused && !pickerOpen -> { pickerOpen = true; true }
+                        listOpen || showErrorCard -> false
+                        else -> { showInfoBar(); true }
                     }
                     else -> false
                 }
@@ -397,7 +421,7 @@ fun PlayerScreen(
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val arrow = if (!many) 0f else if (nameFocused) 1f else .5f
+                    val arrow = if (!many || pickerOpen) 0f else if (nameFocused) 1f else .5f
                     Text(if (rtl) "›" else "‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                     AnimatedContent(
                         targetState = listTitle,
@@ -419,7 +443,7 @@ fun PlayerScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 AnimatedContent(
-                    targetState = listTitle,
+                    targetState = if (pickerOpen) ListPickerKey else listTitle,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     transitionSpec = {
                         (slideInHorizontally(tween(280)) { listDirection * it / 2 } + fadeIn(tween(280))) togetherWith
@@ -427,9 +451,66 @@ fun PlayerScreen(
                     },
                     label = "listPage"
                 ) { title ->
-                    val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
-                    ChannelListPage(page, channel, takeFocus = !listPaged) { item -> onSelect(item, page, title) }
+                    if (title == ListPickerKey) {
+                        ListPicker(lists, listTitle) { picked ->
+                            listDirection = 1
+                            listTitle = picked
+                            listPaged = false
+                            nameFocused = false
+                            pickerOpen = false
+                        }
+                    } else {
+                        val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
+                        ChannelListPage(page, channel, takeFocus = !listPaged, onClose = { overlayState = OverlayState.None }) { item ->
+                            onSelect(item, page, title)
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+private const val ListPickerKey = "\u0000lists"
+
+/** Every list by name, so the viewer can jump straight to one. Opens focused on the current list. */
+@Composable
+private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String, onPick: (String) -> Unit) {
+    val currentIndex = remember(lists) { lists.indexOfFirst { it.first == current }.coerceAtLeast(0) }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentIndex - 2).coerceAtLeast(0))
+    val anchor = remember { FocusRequester() }
+    LaunchedEffect(Unit) { anchor.requestFocusSafely() }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(lists.size, key = { lists[it].first }) { index ->
+            val (name, channels) = lists[index]
+            val isCurrent = index == currentIndex
+            var focused by remember { mutableStateOf(false) }
+            val itemScale by animateFloatAsState(if (focused) 1.04f else 1f, spring(dampingRatio = .78f, stiffness = 420f), label = "listItemScale")
+            Row(
+                (if (isCurrent) Modifier.focusRequester(anchor) else Modifier)
+                    .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
+                    .background(
+                        when {
+                            focused -> Color(0xF2F2F2F7)
+                            isCurrent -> Color(0x1FFFFFFF)
+                            else -> Color.Transparent
+                        }
+                    )
+                    .onFocusChanged { focused = it.isFocused }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onPick(name) }
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(t(name), Modifier.weight(1f), color = if (focused) Color(0xFF1C1C1E) else PlayerWhite, fontSize = 17.sp,
+                    fontWeight = if (isCurrent || focused) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(10.dp))
+                Text(channels.size.toString(), color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF), fontSize = 14.sp, maxLines = 1)
             }
         }
     }
@@ -437,7 +518,7 @@ fun PlayerScreen(
 
 /** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
 @Composable
-private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onPick: (Channel) -> Unit) {
+private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
     val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
     val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
@@ -469,7 +550,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                         }
                     )
                     .onFocusChanged { focused = it.isFocused }
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onPick(item) }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
