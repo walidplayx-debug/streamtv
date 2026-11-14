@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +25,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -39,55 +42,70 @@ import kotlin.math.roundToInt
 @Stable
 class GlassFocus {
     var target by mutableStateOf<Rect?>(null)
+    /** Identifies the focused tile, so a scroll (same tile, new place) is not mistaken for a move. */
+    var owner by mutableStateOf<Any?>(null)
 }
 
 /** Reports this tile's bounds to [glass] while it is focused. Place it before any scale. */
-fun Modifier.glassTarget(glass: GlassFocus, focused: Boolean): Modifier = composed {
+fun Modifier.glassTarget(glass: GlassFocus, focused: Boolean, key: Any): Modifier = composed {
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var mine by remember { mutableStateOf<Rect?>(null) }
     LaunchedEffect(focused) {
         if (focused) {
-            coords?.takeIf { it.isAttached }?.boundsInRoot()?.let { mine = it; glass.target = it }
-        } else if (mine != null && glass.target == mine) {
+            coords?.takeIf { it.isAttached }?.boundsInRoot()?.let { glass.owner = key; glass.target = it }
+        } else if (glass.owner == key) {
+            glass.owner = null
             glass.target = null
         }
     }
     onGloballyPositioned {
         coords = it
-        if (focused) { val rect = it.boundsInRoot(); mine = rect; glass.target = rect }
+        if (focused && glass.owner == key) glass.target = it.boundsInRoot()
     }
 }
 
 /**
- * A sheet of glass that glides from tile to tile as focus moves. Put it in a Box on top of
- * the grid whose tiles use [glassTarget].
+ * A light sheet of glass that glides from tile to tile as focus moves. Put it in a clipping
+ * Box on top of the grid whose tiles use [glassTarget].
  */
 @Composable
-fun GlassFocusOverlay(glass: GlassFocus, radius: Dp = 14.dp, grow: Dp = 6.dp) {
+fun GlassFocusOverlay(glass: GlassFocus, radius: Dp = 14.dp, grow: Dp = 5.dp) {
     val density = LocalDensity.current
     var origin by remember { mutableStateOf(Offset.Zero) }
-    var last by remember { mutableStateOf<Rect?>(null) }
     val target = glass.target
-    if (target != null) last = target
-    val rect = last
-    val glide = spring<Float>(dampingRatio = .82f, stiffness = 420f)
-    val x by animateFloatAsState(rect?.left ?: 0f, glide, label = "glassX")
-    val y by animateFloatAsState(rect?.top ?: 0f, glide, label = "glassY")
-    val w by animateFloatAsState(rect?.width ?: 0f, glide, label = "glassW")
-    val h by animateFloatAsState(rect?.height ?: 0f, glide, label = "glassH")
-    val alpha by animateFloatAsState(if (target != null) 1f else 0f, tween(180), label = "glassAlpha")
+    val owner = glass.owner
+    // The glass travels from where it was drawn last to the newly focused tile.
+    val travel = remember { Animatable(1f) }
+    var from by remember { mutableStateOf<Rect?>(null) }
+    val drawn = remember { arrayOfNulls<Rect>(1) }
+    LaunchedEffect(owner) {
+        if (owner == null) {
+            from = null
+        } else {
+            from = drawn[0]
+            travel.snapTo(0f)
+            travel.animateTo(1f, spring(dampingRatio = .86f, stiffness = 520f))
+        }
+    }
+    val start = from
+    val rect = when {
+        target == null -> null
+        start == null -> target
+        else -> lerp(start, target, travel.value.coerceIn(0f, 1f))
+    }
+    SideEffect { drawn[0] = if (target == null) null else rect }
+    val alpha by animateFloatAsState(if (target != null) 1f else 0f, tween(160), label = "glassAlpha")
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
-        if (rect != null && alpha > 0f) {
+        if (rect != null) {
             val pad = with(density) { grow.toPx() }
             val shape = RoundedCornerShape(radius + grow)
             Box(
                 Modifier
-                    .offset { IntOffset((x - origin.x - pad).roundToInt(), (y - origin.y - pad).roundToInt()) }
-                    .size(with(density) { (w + pad * 2).toDp() }, with(density) { (h + pad * 2).toDp() })
+                    .offset { IntOffset((rect.left - origin.x - pad).roundToInt(), (rect.top - origin.y - pad).roundToInt()) }
+                    .size(with(density) { (rect.width + pad * 2).toDp() }, with(density) { (rect.height + pad * 2).toDp() })
                     .alpha(alpha)
                     .clip(shape)
-                    .background(Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x14FFFFFF), Color(0x24FFFFFF))))
-                    .border(1.5.dp, Brush.verticalGradient(listOf(Color(0xE6FFFFFF), Color(0x59FFFFFF))), shape)
+                    .background(Brush.verticalGradient(listOf(Color(0x26FFFFFF), Color(0x08FFFFFF), Color(0x12FFFFFF))))
+                    .border(1.dp, Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x33FFFFFF))), shape)
             )
         }
     }

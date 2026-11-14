@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -130,17 +131,22 @@ fun PlayerScreen(
     var listTitle by remember { mutableStateOf(queueTitle) }
     var listDirection by remember { mutableIntStateOf(1) }
     var listTick by remember { mutableIntStateOf(0) }
+    // False right after opening (focus goes to the playing channel); true once the user pages.
+    var listPaged by remember { mutableStateOf(false) }
+    val listNameFocusRequester = remember { FocusRequester() }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         listTitle = queueTitle
+        listPaged = false
         listTick++
         overlayState = OverlayState.ChannelList
     }
     fun stepList(delta: Int) {
         if (lists.size < 2) return
         listDirection = delta
-        // Park focus on the player while the old page leaves; the new page takes it back.
-        runCatching { playerFocusRequester.requestFocus() }
+        // Paging is done on the list name: it takes focus, the channels below just follow.
+        listPaged = true
+        runCatching { listNameFocusRequester.requestFocus() }
         listTitle = lists[(listIndex + delta + lists.size) % lists.size].first
     }
 
@@ -354,8 +360,26 @@ fun PlayerScreen(
                     .padding(top = 18.dp)
             ) {
                 val many = lists.size > 1
-                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("‹", color = PlayerWhite.copy(alpha = if (many) .55f else 0f), fontSize = 24.sp)
+                var nameFocused by remember { mutableStateOf(false) }
+                val pop = remember { Animatable(1f) }
+                LaunchedEffect(listTitle) {
+                    if (listPaged) {
+                        pop.snapTo(1.14f)
+                        pop.animateTo(1f, spring(dampingRatio = .45f, stiffness = 380f))
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).scale(pop.value).clip(RoundedCornerShape(18.dp))
+                        .background(if (nameFocused) Color(0x29FFFFFF) else Color.Transparent)
+                        .border(1.dp, if (nameFocused) Color(0x66FFFFFF) else Color.Transparent, RoundedCornerShape(18.dp))
+                        .focusRequester(listNameFocusRequester)
+                        .onFocusChanged { nameFocused = it.isFocused }
+                        .focusable()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val arrow = if (!many) 0f else if (nameFocused) 1f else .5f
+                    Text("‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                     AnimatedContent(
                         targetState = listTitle,
                         modifier = Modifier.weight(1f),
@@ -369,10 +393,10 @@ fun PlayerScreen(
                             Text(title, color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val size = lists.firstOrNull { it.first == title }?.second?.size ?: 0
-                            Text("$size channels", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
+                            Text(if (size == 1) "1 channel" else "$size channels", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
                         }
                     }
-                    Text("›", color = PlayerWhite.copy(alpha = if (many) .55f else 0f), fontSize = 24.sp)
+                    Text("›", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                 }
                 Spacer(Modifier.height(8.dp))
                 AnimatedContent(
@@ -385,7 +409,7 @@ fun PlayerScreen(
                     label = "listPage"
                 ) { title ->
                     val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
-                    ChannelListPage(page, channel) { item -> onSelect(item, page, title) }
+                    ChannelListPage(page, channel, takeFocus = !listPaged) { item -> onSelect(item, page, title) }
                 }
             }
         }
@@ -394,12 +418,12 @@ fun PlayerScreen(
 
 /** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
 @Composable
-private fun ChannelListPage(items: List<Channel>, playing: Channel, onPick: (Channel) -> Unit) {
+private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onPick: (Channel) -> Unit) {
     val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
     val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
     val anchor = remember { FocusRequester() }
-    LaunchedEffect(Unit) { anchor.requestFocusSafely() }
+    LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),

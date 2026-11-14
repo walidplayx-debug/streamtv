@@ -31,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -322,7 +323,7 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
         }
     } else {
         val glass = remember { GlassFocus() }
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().clipToBounds()) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 modifier = Modifier.fillMaxSize(),
@@ -349,7 +350,7 @@ private fun PosterCard(channel: Channel, glass: GlassFocus, favorite: Boolean, o
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).glassTarget(glass, focused).clip(RoundedCornerShape(12.dp))
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f).glassTarget(glass, focused, channel.key).clip(RoundedCornerShape(12.dp))
                 .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
@@ -407,7 +408,7 @@ private fun ChannelGrid(channels: List<Channel>, title: String, programs: List<E
         return
     }
     val glass = remember { GlassFocus() }
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().clipToBounds()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
             modifier = Modifier.fillMaxSize(),
@@ -428,7 +429,7 @@ private fun ChannelCard(channel: Channel, glass: GlassFocus, favorite: Boolean, 
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.035f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "cardScale")
     Box(
-        modifier.glassTarget(glass, focused).scale(scale).clip(RoundedCornerShape(10.dp))
+        modifier.glassTarget(glass, focused, channel.key).scale(scale).clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(Color(0xFF252A33), Color(0xFF171B22))))
             .border(1.dp, White.copy(alpha = .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
