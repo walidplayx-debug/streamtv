@@ -47,6 +47,7 @@ private data class DownloadedUpdate(
 @Composable
 fun AppUpdateSection() {
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     val scope = rememberCoroutineScope()
     var downloaded by remember { mutableStateOf<DownloadedUpdate?>(null) }
     var status by remember { mutableStateOf("") }
@@ -66,6 +67,13 @@ fun AppUpdateSection() {
             color = Color(0xFF99999E),
             fontSize = 16.sp
         )
+        if (downloaded != null) {
+            Text(
+                "${translate(language, "Available version")}: ${downloaded!!.versionName} (${downloaded!!.versionCode})",
+                color = Color(0xFF99999E),
+                fontSize = 15.sp
+            )
+        }
         if (status.isNotBlank()) {
             Text(status, color = Color(0xFFD5DADF), fontSize = 16.sp)
         }
@@ -86,7 +94,7 @@ fun AppUpdateSection() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
                                 !context.packageManager.canRequestPackageInstalls()
                             ) {
-                                status = context.getStringFromAppText(
+                                status = translate(language, 
                                     "Allow STV to install updates in the next screen, then return and choose Install update."
                                 )
                                 context.startActivity(
@@ -109,27 +117,27 @@ fun AppUpdateSection() {
                                 context.startActivity(installIntent)
                             }
                         } catch (_: Exception) {
-                            status = context.getStringFromAppText(
+                            status = translate(language, 
                                 "Could not check for updates. Check your internet connection and try again."
                             )
                         }
                     } else {
                         busy = true
-                        status = context.getStringFromAppText("Checking for updates…")
+                        status = translate(language, "Checking for updates…")
                         scope.launch {
                             try {
                                 val result = withContext(Dispatchers.IO) {
                                     checkAndDownloadUpdate(context)
                                 }
                                 downloaded = result
-                                status = context.getStringFromAppText(
+                                status = translate(language, 
                                     if (result == null) "You're up to date"
                                     else "Update downloaded. Choose Install update to continue."
                                 )
                             } catch (error: IncompatibleUpdateException) {
-                                status = context.getStringFromAppText("This update is not compatible with this app.")
+                                status = translate(language, "This update is not compatible with this app.")
                             } catch (_: Exception) {
-                                status = context.getStringFromAppText(
+                                status = translate(language, 
                                     "Could not check for updates. Check your internet connection and try again."
                                 )
                             } finally {
@@ -141,21 +149,12 @@ fun AppUpdateSection() {
                 .padding(horizontal = 25.dp, vertical = 14.dp)
         ) {
             Text(
-                context.getStringFromAppText(buttonLabel),
+                translate(language, buttonLabel),
                 color = Color(0xFF101014),
                 fontSize = 17.sp
             )
         }
     }
-}
-
-private fun android.content.Context.getStringFromAppText(key: String): String =
-    translateForCurrentLanguage(this, key)
-
-private fun translateForCurrentLanguage(context: android.content.Context, key: String): String {
-    val preferences = context.getSharedPreferences("stv_preferences", android.content.Context.MODE_PRIVATE)
-    val language = preferences.getString("language", "en") ?: "en"
-    return translate(language, key)
 }
 
 private class IncompatibleUpdateException : IOException()
