@@ -35,11 +35,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import com.streamtv.data.Channel
 import com.streamtv.data.detectedLanguage
 import com.streamtv.data.EpgProgram
@@ -54,6 +58,7 @@ private val White = Color(0xFFFFFFFF)
 private val Muted = Color(0xFF99999E)
 private val Accent = Color(0xFFD5DADF)
 private val Glass = Color(0xFF29292C)
+private const val ExamplePlaylistUrl = "https://iptv-org.github.io/iptv/countries/be.m3u"
 
 @Composable
 fun MainScreen(state: TvState, model: MainViewModel) {
@@ -71,6 +76,41 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         return
     }
 
+    // Text entry is a screen of its own: a floating TV keyboard would cover an inline form.
+    var entry by remember { mutableStateOf("") }
+    var settingsSection by remember { mutableStateOf("Playlist") }
+    when (entry) {
+        "playlist" -> {
+            TextEntryScreen(
+                title = "Add M3U playlist", urlHint = "Playlist address  https://…", initialUrl = "",
+                exampleUrl = ExamplePlaylistUrl, showName = true, saveLabel = "Save & load",
+                onSave = { name, url ->
+                    model.setPlaylistName(name)
+                    model.setUrl(url)
+                    model.savePlaylistEntry()
+                    model.loadPlaylist()
+                    entry = ""
+                },
+                onCancel = { entry = "" }
+            )
+            return
+        }
+        "epg" -> {
+            TextEntryScreen(
+                title = "TV guide address (XMLTV)", urlHint = "https://…", initialUrl = state.epgUrl,
+                exampleUrl = null, showName = false, saveLabel = "Save & load",
+                onSave = { _, url ->
+                    model.setEpgUrl(url)
+                    model.loadEpg()
+                    entry = ""
+                },
+                onCancel = { entry = "" }
+            )
+            return
+        }
+    }
+
+    // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
     Column(Modifier.fillMaxSize().background(Ink).padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)) {
         TopNavigation(state.tab, model::selectTab)
         Spacer(Modifier.height(30.dp))
@@ -83,7 +123,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                 ChannelGrid(state.channels.filter { it.id in state.favorites }, state.programs, state.favorites, model)
             }
             "Search" -> SearchContent(state, model)
-            "Settings" -> SettingsContent(state, model)
+            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }) { entry = it }
             else -> HomeContent(state, model)
         }
     }
@@ -92,7 +132,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
 @Composable
 private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("STREEM", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
+        Box(Modifier.width(120.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Spacer(Modifier.weight(1f))
         Row(
             Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
@@ -104,7 +144,26 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
             }
         }
         Spacer(Modifier.weight(1f))
-        Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()), color = Muted, fontSize = 19.sp)
+        Box(Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+            Text("STREEM", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, maxLines = 1)
+        }
+    }
+}
+
+/** 24h clock with Western digits in left-to-right order, whatever the TV language is. */
+@Composable
+private fun Clock() {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L - System.currentTimeMillis() % 60_000L + 100L)
+            now = System.currentTimeMillis()
+        }
+    }
+    val text = remember(now) { SimpleDateFormat("HH:mm", Locale.US).format(Date(now)) }
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Text(text, color = Muted, fontSize = 19.sp, maxLines = 1,
+            style = androidx.compose.ui.text.TextStyle(textDirection = TextDirection.Ltr))
     }
 }
 
@@ -261,7 +320,7 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        gridItems(channels, key = { it.id }) { channel ->
+        gridItems(channels, key = { it.key }) { channel ->
             ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel) }
         }
     }
@@ -273,7 +332,7 @@ private fun ChannelShelf(channels: List<Channel>, programs: List<EpgProgram>, fa
         horizontalArrangement = Arrangement.spacedBy(18.dp),
         contentPadding = PaddingValues(end = 30.dp, bottom = 12.dp)
     ) {
-        items(channels.take(18), key = { it.id }) { channel ->
+        items(channels.take(18), key = { it.key }) { channel ->
             Column(Modifier.width(232.dp)) {
                 ChannelCard(channel, programs, channel.id in favorites, Modifier.width(232.dp).height(130.dp)) { model.select(channel) }
                 Spacer(Modifier.height(8.dp))
@@ -296,23 +355,10 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
-                .background(Brush.linearGradient(channelGradient(channel.name))),
-            contentAlignment = Alignment.Center
-        ) {
-            val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-                .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
-            Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        }
-        if (!channel.logo.isNullOrBlank()) {
-            AsyncImage(
-                model = channel.logo,
-                contentDescription = channel.name,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
-                contentScale = ContentScale.Fit
-            )
-        }
+        ChannelLogo(
+            channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
+            placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp
+        )
         if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
     }
 }
@@ -383,7 +429,9 @@ private fun SearchContent(state: TvState, model: MainViewModel) {
 }
 
 @Composable
-private fun SettingsContent(state: TvState, model: MainViewModel) {
+private fun SettingsContent(
+    state: TvState, model: MainViewModel, section: String, onSection: (String) -> Unit, onEntry: (String) -> Unit
+) {
     val context = LocalContext.current
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -393,32 +441,24 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
             }.onSuccess(model::importPlaylist).onFailure { model.setError(it.message ?: "Unable to import playlist") }
         }
     }
-    var section by remember { mutableStateOf("Playlist") }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(270.dp)) {
             Text("Settings", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(26.dp))
             listOf("Playback", "Playlist", "Language", "Parental control", "TV guide", "Appearance", "About").forEach { item ->
-                FocusRow(item, if (item == section) "●" else "", item == section) { section = item }
+                FocusRow(item, if (item == section) "●" else "", item == section) { onSection(item) }
             }
         }
         Spacer(Modifier.width(44.dp))
-        Column(Modifier.weight(1f).fillMaxHeight().imePadding().verticalScroll(rememberScrollState())) {
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
             Text(section, color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(18.dp))
             when (section) {
                 "Playlist" -> {
-                    SettingsRow("Add M3U playlist", "Give your playlist a name and paste its M3U address") {
-                        GlassInput(state.playlistName, "Playlist name", model::setPlaylistName, Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(10.dp))
-                        GlassInput(state.playlistUrl, "https://…", model::setUrl, Modifier.fillMaxWidth())
-                    }
+                    SettingsRow("Current playlist", state.playlistUrl.ifBlank { "None yet" })
                     Spacer(Modifier.height(14.dp))
-                    WhiteButton(if (state.loading) "Loading…" else "Save & load playlist") {
-                        if (!state.loading) {
-                            model.savePlaylistEntry()
-                            model.loadPlaylist()
-                        }
+                    WhiteButton(if (state.loading) "Loading…" else "Add M3U playlist") {
+                        if (!state.loading) onEntry("playlist")
                     }
                     Spacer(Modifier.height(10.dp))
                     WhiteButton("Import M3U file") {
@@ -455,11 +495,13 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                     Text("${state.channels.size} channels loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 "TV guide" -> {
-                    SettingsRow("XMLTV guide URL", "Optional programme guide") {
-                        GlassInput(state.epgUrl, "https://…", model::setEpgUrl, Modifier.fillMaxWidth())
-                    }
+                    SettingsRow("XMLTV guide URL", state.epgUrl.ifBlank { "Optional programme guide · not set" })
                     Spacer(Modifier.height(14.dp))
-                    WhiteButton("Load TV guide") { model.loadEpg() }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        WhiteButton("Set guide address") { onEntry("epg") }
+                        if (state.epgUrl.isNotBlank()) WhiteButton("Reload TV guide") { model.loadEpg() }
+                    }
+                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} programmes loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
