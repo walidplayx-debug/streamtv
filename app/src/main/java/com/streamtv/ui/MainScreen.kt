@@ -488,7 +488,7 @@ private fun SettingsContent(
         Column(Modifier.width(270.dp)) {
             Text(t("Settings"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(26.dp))
-            listOf("Playback", "Playlist", "Language", "Appearance", "About", "Parental control", "TV guide").forEach { item ->
+            listOf("Playback", "Playlist", "Language", "About", "Parental control", "TV guide").forEach { item ->
                 FocusRow(item, if (item == section) "●" else "", item == section) { onSection(item) }
             }
         }
@@ -502,17 +502,17 @@ private fun SettingsContent(
                     val activeName = state.playlists.firstOrNull { it.url == state.playlistUrl }?.name
                     var summaryFocused by remember { mutableStateOf(false) }
                     Column(
-                        Modifier.fillMaxWidth(.72f).clip(RoundedCornerShape(18.dp))
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
                             .background(White.copy(alpha = if (summaryFocused) .13f else .07f))
                             .border(1.dp, White.copy(alpha = if (summaryFocused) .5f else 0f), RoundedCornerShape(18.dp))
                             .onFocusChanged { summaryFocused = it.isFocused }.focusable()
-                            .padding(20.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(2.dp))
                         Text(activeName ?: t("Playlist"), color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(t(playlistLabel(state.playlistUrl)), color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             if (state.loading) t("Loading…")
                             else "${counts[ChannelKind.Live] ?: 0} ${t("live")}  ·  ${counts[ChannelKind.Movie] ?: 0} ${t("movies")}  ·  ${counts[ChannelKind.Series] ?: 0} ${t("series")}",
@@ -570,7 +570,6 @@ private fun SettingsContent(
                     }
                 }
                 "Parental control" -> SettingsRow("Parental lock", "Not configured")
-                "Appearance" -> SettingsRow("Theme", "Dark · tvOS inspired")
                 "About" -> AppUpdateSection()
                 else -> SettingsRow("streamtv", "Version 1.0.0")
             }
