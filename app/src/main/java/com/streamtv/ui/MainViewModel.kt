@@ -23,9 +23,13 @@ data class TvState(
     val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
     val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
-    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false, val searchQuery: String = "",
+    val favorites: Set<String> = emptySet(), val tab: String = "Live TV", val playing: Boolean = false, val searchQuery: String = "",
     /** The list the playing channel was opened from; the player browses and zaps inside it. */
-    val queue: List<Channel> = emptyList()
+    val queue: List<Channel> = emptyList(),
+    /** Keys of recently watched channels, newest first. */
+    val recent: List<String> = emptyList(),
+    /** True once the saved settings were read, so first-run screens do not flash. */
+    val ready: Boolean = false
 )
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
@@ -39,12 +43,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             preferences.playlistUrl.collect { saved ->
-                if (_state.value.playlistUrl.isBlank()) {
-                    val initial = saved.ifBlank { "https://iptv-org.github.io/iptv/countries/be.m3u" }
-                    _state.value = _state.value.copy(playlistUrl = initial)
-                    if (saved.isBlank()) preferences.savePlaylist(initial)
+                // No playlist is bundled: a fresh install shows the welcome screen instead.
+                if (_state.value.playlistUrl.isBlank() && saved.isNotBlank()) {
+                    _state.value = _state.value.copy(playlistUrl = saved)
                     if (_state.value.channels.isEmpty()) loadPlaylist()
                 }
+                _state.value = _state.value.copy(ready = true)
             }
         }
         viewModelScope.launch {
@@ -85,6 +89,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(playlists = entries)
             }
         }
+    }
+
+    init {
+        viewModelScope.launch {
+            preferences.recentKeys.collect { keys -> _state.value = _state.value.copy(recent = keys) }
+        }
+    }
+    private fun rememberWatched(channel: Channel) {
+        val updated = (listOf(channel.key) + _state.value.recent.filterNot { it == channel.key }).take(20)
+        _state.value = _state.value.copy(recent = updated)
+        viewModelScope.launch { preferences.saveRecent(updated) }
     }
 
     fun setPlaylistName(value: String) { _state.value = _state.value.copy(playlistName = value) }
@@ -175,6 +190,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _state.value.queue
         val queue = from ?: if (current.any { it.key == channel.key }) current else _state.value.channels
         _state.value = _state.value.copy(selected = channel, playing = true, queue = queue)
+        rememberWatched(channel)
         viewModelScope.launch { preferences.saveLastChannel(channel.id) }
     }
     fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
@@ -186,6 +202,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val selected = channels[next]
         lastChannelId = selected.id
         _state.value = _state.value.copy(selected = selected)
+        rememberWatched(selected)
         viewModelScope.launch { preferences.saveLastChannel(selected.id) }
     }
     fun toggleFavorite(channel: Channel) {

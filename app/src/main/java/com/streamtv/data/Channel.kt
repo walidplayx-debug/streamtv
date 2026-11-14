@@ -21,3 +21,19 @@ fun Channel.detectedLanguage(): String {
         group.contains("Français", true) || group.contains("Francais", true)) return "fr"
     return "other"
 }
+
+enum class ChannelKind { Live, Movie, Series }
+
+private val videoFileExtensions = listOf(".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv", ".flv")
+private val episodeMarker = Regex("""\bS\d{1,2}\s?E\d{1,3}\b""", RegexOption.IGNORE_CASE)
+
+/** Playlists mix live channels with on-demand files; tell them apart by the stream address. */
+fun Channel.kind(): ChannelKind {
+    val path = url.substringBefore('?').lowercase()
+    val file = videoFileExtensions.any { path.endsWith(it) }
+    return when {
+        path.contains("/series/") || (file && episodeMarker.containsMatchIn(name)) -> ChannelKind.Series
+        path.contains("/movie/") || path.contains("/movies/") || file -> ChannelKind.Movie
+        else -> ChannelKind.Live
+    }
+}

@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,7 +31,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -44,7 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import com.streamtv.R
 import com.streamtv.data.Channel
+import com.streamtv.data.ChannelKind
+import com.streamtv.data.kind
 import com.streamtv.data.detectedLanguage
 import com.streamtv.data.EpgProgram
 import java.text.SimpleDateFormat
@@ -110,13 +118,27 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         }
     }
 
+    if (state.ready && state.playlistUrl.isBlank() && state.channels.isEmpty()) {
+        WelcomeScreen(
+            loading = state.loading, error = state.error,
+            onAdd = { entry = "playlist" },
+            onExample = {
+                model.setPlaylistName("Example")
+                model.setUrl(ExamplePlaylistUrl)
+                model.savePlaylistEntry()
+                model.loadPlaylist()
+            }
+        )
+        return
+    }
+
     // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
     Column(Modifier.fillMaxSize().background(Ink).padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)) {
         TopNavigation(state.tab, model::selectTab)
         Spacer(Modifier.height(30.dp))
         when (state.tab) {
-            "Live TV" -> LiveContent(state, model)
-            "Categories" -> CategoryContent(state.channels, model)
+            "Movies" -> LibraryContent("Movies", ChannelKind.Movie, state, model)
+            "Series" -> LibraryContent("Series", ChannelKind.Series, state, model)
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} saved channels")
                 Spacer(Modifier.height(20.dp))
@@ -124,7 +146,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             }
             "Search" -> SearchContent(state, model)
             "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }) { entry = it }
-            else -> HomeContent(state, model)
+            else -> LiveContent(state, model)
         }
     }
 }
@@ -138,7 +160,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
             Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Home", "Live TV", "Categories", "Favorites", "Search", "Settings").forEach { item ->
+            listOf("Live TV", "Movies", "Series", "Favorites", "Search", "Settings").forEach { item ->
                 val selected = tab == item
                 FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
             }
@@ -199,70 +221,29 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
 }
 
 @Composable
-private fun HomeContent(state: TvState, model: MainViewModel) {
-    if (state.channels.isEmpty()) {
-        EmptyState(
-            title = "Your TV starts here",
-            message = "Add an M3U playlist to bring your channels together.",
-            button = if (state.loading) "Loading…" else "Add your playlist",
-            onClick = { model.selectTab("Settings") }
-        )
-        return
-    }
-    val hero = state.selected ?: state.channels.first()
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(end = 32.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(Accent))
-                    Spacer(Modifier.width(10.dp))
-                    Text("LIVE  ·  ${hero.name}", color = Muted, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Spacer(Modifier.height(18.dp))
-                Text(hero.name, color = White, fontSize = 54.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(10.dp))
-                Text(currentProgram(hero, state.programs)?.title ?: hero.group, color = Muted, fontSize = 21.sp, maxLines = 2)
-                Spacer(Modifier.height(24.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    WhiteButton("Watch live") { model.select(hero, state.channels) }
-                    Spacer(Modifier.width(14.dp))
-                    GlassCircle(if (hero.id in state.favorites) "★" else "+") { model.toggleFavorite(hero) }
-                }
-            }
-            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp)).clickable { model.select(hero, state.channels) }.focusable()) {
-                ChannelArtwork(hero, Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Ink.copy(alpha = .48f), Color.Transparent))))
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .82f)))))
-            }
-        }
-        Spacer(Modifier.height(22.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Your channels", color = White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-            Text("Browse categories  ›", color = Muted, fontSize = 17.sp, modifier = Modifier.clickable { model.selectTab("Categories") }.focusable())
-        }
-        Spacer(Modifier.height(14.dp))
-        ChannelShelf(state.channels, state.programs, state.favorites, model)
-    }
-}
-
-@Composable
 private fun LiveContent(state: TvState, model: MainViewModel) {
-    val countryGroups = state.channels.filter { it.country.isNotBlank() }
+    val live = remember(state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } }
+    val recent = remember(live, state.recent) {
+        val byKey = live.associateBy { it.key }
+        state.recent.mapNotNull { byKey[it] }
+    }
+    val countryGroups = live.filter { it.country.isNotBlank() }
         .groupBy { it.country.trim().uppercase() }.toSortedMap()
-    val categoryGroups = state.channels.groupBy { it.group.ifBlank { "Other" } }.toSortedMap()
+    val categoryGroups = live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap()
     val languageGroups = listOf(
-        Triple("العربية", "__language_ar", state.channels.count { it.detectedLanguage() == "ar" }),
-        Triple("Français", "__language_fr", state.channels.count { it.detectedLanguage() == "fr" })
+        Triple("العربية", "__language_ar", live.count { it.detectedLanguage() == "ar" }),
+        Triple("Français", "__language_fr", live.count { it.detectedLanguage() == "fr" })
     ).filter { it.third > 0 }
     val filtered = when {
-        state.searchQuery.isBlank() || state.searchQuery == "__all" -> state.channels
-        state.searchQuery == "__language_ar" -> state.channels.filter { it.detectedLanguage() == "ar" }
-        state.searchQuery == "__language_fr" -> state.channels.filter { it.detectedLanguage() == "fr" }
-        state.searchQuery.startsWith("__country:") -> state.channels.filter { it.country.equals(state.searchQuery.removePrefix("__country:"), true) }
-        else -> state.channels.filter { it.group.equals(state.searchQuery, true) }
+        state.searchQuery == "__recent" -> recent
+        state.searchQuery.isBlank() || state.searchQuery == "__all" -> live
+        state.searchQuery == "__language_ar" -> live.filter { it.detectedLanguage() == "ar" }
+        state.searchQuery == "__language_fr" -> live.filter { it.detectedLanguage() == "fr" }
+        state.searchQuery.startsWith("__country:") -> live.filter { it.country.equals(state.searchQuery.removePrefix("__country:"), true) }
+        else -> live.filter { it.group.equals(state.searchQuery, true) }
     }
     val heading = when {
+        state.searchQuery == "__recent" -> "Last watched"
         state.searchQuery == "__language_ar" -> "العربية"
         state.searchQuery == "__language_fr" -> "Français"
         state.searchQuery.startsWith("__country:") -> state.searchQuery.removePrefix("__country:")
@@ -274,7 +255,10 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
             Text("Live TV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(18.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                item { FocusRow("All channels", state.channels.size.toString(), state.searchQuery.isBlank() || state.searchQuery == "__all") { model.setSearchQuery("__all") } }
+                if (recent.isNotEmpty()) {
+                    item { FocusRow("Last watched", recent.size.toString(), state.searchQuery == "__recent") { model.setSearchQuery("__recent") } }
+                }
+                item { FocusRow("All channels", live.size.toString(), state.searchQuery.isBlank() || state.searchQuery == "__all") { model.setSearchQuery("__all") } }
                 if (languageGroups.isNotEmpty()) {
                     item { Text("BY LANGUAGE", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                     items(languageGroups) { item ->
@@ -308,6 +292,54 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
 }
 
 @Composable
+private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, model: MainViewModel) {
+    val items = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
+    ScreenHeading(title, "${items.size} titles")
+    Spacer(Modifier.height(20.dp))
+    if (items.isEmpty()) {
+        EmptyState("No ${title.lowercase()} yet", "Your playlist has no ${title.lowercase()}. Add one that includes them in Settings.", "Settings") {
+            model.selectTab("Settings")
+        }
+    } else {
+        ChannelGrid(items, state.programs, state.favorites, model)
+    }
+}
+
+@Composable
+private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, onExample: () -> Unit) {
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    Box(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 640.dp)) {
+            Image(painterResource(R.drawable.banner), contentDescription = "STV",
+                modifier = Modifier.width(240.dp).height(135.dp).clip(RoundedCornerShape(20.dp)))
+            Spacer(Modifier.height(26.dp))
+            Text("Welcome to STV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
+            Spacer(Modifier.height(10.dp))
+            Text("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings.",
+                color = Muted, fontSize = 18.sp, textAlign = TextAlign.Center, lineHeight = 26.sp)
+            Spacer(Modifier.height(28.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                WhiteButton(if (loading) "Loading…" else "Add M3U playlist", Modifier.focusRequester(first)) { if (!loading) onAdd() }
+                WhiteButton("Try an example playlist") { if (!loading) onExample() }
+            }
+            error?.let {
+                Spacer(Modifier.height(18.dp))
+                Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
     if (channels.isEmpty()) {
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
@@ -322,23 +354,6 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
     ) {
         gridItems(channels, key = { it.key }) { channel ->
             ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels) }
-        }
-    }
-}
-
-@Composable
-private fun ChannelShelf(channels: List<Channel>, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
-    androidx.compose.foundation.lazy.LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        contentPadding = PaddingValues(end = 30.dp, bottom = 12.dp)
-    ) {
-        items(channels.take(18), key = { it.key }) { channel ->
-            Column(Modifier.width(232.dp)) {
-                ChannelCard(channel, programs, channel.id in favorites, Modifier.width(232.dp).height(130.dp)) { model.select(channel, channels) }
-                Spacer(Modifier.height(8.dp))
-                Text(channel.name, color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(currentProgram(channel, programs)?.title ?: channel.group, color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
         }
     }
 }
@@ -363,25 +378,6 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
     }
 }
 
-@Composable
-private fun ChannelArtwork(channel: Channel, modifier: Modifier = Modifier) {
-    if (!channel.logo.isNullOrBlank()) {
-        Box(modifier.background(channelColor(channel.name))) {
-            AsyncImage(model = channel.logo, contentDescription = channel.name, modifier = Modifier.fillMaxSize())
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .22f)))))
-        }
-    } else {
-        Box(modifier.background(Brush.linearGradient(channelGradient(channel.name)))) {
-            Box(Modifier.align(Alignment.TopEnd).offset(x = 20.dp, y = (-18).dp).size(110.dp).background(White.copy(alpha = .10f), CircleShape))
-            Text(channel.name.take(1).uppercase(), Modifier.align(Alignment.Center), color = White.copy(alpha = .72f), fontSize = 54.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-private fun channelColor(name: String): Color {
-    val colors = listOf(Color(0xFF25272B), Color(0xFF292624), Color(0xFF25292A), Color(0xFF2B282D), Color(0xFF292A25))
-    return colors[(name.hashCode().ushr(1) % colors.size)]
-}
 private fun channelGradient(name: String): List<Color> {
     val palettes = listOf(
         listOf(Color(0xFF30363B), Color(0xFF202428), Color(0xFF141719)),
@@ -390,29 +386,6 @@ private fun channelGradient(name: String): List<Color> {
         listOf(Color(0xFF303A39), Color(0xFF222B2A), Color(0xFF141A19))
     )
     return palettes[name.hashCode().ushr(1) % palettes.size]
-}
-
-@Composable
-private fun CategoryContent(channels: List<Channel>, model: MainViewModel) {
-    ScreenHeading("Browse", "Explore channels by category")
-    Spacer(Modifier.height(22.dp))
-    val groups = channels.groupBy { it.group.ifBlank { "Other" } }.toList()
-    if (groups.isEmpty()) {
-        EmptyState("Nothing to browse", "Add a playlist to see your channel categories.", "Add playlist") { model.selectTab("Settings") }
-    } else {
-        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            gridItems(groups, key = { it.first }) { (name, items) ->
-                var focused by remember { mutableStateOf(false) }
-                val scale by animateFloatAsState(if (focused) 1.06f else 1f, spring(stiffness = 360f), label = "categoryScale")
-                Column(Modifier.scale(scale).fillMaxWidth().height(160.dp).clip(RoundedCornerShape(20.dp))
-                    .background(Brush.linearGradient(channelGradient(name))).onFocusChanged { focused = it.isFocused }
-                    .clickable { model.selectTab("Live TV"); model.setSearchQuery(name) }.focusable().padding(18.dp), verticalArrangement = Arrangement.Bottom) {
-                    Text(name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${items.size} channels", color = White.copy(alpha = .62f), fontSize = 16.sp)
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -557,28 +530,19 @@ private fun EmptyState(title: String, message: String, button: String, onClick: 
             Spacer(Modifier.height(8.dp))
             Text(message, color = Muted, fontSize = 19.sp)
             Spacer(Modifier.height(22.dp))
-            WhiteButton(button, onClick)
+            WhiteButton(button, onClick = onClick)
         }
     }
 }
 
 @Composable
-private fun WhiteButton(text: String, onClick: () -> Unit) {
+private fun WhiteButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 430f), label = "buttonScale")
-    Box(Modifier.scale(scale).clip(CircleShape).background(White).onFocusChanged { focused = it.isFocused }
+    Box(modifier.scale(scale).clip(CircleShape).background(if (focused) White else White.copy(alpha = .82f))
+        .onFocusChanged { focused = it.isFocused }
         .clickable(onClick = onClick).focusable().padding(horizontal = 26.dp, vertical = 14.dp)) {
         Text(text, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun GlassCircle(text: String, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Box(Modifier.size(58.dp).scale(if (focused) 1.06f else 1f).clip(CircleShape).background(Glass)
-        .border(1.dp, White.copy(alpha = .12f), CircleShape).onFocusChanged { focused = it.isFocused }
-        .clickable(onClick = onClick).focusable(), contentAlignment = Alignment.Center) {
-        Text(text, color = if (text == "★") Accent else White, fontSize = 25.sp)
     }
 }
 
