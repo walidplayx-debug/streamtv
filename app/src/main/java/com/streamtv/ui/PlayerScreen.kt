@@ -291,6 +291,8 @@ fun PlayerScreen(
                         // OK on the list name opens the list of lists.
                         listOpen && nameFocused && !pickerOpen -> { pickerOpen = true; true }
                         listOpen || showErrorCard -> false
+                        // OK shows the info bar; OK again while it is up toggles the favourite star.
+                        overlayState == OverlayState.InfoBar -> { onFavorite(channel); showInfoBar(); true }
                         else -> { showInfoBar(); true }
                     }
                     else -> false
@@ -385,7 +387,28 @@ fun PlayerScreen(
                         }
                     }
                 }
-                Spacer(Modifier.width(18.dp))
+                Spacer(Modifier.width(14.dp))
+                val starred = channel.id in favorites
+                val starPop = remember { Animatable(1f) }
+                LaunchedEffect(starred) {
+                    if (starred) {
+                        starPop.snapTo(1.35f)
+                        starPop.animateTo(1f, spring(dampingRatio = .4f, stiffness = 380f))
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(38.dp).scale(starPop.value).clip(CircleShape)
+                            .background(if (starred) Color(0x33FFFFFF) else Color(0x14FFFFFF))
+                            .border(1.dp, if (starred) Color(0x99FFFFFF) else Color(0x29FFFFFF), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (starred) "★" else "☆", color = if (starred) PlayerWhite else PlayerWhite.copy(alpha = .5f),
+                            fontSize = 19.sp, maxLines = 1)
+                    }
+                    Text("OK", color = PlayerMuted.copy(alpha = .8f), fontSize = 9.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                }
+                Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
         }
