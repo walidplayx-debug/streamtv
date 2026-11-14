@@ -31,7 +31,9 @@ data class TvState(
     /** Keys of recently watched channels, newest first. */
     val recent: List<String> = emptyList(),
     /** True once the saved settings were read, so first-run screens do not flash. */
-    val ready: Boolean = false
+    val ready: Boolean = false,
+    /** Interface language: "en", "fr" or "ar". */
+    val language: String = "en"
 )
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
@@ -97,6 +99,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.recentKeys.collect { keys -> _state.value = _state.value.copy(recent = keys) }
         }
+    }
+    init {
+        viewModelScope.launch {
+            preferences.language.collect { code -> _state.value = _state.value.copy(language = code) }
+        }
+    }
+    fun setLanguage(code: String) {
+        _state.value = _state.value.copy(language = code)
+        viewModelScope.launch { preferences.saveLanguage(code) }
     }
     private fun rememberWatched(channel: Channel) {
         val updated = (listOf(channel.key) + _state.value.recent.filterNot { it == channel.key }).take(20)

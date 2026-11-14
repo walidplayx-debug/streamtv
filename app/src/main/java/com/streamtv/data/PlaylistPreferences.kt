@@ -15,6 +15,7 @@ class PlaylistPreferences(private val context: Context) {
     private val favoritesKey = stringSetPreferencesKey("favorite_ids")
     private val playlistsKey = stringSetPreferencesKey("saved_playlists")
     private val lastChannelKey = stringPreferencesKey("last_channel_id")
+    private val languageKey = stringPreferencesKey("interface_language")
     private val recentKey = stringPreferencesKey("recent_channel_keys")
     val playlistUrl: Flow<String> = context.dataStore.data.map { it[playlistKey].orEmpty() }
     val epgUrl: Flow<String> = context.dataStore.data.map { it[epgKey].orEmpty() }
@@ -27,5 +28,7 @@ class PlaylistPreferences(private val context: Context) {
     suspend fun savePlaylists(entries: Set<String>) { context.dataStore.edit { it[playlistsKey] = entries } }
     val recentKeys: Flow<List<String>> = context.dataStore.data.map { it[recentKey].orEmpty().split("\n").filter { key -> key.isNotBlank() } }
     suspend fun saveRecent(keys: List<String>) { context.dataStore.edit { it[recentKey] = keys.joinToString("\n") } }
+    val language: Flow<String> = context.dataStore.data.map { it[languageKey] ?: "en" }
+    suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
     suspend fun saveLastChannel(id: String) { context.dataStore.edit { it[lastChannelKey] = id } }
 }

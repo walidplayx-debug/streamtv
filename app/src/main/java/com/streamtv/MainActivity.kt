@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import com.streamtv.ui.LocalAppLanguage
 import com.streamtv.ui.MainScreen
 import com.streamtv.ui.MainViewModel
 import com.streamtv.ui.StreamTheme
@@ -22,9 +23,12 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(SOFT_INPUT_ADJUST_NOTHING)
         setContent {
             StreamTheme {
-                // The interface is English-only, so keep one left-to-right layout on every TV language.
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    val state by model.state.collectAsState()
+                // Layout direction follows the language chosen in the app, not the TV's system language.
+                val state by model.state.collectAsState()
+                CompositionLocalProvider(
+                    LocalAppLanguage provides state.language,
+                    LocalLayoutDirection provides if (state.language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
+                ) {
                     MainScreen(state, model)
                 }
             }

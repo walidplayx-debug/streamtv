@@ -45,6 +45,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -96,6 +98,9 @@ fun PlayerScreen(
     onFavorite: (Channel) -> Unit
 ) {
     val context = LocalContext.current
+    // In a right-to-left layout the panel sits on the right, so the arrow keys swap roles.
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val side = if (rtl) 1 else -1
     val player = remember(channel.url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(channel.url))
@@ -222,8 +227,13 @@ fun PlayerScreen(
         }
     }
 
+    // Back from the channels goes to the list name, from the list name it closes the panel.
+    fun backInList() {
+        if (nameFocused) overlayState = OverlayState.None
+        else if (runCatching { listNameFocusRequester.requestFocus() }.isFailure) overlayState = OverlayState.None
+    }
     BackHandler {
-        if (overlayState == OverlayState.ChannelList) overlayState = OverlayState.None else onBack()
+        if (overlayState == OverlayState.ChannelList) backInList() else onBack()
     }
 
     Box(
@@ -237,25 +247,27 @@ fun PlayerScreen(
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> { onZap(1); showInfoBar(); true }
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> { onZap(-1); showInfoBar(); true }
                     Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
-                        if (listOpen) { overlayState = OverlayState.None; true } else false
+                        if (listOpen) { backInList(); true } else false
                     }
                     Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
                     Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
                     // On the list name, left/right page between lists; on the channels they close the panel.
-                    Key.DirectionLeft -> when {
-                        listOpen && nameFocused -> { stepList(-1); true }
-                        listOpen -> { overlayState = OverlayState.None; true }
-                        showErrorCard -> false
-                        else -> { openList(); true }
+                    // "Open" is the arrow pointing at the panel's side of the screen.
+                    Key.DirectionLeft, Key.DirectionRight -> {
+                        val towardsPanel = (event.key == Key.DirectionLeft) != rtl
+                        val step = if ((event.key == Key.DirectionRight) != rtl) 1 else -1
+                        when {
+                            listOpen && nameFocused -> { stepList(step); true }
+                            listOpen -> { overlayState = OverlayState.None; true }
+                            showErrorCard -> false
+                            towardsPanel -> { openList(); true }
+                            else -> false
+                        }
                     }
-                    Key.DirectionRight -> when {
-                        listOpen && nameFocused -> { stepList(1); true }
-                        listOpen -> { overlayState = OverlayState.None; true }
-                        else -> false
-                    }
+                    // OK only brings up the info bar; the channel list opens with the arrow key.
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
                     Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                        if (listOpen || showErrorCard) false else { openList(); true }
+                        if (listOpen || showErrorCard) false else { showInfoBar(); true }
                     }
                     else -> false
                 }
@@ -292,12 +304,12 @@ fun PlayerScreen(
                     .padding(horizontal = 28.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Can't play this channel", color = PlayerWhite, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text(t("Can't play this channel"), color = PlayerWhite, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 Text(channelDisplayName(channel.name), color = PlayerMuted, fontSize = 16.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
-                Text("The stream is not responding right now.", color = PlayerMuted, fontSize = 14.sp,
+                Text(t("The stream is not responding right now."), color = PlayerMuted, fontSize = 14.sp,
                     textAlign = TextAlign.Center)
                 Spacer(Modifier.height(20.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -325,7 +337,7 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.width(52.dp), horizontalAlignment = Alignment.Start) {
-                    Text("CH", color = PlayerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text(t("CH"), color = PlayerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     Text((currentChannelIndex + 1).toString(), color = PlayerWhite, fontSize = 24.sp,
                         fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
@@ -357,9 +369,9 @@ fun PlayerScreen(
         AnimatedVisibility(
             visible = overlayState == OverlayState.ChannelList,
             modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().padding(24.dp).width(340.dp),
-            enter = slideInHorizontally(initialOffsetX = { -it },
+            enter = slideInHorizontally(initialOffsetX = { side * it },
                 animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
-            exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(220)) + fadeOut(tween(180))
+            exit = slideOutHorizontally(targetOffsetX = { side * it }, animationSpec = tween(220)) + fadeOut(tween(180))
         ) {
             Column(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))
@@ -386,7 +398,7 @@ fun PlayerScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val arrow = if (!many) 0f else if (nameFocused) 1f else .5f
-                    Text("‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
+                    Text(if (rtl) "›" else "‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                     AnimatedContent(
                         targetState = listTitle,
                         modifier = Modifier.weight(1f),
@@ -397,13 +409,13 @@ fun PlayerScreen(
                         label = "listTitle"
                     ) { title ->
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(title, color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold,
+                            Text(t(title), color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val size = lists.firstOrNull { it.first == title }?.second?.size ?: 0
-                            Text(if (size == 1) "1 channel" else "$size channels", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
+                            Text(if (size == 1) "1 ${t("channel")}" else "$size ${t("channels")}", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
                         }
                     }
-                    Text("›", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
+                    Text(if (rtl) "‹" else "›", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                 }
                 Spacer(Modifier.height(8.dp))
                 AnimatedContent(
@@ -512,7 +524,7 @@ private fun CardButton(label: String, modifier: Modifier = Modifier, onClick: ()
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = if (focused) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(t(label), color = if (focused) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

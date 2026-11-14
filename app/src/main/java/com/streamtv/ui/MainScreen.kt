@@ -160,7 +160,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             "Movies" -> LibraryContent("Movies", ChannelKind.Movie, state, model)
             "Series" -> LibraryContent("Series", ChannelKind.Series, state, model)
             "Favorites" -> {
-                ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} saved channels")
+                ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
                 Spacer(Modifier.height(20.dp))
                 ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model)
             }
@@ -228,11 +228,11 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
                 shape = CircleShape
             )
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick).focusable().padding(horizontal = 15.dp, vertical = 11.dp),
+            .clickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text,
+            t(text),
             color = White.copy(alpha = if (focused || selected) .98f else .72f),
             fontSize = 16.sp,
             maxLines = 1,
@@ -274,7 +274,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
     }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(250.dp).fillMaxHeight()) {
-            Text("Live TV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+            Text(t("Live TV"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(18.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
@@ -282,19 +282,19 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
                 }
                 item { FocusRow("All channels", live.size.toString(), state.searchQuery.isBlank() || state.searchQuery == "__all") { model.setSearchQuery("__all") } }
                 if (languageGroups.isNotEmpty()) {
-                    item { Text("BY LANGUAGE", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    item { Text(t("BY LANGUAGE"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                     items(languageGroups) { item ->
                         FocusRow(item.first, item.third.toString(), state.searchQuery == item.second) { model.setSearchQuery(item.second) }
                     }
                 }
                 if (countryGroups.isNotEmpty()) {
-                    item { Text("BY COUNTRY", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    item { Text(t("BY COUNTRY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                     items(countryGroups.toList()) { (country, channels) ->
                         val token = "__country:$country"
                         FocusRow(country, channels.size.toString(), state.searchQuery == token) { model.setSearchQuery(token) }
                     }
                 }
-                item { Text("BY CATEGORY", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                 items(categoryGroups.toList()) { (name, channels) ->
                     FocusRow(name, channels.size.toString(), state.searchQuery == name) { model.setSearchQuery(name) }
                 }
@@ -303,9 +303,9 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
         Spacer(Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(heading, color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
+                Text(t(heading), color = White, fontSize = 27.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                Text("${filtered.size} channels", color = Muted, fontSize = 17.sp)
+                Text("${filtered.size} ${t("channels")}", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(14.dp))
             ChannelGrid(filtered, heading, state.programs, state.favorites, model)
@@ -316,7 +316,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
 @Composable
 private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, model: MainViewModel) {
     val items = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
-    ScreenHeading(title, "${items.size} titles")
+    ScreenHeading(title, "${items.size} ${t("titles")}")
     Spacer(Modifier.height(20.dp))
     if (items.isEmpty()) {
         EmptyState("No ${title.lowercase()} yet", "Your playlist has no ${title.lowercase()}. Add one that includes them in Settings.", "Settings") {
@@ -384,9 +384,9 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
             Image(painterResource(R.drawable.banner), contentDescription = "STV",
                 modifier = Modifier.width(240.dp).height(135.dp).clip(RoundedCornerShape(20.dp)))
             Spacer(Modifier.height(26.dp))
-            Text("Welcome to STV", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
+            Text(t("Welcome to STV"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
-            Text("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings.",
+            Text(t("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings."),
                 color = Muted, fontSize = 18.sp, textAlign = TextAlign.Center, lineHeight = 26.sp)
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -436,7 +436,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, modifier: Modifier 
             .background(Brush.linearGradient(if (focused) listOf(Color(0xFF323946), Color(0xFF20252E)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
             .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick).focusable(),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         ChannelLogo(
@@ -465,7 +465,7 @@ private fun SearchContent(state: TvState, model: MainViewModel) {
     Spacer(Modifier.height(16.dp))
     val q = state.searchQuery.trim()
     val matches = if (q.isEmpty()) emptyList() else state.channels.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
-    Text(if (q.isEmpty()) "Start typing to search" else "${matches.size} results", color = Muted, fontSize = 17.sp)
+    Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 17.sp)
     Spacer(Modifier.height(14.dp))
     ChannelGrid(matches, "Search results", state.programs, state.favorites, model)
 }
@@ -485,7 +485,7 @@ private fun SettingsContent(
     }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(270.dp)) {
-            Text("Settings", color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+            Text(t("Settings"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(26.dp))
             listOf("Playback", "Playlist", "Language", "Parental control", "TV guide", "Appearance", "About").forEach { item ->
                 FocusRow(item, if (item == section) "●" else "", item == section) { onSection(item) }
@@ -493,27 +493,34 @@ private fun SettingsContent(
         }
         Spacer(Modifier.width(44.dp))
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-            Text(section, color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+            Text(t(section), color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(18.dp))
             when (section) {
                 "Playlist" -> {
                     val counts = remember(state.channels) { state.channels.groupingBy { it.kind() }.eachCount() }
                     val activeName = state.playlists.firstOrNull { it.url == state.playlistUrl }?.name
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(White.copy(alpha = .07f)).padding(20.dp)) {
-                        Text("NOW PLAYING FROM", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    var summaryFocused by remember { mutableStateOf(false) }
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                            .background(White.copy(alpha = if (summaryFocused) .13f else .07f))
+                            .border(1.dp, White.copy(alpha = if (summaryFocused) .5f else 0f), RoundedCornerShape(18.dp))
+                            .onFocusChanged { summaryFocused = it.isFocused }.focusable()
+                            .padding(20.dp)
+                    ) {
+                        Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
-                        Text(activeName ?: "Playlist", color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(playlistLabel(state.playlistUrl), color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(activeName ?: t("Playlist"), color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(t(playlistLabel(state.playlistUrl)), color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            if (state.loading) "Loading…"
-                            else "${counts[ChannelKind.Live] ?: 0} live  ·  ${counts[ChannelKind.Movie] ?: 0} movies  ·  ${counts[ChannelKind.Series] ?: 0} series",
+                            if (state.loading) t("Loading…")
+                            else "${counts[ChannelKind.Live] ?: 0} ${t("live")}  ·  ${counts[ChannelKind.Movie] ?: 0} ${t("movies")}  ·  ${counts[ChannelKind.Series] ?: 0} ${t("series")}",
                             color = White.copy(alpha = .86f), fontSize = 16.sp
                         )
                         state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
                     }
                     Spacer(Modifier.height(22.dp))
-                    Text("Add a playlist", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text(t("Add a playlist"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         WhiteButton("M3U link") { if (!state.loading) onEntry("playlist") }
@@ -525,11 +532,14 @@ private fun SettingsContent(
                                 model.setError("No file picker is available on this TV. Use M3U link or Xtream login instead.")
                             }
                         }
-                        if (state.playlistUrl.startsWith("http")) WhiteButton("Reload") { if (!state.loading) model.loadPlaylist() }
+                    }
+                    if (state.playlistUrl.startsWith("http")) {
+                        Spacer(Modifier.height(10.dp))
+                        WhiteButton("Reload") { if (!state.loading) model.loadPlaylist() }
                     }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
-                        Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
                         for (item in state.playlists) {
                             PlaylistRow(item, item.url == state.playlistUrl, { model.selectPlaylist(item) }) { model.removePlaylist(item) }
@@ -545,10 +555,16 @@ private fun SettingsContent(
                         if (state.epgUrl.isNotBlank()) WhiteButton("Reload TV guide") { model.loadEpg() }
                     }
                     state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
-                    Text("${state.programs.size} programmes loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
+                    Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
-                "Language" -> SettingsRow("Interface language", "System default")
+                "Language" -> {
+                    Text(t("Interface language"), color = Muted, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    for ((code, name) in AppLanguages) {
+                        FocusRow(name, if (state.language == code) "●" else "", state.language == code) { model.setLanguage(code) }
+                    }
+                }
                 "Parental control" -> SettingsRow("Parental lock", "Not configured")
                 "Appearance" -> SettingsRow("Theme", "Dark · tvOS inspired")
                 else -> SettingsRow("streamtv", "Version 1.0.0")
@@ -565,24 +581,24 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
         Row(
             Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
                 .background(if (focused) White else if (active) White.copy(alpha = .12f) else White.copy(alpha = .05f))
-                .onFocusChanged { focused = it.isFocused }.clickable(onClick = onOpen).focusable()
+                .onFocusChanged { focused = it.isFocused }.clickable(onClick = onOpen)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
                 Text(entry.name, color = if (focused) Ink else White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(playlistLabel(entry.url), color = if (focused) Ink.copy(alpha = .6f) else Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t(playlistLabel(entry.url)), color = if (focused) Ink.copy(alpha = .6f) else Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (active) Text("Active", color = if (focused) Ink.copy(alpha = .7f) else Accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            if (active) Text(t("Active"), color = if (focused) Ink.copy(alpha = .7f) else Accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(10.dp))
         Box(
             Modifier.clip(RoundedCornerShape(15.dp)).background(if (removeFocused) Color(0xFFFF6B5E) else White.copy(alpha = .05f))
-                .onFocusChanged { removeFocused = it.isFocused }.clickable(onClick = onRemove).focusable()
+                .onFocusChanged { removeFocused = it.isFocused }.clickable(onClick = onRemove)
                 .padding(horizontal = 16.dp, vertical = 19.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("Remove", color = if (removeFocused) White else Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(t("Remove"), color = if (removeFocused) White else Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -590,8 +606,8 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
 @Composable
 private fun SettingsRow(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit = {}) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(White.copy(alpha = .07f)).padding(20.dp)) {
-        Text(title, color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-        Text(subtitle, color = Muted, fontSize = 16.sp)
+        Text(t(title), color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        Text(t(subtitle), color = Muted, fontSize = 16.sp)
         Spacer(Modifier.height(12.dp))
         content()
     }
@@ -603,9 +619,9 @@ private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick
     val scale by animateFloatAsState(if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
         .background(if (focused) White else if (selected) White.copy(alpha = .10f) else Color.Transparent)
-        .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick).focusable()
+        .onFocusChanged { focused = it.isFocused }.clickable(onClick = onClick)
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), color = if (focused) Ink else if (selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(t(title), Modifier.weight(1f), color = if (focused) Ink else if (selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal)
         Text(trailing, color = if (focused) Ink.copy(alpha = .55f) else Muted, fontSize = 16.sp)
     }
 }
@@ -613,8 +629,8 @@ private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick
 @Composable
 private fun ScreenHeading(title: String, subtitle: String) {
     Column {
-        Text(title, color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
-        Text(subtitle, color = Muted, fontSize = 17.sp)
+        Text(t(title), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+        Text(t(subtitle), color = Muted, fontSize = 17.sp)
     }
 }
 
@@ -626,9 +642,9 @@ private fun EmptyState(title: String, message: String, button: String, onClick: 
                 Text("＋", color = White, fontSize = 48.sp)
             }
             Spacer(Modifier.height(24.dp))
-            Text(title, color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text(t(title), color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text(message, color = Muted, fontSize = 19.sp)
+            Text(t(message), color = Muted, fontSize = 19.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(22.dp))
             WhiteButton(button, onClick = onClick)
         }
@@ -641,8 +657,8 @@ private fun WhiteButton(text: String, modifier: Modifier = Modifier, onClick: ()
     val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 430f), label = "buttonScale")
     Box(modifier.scale(scale).clip(CircleShape).background(if (focused) White else White.copy(alpha = .82f))
         .onFocusChanged { focused = it.isFocused }
-        .clickable(onClick = onClick).focusable().padding(horizontal = 26.dp, vertical = 14.dp)) {
-        Text(text, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        .clickable(onClick = onClick).padding(horizontal = 26.dp, vertical = 14.dp)) {
+        Text(t(text), color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
     }
 }
 
@@ -650,7 +666,7 @@ private fun WhiteButton(text: String, modifier: Modifier = Modifier, onClick: ()
 private fun GlassInput(value: String, hint: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.clip(RoundedCornerShape(16.dp)).background(Glass).border(1.dp, White.copy(alpha = .10f), RoundedCornerShape(16.dp)).padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(value = value, onValueChange = onValueChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp), modifier = Modifier.fillMaxWidth(), decorationBox = { inner ->
-            if (value.isEmpty()) Text(hint, color = Muted, fontSize = 18.sp)
+            if (value.isEmpty()) Text(t(hint), color = Muted, fontSize = 18.sp)
             inner()
         })
     }

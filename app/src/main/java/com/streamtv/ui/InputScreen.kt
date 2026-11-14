@@ -99,7 +99,7 @@ fun TextEntryScreen(
 
     Box(Modifier.fillMaxSize().background(EntryInk)) {
         Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
-            Text(title, color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(t(title), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (showName) {
@@ -134,14 +134,14 @@ fun TextEntryScreen(
             if (exampleUrl != null) {
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Example", color = EntryMuted, fontSize = 14.sp)
+                    Text(t("Example"), color = EntryMuted, fontSize = 14.sp)
                     Spacer(Modifier.width(10.dp))
                     EntryButton(exampleUrl, small = true) { url = exampleUrl; message = null }
                 }
             }
             message?.let {
                 Spacer(Modifier.height(10.dp))
-                Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -201,7 +201,7 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
 
     Box(Modifier.fillMaxSize().background(EntryInk)) {
         Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
-            Text("Xtream Codes login", color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(t("Xtream Codes login"), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 EntryField(
@@ -239,7 +239,7 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 EntryButton("Save & load", primary = true, modifier = Modifier.focusRequester(saveButton)) { submit() }
                 EntryButton("Cancel") { keyboard?.hide(); onCancel() }
-                message?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                message?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -271,7 +271,7 @@ private fun EntryField(
                     .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (value.isEmpty()) Text(hint, color = EntryMuted, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (value.isEmpty()) Text(t(hint), color = EntryMuted, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 inner()
             }
         }
@@ -298,7 +298,7 @@ private fun EntryButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text,
+            t(text),
             color = if (focused) EntryInk else EntryWhite,
             fontSize = if (small) 14.sp else 17.sp,
             fontWeight = FontWeight.SemiBold,
