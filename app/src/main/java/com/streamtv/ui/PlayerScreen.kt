@@ -1,7 +1,6 @@
 package com.streamtv.ui
 
 import android.view.ViewGroup
-import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -16,6 +15,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +39,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -143,6 +147,7 @@ fun PlayerScreen(
     // The list of lists, opened with OK on the list name.
     var pickerOpen by remember { mutableStateOf(false) }
     val lastBack = remember { longArrayOf(0L) }
+    val okArmed = remember { booleanArrayOf(false) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         listTitle = queueTitle
@@ -260,15 +265,24 @@ fun PlayerScreen(
         Modifier.fillMaxSize().background(Color.Black)
             .focusRequester(playerFocusRequester).focusable()
             .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val listOpen = overlayState == OverlayState.ChannelList
+                if (event.type == KeyEventType.KeyUp) {
+                    return@onPreviewKeyEvent when (event.key) {
+                        // Back is fully handled on key down; swallow the release so nothing else reacts.
+                        Key.Back -> true
+                        // The list of lists opens on release, so the same press cannot also pick a row in it.
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect ->
+                            if (okArmed[0]) { okArmed[0] = false; pickerOpen = true; true } else false
+                        else -> false
+                    }
+                }
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (listOpen) listTick++
                 when (event.key) {
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> { onZap(1); showInfoBar(); true }
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> { onZap(-1); showInfoBar(); true }
-                    Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
-                        if (listOpen) { backInList(); true } else false
-                    }
+                    Key.ChannelUp -> { onZap(1); showInfoBar(); true }
+                    Key.ChannelDown -> { onZap(-1); showInfoBar(); true }
+                    // Handled here, before the system moves focus on its own for the Back key.
+                    Key.Back -> { if (listOpen) backInList() else onBack(); true }
                     Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
                     Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
                     // On the list name, left/right page between lists; on the channels they close the panel.
@@ -287,9 +301,9 @@ fun PlayerScreen(
                     }
                     // OK only brings up the info bar; the channel list opens with the arrow key.
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
-                    Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> when {
-                        // OK on the list name opens the list of lists.
-                        listOpen && nameFocused && !pickerOpen -> { pickerOpen = true; true }
+                    Key.ButtonSelect -> when {
+                        // OK on the list name opens the list of lists (on release, see above).
+                        listOpen && nameFocused && !pickerOpen -> { okArmed[0] = true; true }
                         listOpen || showErrorCard -> false
                         // OK shows the info bar; OK again while it is up toggles the favourite star.
                         overlayState == OverlayState.InfoBar -> { onFavorite(channel); showInfoBar(); true }
@@ -396,18 +410,7 @@ fun PlayerScreen(
                         starPop.animateTo(1f, spring(dampingRatio = .4f, stiffness = 380f))
                     }
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        Modifier.size(38.dp).scale(starPop.value).clip(CircleShape)
-                            .background(if (starred) Color(0x33FFFFFF) else Color(0x14FFFFFF))
-                            .border(1.dp, if (starred) Color(0x99FFFFFF) else Color(0x29FFFFFF), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(if (starred) "★" else "☆", color = if (starred) PlayerWhite else PlayerWhite.copy(alpha = .5f),
-                            fontSize = 19.sp, maxLines = 1)
-                    }
-                    Text("OK", color = PlayerMuted.copy(alpha = .8f), fontSize = 9.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                }
+                StarIcon(starred, Modifier.size(26.dp).scale(starPop.value))
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
@@ -611,6 +614,34 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     }
                 }
             }
+        }
+    }
+}
+
+/** Five-point star with soft corners: a thin outline when off, solid white with a glow when on. */
+@Composable
+private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val outer = size.minDimension / 2f * .92f
+        val inner = outer * .46f
+        val path = Path()
+        for (i in 0 until 10) {
+            val r = if (i % 2 == 0) outer else inner
+            val angle = Math.toRadians(-90.0 + i * 36.0)
+            val x = cx + (r * kotlin.math.cos(angle)).toFloat()
+            val y = cy + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        val round = Stroke(width = size.minDimension * .11f, join = StrokeJoin.Round, cap = StrokeCap.Round)
+        if (filled) {
+            drawPath(path, Color.White.copy(alpha = .22f), style = Stroke(width = size.minDimension * .34f, join = StrokeJoin.Round))
+            drawPath(path, Color.White)
+            drawPath(path, Color.White, style = round)
+        } else {
+            drawPath(path, Color.White.copy(alpha = .55f), style = Stroke(width = size.minDimension * .075f, join = StrokeJoin.Round))
         }
     }
 }
