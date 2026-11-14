@@ -487,7 +487,7 @@ private fun SettingsContent(
         Column(Modifier.width(270.dp)) {
             Text(t("Settings"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(26.dp))
-            listOf("Playback", "Playlist", "Language", "Parental control", "TV guide", "Appearance", "About").forEach { item ->
+            listOf("Playback", "Playlist", "Language", "Appearance", "About", "Parental control", "TV guide").forEach { item ->
                 FocusRow(item, if (item == section) "●" else "", item == section) { onSection(item) }
             }
         }
