@@ -471,29 +471,175 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
             withFrameNanos { }
         }
     }
+
     Box(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
-        contentAlignment = Alignment.Center
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFF15191D), Color(0xFF090A0C), Ink))
+        )
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 760.dp)) {
-            Image(painterResource(R.drawable.banner), contentDescription = "STV",
-                modifier = Modifier.width(240.dp).height(135.dp).clip(RoundedCornerShape(20.dp)))
-            Spacer(Modifier.height(26.dp))
-            Text(t("Welcome to STV"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Text(t("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings."),
-                color = Muted, fontSize = 18.sp, textAlign = TextAlign.Center, lineHeight = 26.sp)
-            Spacer(Modifier.height(28.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                WhiteButton(if (loading) "Loading…" else "Add M3U playlist", Modifier.focusRequester(first)) { if (!loading) onAdd() }
-                WhiteButton("Xtream login") { if (!loading) onXtream() }
-                WhiteButton("Try an example") { if (!loading) onExample() }
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 88.dp, vertical = 54.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                Modifier.weight(1.08f).fillMaxHeight(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.Start
+            ) {
+                Image(
+                    painterResource(R.drawable.stv_wordmark),
+                    contentDescription = "STV",
+                    modifier = Modifier.width(112.dp).height(30.dp)
+                )
+                Spacer(Modifier.height(34.dp))
+                Text(
+                    t("Welcome to STV"),
+                    color = White,
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    t("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings."),
+                    color = Muted,
+                    fontSize = 18.sp,
+                    lineHeight = 27.sp
+                )
+                Spacer(Modifier.height(30.dp))
+                WelcomeActionCard(
+                    title = if (loading) "Loading…" else "Add M3U playlist",
+                    mark = "M3U",
+                    primary = true,
+                    modifier = Modifier.fillMaxWidth().focusRequester(first),
+                    onClick = { if (!loading) onAdd() }
+                )
+                Spacer(Modifier.height(12.dp))
+                WelcomeActionCard(
+                    title = "Xtream login",
+                    mark = "XC",
+                    primary = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { if (!loading) onXtream() }
+                )
+                Spacer(Modifier.height(14.dp))
+                var exampleFocused by remember { mutableStateOf(false) }
+                Text(
+                    t("Try an example"),
+                    color = if (exampleFocused) White else Muted,
+                    fontSize = 15.sp,
+                    fontWeight = if (exampleFocused) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier
+                        .onFocusChanged { exampleFocused = it.isFocused }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { if (!loading) onExample() }
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                )
+                error?.let {
+                    Spacer(Modifier.height(12.dp))
+                    Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp)
+                }
             }
-            error?.let {
-                Spacer(Modifier.height(18.dp))
-                Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, textAlign = TextAlign.Center)
+
+            Spacer(Modifier.width(48.dp))
+            Box(
+                Modifier.weight(.92f).fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    Modifier.size(410.dp).clip(CircleShape).background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFF38535B).copy(alpha = .42f), Color(0xFF1A2930).copy(alpha = .16f), Color.Transparent)
+                        )
+                    )
+                )
+                Box(
+                    Modifier.width(330.dp).height(220.dp)
+                        .clip(RoundedCornerShape(34.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF252D33), Color(0xFF12171B))))
+                        .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(34.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painterResource(R.drawable.stv_wordmark),
+                        contentDescription = "STV",
+                        modifier = Modifier.width(174.dp).height(48.dp)
+                    )
+                }
+                Box(
+                    Modifier.align(Alignment.BottomEnd).padding(end = 30.dp, bottom = 92.dp)
+                        .size(58.dp).clip(CircleShape)
+                        .background(Color(0xFF7E9CA3).copy(alpha = .16f))
+                        .border(1.dp, White.copy(alpha = .12f), CircleShape)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun WelcomeActionCard(
+    title: String,
+    mark: String,
+    primary: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(
+        if (pressed) .985f else if (focused) 1.015f else 1f,
+        spring(stiffness = 480f),
+        label = "welcomeActionScale"
+    )
+    val shape = RoundedCornerShape(20.dp)
+    Row(
+        modifier.scale(scale)
+            .fillMaxWidth()
+            .height(76.dp)
+            .clip(shape)
+            .background(
+                when {
+                    pressed -> PressBrush
+                    focused && primary -> FocusBrush
+                    primary -> Brush.verticalGradient(listOf(Color(0xFF29343A), Color(0xFF1B2429)))
+                    else -> Brush.verticalGradient(listOf(Color(0xFF191B1E), Color(0xFF121416)))
+                }
+            )
+            .border(
+                if (focused) 1.5.dp else 1.dp,
+                if (focused) White.copy(alpha = .58f) else White.copy(alpha = if (primary) .16f else .09f),
+                shape
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = press
+            )
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(CircleShape)
+                .background(White.copy(alpha = if (focused) .18f else .09f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(mark, color = White, fontSize = if (mark.length > 2) 12.sp else 15.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(17.dp))
+        Text(
+            t(title),
+            color = White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(Modifier.weight(1f))
+        Text("›", color = White.copy(alpha = .72f), fontSize = 28.sp)
     }
 }
 
