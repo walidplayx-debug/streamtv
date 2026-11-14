@@ -14,6 +14,8 @@ android {
         targetSdk = 34
         versionCode = ciVersionCode
         versionName = "1.0.0"
+        val updateChannel = if (System.getenv("GITHUB_REF_NAME") == "main") "latest" else "preview"
+        buildConfigField("String", "UPDATE_CHANNEL", "\"$updateChannel\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
