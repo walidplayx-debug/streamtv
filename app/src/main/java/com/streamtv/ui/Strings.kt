@@ -76,7 +76,15 @@ private val French = mapOf(
     "Fill in the server, username and password" to "Renseignez le serveur, le nom d'utilisateur et le mot de passe",
     // player
     "Can't play this channel" to "Impossible de lire cette chaîne", "The stream is not responding right now." to "Le flux ne répond pas pour le moment.",
-    "Retry" to "Réessayer", "Next channel" to "Chaîne suivante", "CH" to "CH"
+    "Retry" to "Réessayer", "Next channel" to "Chaîne suivante", "CH" to "CH",
+    // channel options and parental control
+    "Add to favorites" to "Ajouter aux favoris", "Remove from favorites" to "Retirer des favoris",
+    "Hide channel" to "Masquer la chaîne", "Lock channel" to "Verrouiller la chaîne", "Unlock channel" to "Déverrouiller la chaîne",
+    "Rename" to "Renommer", "Rename channel" to "Renommer la chaîne", "Channel name" to "Nom de la chaîne", "Save" to "Enregistrer",
+    "Enter PIN" to "Saisir le code PIN", "Choose a 4-digit PIN" to "Choisissez un code PIN à 4 chiffres",
+    "Wrong PIN" to "Code PIN incorrect", "The PIN must be 4 digits" to "Le code PIN doit comporter 4 chiffres",
+    "PIN" to "Code PIN", "Set" to "Défini", "Not set" to "Non défini", "Set PIN" to "Définir le code PIN", "Change PIN" to "Changer le code PIN",
+    "Locked channels" to "Chaînes verrouillées", "Hidden channels" to "Chaînes masquées", "Restore hidden channels" to "Restaurer les chaînes masquées"
 )
 
 private val Arabic = mapOf(
@@ -132,5 +140,13 @@ private val Arabic = mapOf(
     "Fill in the server, username and password" to "أدخل السيرفر واسم المستخدم وكلمة السر",
     // player
     "Can't play this channel" to "تعذّر تشغيل هذه القناة", "The stream is not responding right now." to "البث لا يستجيب حالياً.",
-    "Retry" to "إعادة المحاولة", "Next channel" to "القناة التالية", "CH" to "قناة"
+    "Retry" to "إعادة المحاولة", "Next channel" to "القناة التالية", "CH" to "قناة",
+    // channel options and parental control
+    "Add to favorites" to "إضافة إلى المفضلة", "Remove from favorites" to "إزالة من المفضلة",
+    "Hide channel" to "إخفاء القناة", "Lock channel" to "قفل القناة", "Unlock channel" to "فتح قفل القناة",
+    "Rename" to "تغيير الاسم", "Rename channel" to "تغيير اسم القناة", "Channel name" to "اسم القناة", "Save" to "حفظ",
+    "Enter PIN" to "أدخل الرمز السري", "Choose a 4-digit PIN" to "اختر رمزاً سرياً من 4 أرقام",
+    "Wrong PIN" to "الرمز السري غير صحيح", "The PIN must be 4 digits" to "الرمز السري يجب أن يكون 4 أرقام",
+    "PIN" to "الرمز السري", "Set" to "محدّد", "Not set" to "غير محدّد", "Set PIN" to "تحديد الرمز السري", "Change PIN" to "تغيير الرمز السري",
+    "Locked channels" to "القنوات المقفلة", "Hidden channels" to "القنوات المخفية", "Restore hidden channels" to "استرجاع القنوات المخفية"
 )

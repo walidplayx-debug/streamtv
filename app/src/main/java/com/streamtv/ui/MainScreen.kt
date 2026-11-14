@@ -97,6 +97,26 @@ private fun rememberPress(onClick: () -> Unit): Pair<Boolean, () -> Unit> {
 fun MainScreen(state: TvState, model: MainViewModel) {
     // The channel to put focus back on when the player closes.
     var returnKey by remember { mutableStateOf<String?>(null) }
+
+    // PIN question (locking a channel, opening a locked one, changing the PIN).
+    state.pin?.let { prompt ->
+        val choosing = prompt.purpose == "set"
+        SingleFieldScreen(
+            title = if (choosing) "Choose a 4-digit PIN" else "Enter PIN", hint = "••••", initial = "", pin = true,
+            error = if (!state.pinError) null else if (choosing) "The PIN must be 4 digits" else "Wrong PIN",
+            saveLabel = "Save", onSave = model::submitPin, onCancel = model::cancelPin
+        )
+        return
+    }
+    var renaming by remember { mutableStateOf<Channel?>(null) }
+    renaming?.let { target ->
+        SingleFieldScreen(
+            title = "Rename channel", hint = "Channel name", initial = target.name, pin = false, error = null, saveLabel = "Save",
+            onSave = { name -> model.renameChannel(target, name); renaming = null },
+            onCancel = { renaming = null }
+        )
+        return
+    }
     if (state.playing && state.selected != null) {
         SideEffect { returnKey = state.selected.key }
         PlayerScreen(
@@ -110,7 +130,15 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             onBack = model::stopPlaying,
             onZap = model::zap,
             onSelect = { item, list, title -> model.select(item, list, title) },
-            onFavorite = model::toggleFavorite
+            onFavorite = model::toggleFavorite,
+            locked = state.selected.key in state.locked,
+            onOption = { option ->
+                when (option) {
+                    "hide" -> model.hideChannel(state.selected)
+                    "lock" -> model.toggleLock(state.selected)
+                    "rename" -> renaming = state.selected
+                }
+            }
         )
         return
     }
@@ -635,7 +663,20 @@ private fun SettingsContent(
                         FocusRow(name, if (state.language == code) "●" else "", state.language == code) { model.setLanguage(code) }
                     }
                 }
-                "Parental control" -> SettingsRow("Parental lock", "Not configured")
+                "Parental control" -> {
+                    SettingsRow("PIN", if (state.pinSet) "Set" else "Not set")
+                    Spacer(Modifier.height(12.dp))
+                    WhiteButton(if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
+                    Spacer(Modifier.height(18.dp))
+                    SettingsRow("Locked channels", state.locked.size.toString())
+                    Spacer(Modifier.height(12.dp))
+                    SettingsRow("Hidden channels", state.hidden.size.toString())
+                    if (state.hidden.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        WhiteButton("Restore hidden channels") { model.restoreHidden() }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
                 "About" -> AppUpdateSection()
                 else -> SettingsRow("streamtv", "Version 1.0.0")
             }

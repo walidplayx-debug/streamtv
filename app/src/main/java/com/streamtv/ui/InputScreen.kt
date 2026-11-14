@@ -45,6 +45,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -245,6 +247,48 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
     }
 }
 
+/** One field in the top half of the screen: a channel name, or a 4-digit PIN when [pin] is true. */
+@Composable
+fun SingleFieldScreen(
+    title: String, hint: String, initial: String, pin: Boolean, error: String?, saveLabel: String,
+    onSave: (String) -> Unit, onCancel: () -> Unit
+) {
+    var value by remember { mutableStateOf(initial) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val field = remember { FocusRequester() }
+    val saveButton = remember { FocusRequester() }
+    BackHandler { keyboard?.hide(); onCancel() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { field.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    Box(Modifier.fillMaxSize().background(EntryInk)) {
+        Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
+            Text(t(title), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.height(10.dp))
+            EntryField(
+                value = value, hint = hint,
+                onValueChange = { typed -> value = if (pin) typed.filter { it.isDigit() }.take(4) else typed },
+                modifier = Modifier.fillMaxWidth(if (pin) .3f else .6f).focusRequester(field),
+                keyboardOptions = KeyboardOptions(keyboardType = if (pin) KeyboardType.NumberPassword else KeyboardType.Text, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    keyboard?.hide()
+                    runCatching { saveButton.requestFocus() }
+                }),
+                masked = pin
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                EntryButton(saveLabel, primary = true, modifier = Modifier.focusRequester(saveButton)) { keyboard?.hide(); onSave(value) }
+                EntryButton("Cancel") { keyboard?.hide(); onCancel() }
+                error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EntryField(
     value: String,
@@ -252,13 +296,15 @@ private fun EntryField(
     onValueChange: (String) -> Unit,
     modifier: Modifier,
     keyboardOptions: KeyboardOptions,
-    keyboardActions: KeyboardActions
+    keyboardActions: KeyboardActions,
+    masked: Boolean = false
 ) {
     var focused by remember { mutableStateOf(false) }
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
+        visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
         textStyle = TextStyle(color = EntryWhite, fontSize = 18.sp),
         cursorBrush = SolidColor(EntryWhite),
         keyboardOptions = keyboardOptions,

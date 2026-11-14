@@ -13,11 +13,17 @@ import com.streamtv.data.EpgProgram
 import com.streamtv.data.EpgRepository
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
+
+/** A PIN question on screen. purpose: "set", "open", "unlock" or "verify". */
+data class PinPrompt(val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null)
 
 data class TvState(
     val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
@@ -33,8 +39,34 @@ data class TvState(
     /** True once the saved settings were read, so first-run screens do not flash. */
     val ready: Boolean = false,
     /** Interface language: "en", "fr" or "ar". */
-    val language: String = "en"
+    val language: String = "en",
+    /** Channels the viewer removed from every list (by key). */
+    val hidden: Set<String> = emptySet(),
+    /** Channels that need the PIN before they play (by key). */
+    val locked: Set<String> = emptySet(),
+    /** Names the viewer gave to channels (key -> name). */
+    val names: Map<String, String> = emptyMap(),
+    val pinSet: Boolean = false,
+    val pin: PinPrompt? = null,
+    val pinError: Boolean = false
 )
+
+/** Applies the viewer's hidden channels and custom names to a list, remembering the last result. */
+private class ChannelView {
+    private var list: List<Channel>? = null
+    private var hidden: Set<String>? = null
+    private var names: Map<String, String>? = null
+    private var result: List<Channel> = emptyList()
+    fun of(list: List<Channel>, hidden: Set<String>, names: Map<String, String>): List<Channel> {
+        if (list === this.list && hidden === this.hidden && names === this.names) return result
+        this.list = list; this.hidden = hidden; this.names = names
+        result = if (hidden.isEmpty() && names.isEmpty()) list else list.mapNotNull { channel ->
+            val key = channel.key
+            if (key in hidden) null else names[key]?.let { channel.copy(name = it) } ?: channel
+        }
+        return result
+    }
+}
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
     private val epgRepository = EpgRepository()
@@ -43,7 +75,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val playlistDirectory = File(application.filesDir, "playlists")
     private var lastChannelId: String = ""
     private val _state = MutableStateFlow(TvState())
-    val state: StateFlow<TvState> = _state
+    private val channelsView = ChannelView()
+    private val queueView = ChannelView()
+    private var pinCode: String = ""
+    /** What the screens see: the raw state with hidden channels removed and custom names applied. */
+    val state: StateFlow<TvState> = _state.map { raw ->
+        raw.copy(
+            channels = channelsView.of(raw.channels, raw.hidden, raw.names),
+            queue = queueView.of(raw.queue, raw.hidden, raw.names),
+            selected = raw.selected?.let { channel -> raw.names[channel.key]?.let { channel.copy(name = it) } ?: channel }
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, TvState())
+    init {
+        viewModelScope.launch { preferences.hiddenKeys.collect { keys -> _state.value = _state.value.copy(hidden = keys) } }
+        viewModelScope.launch { preferences.lockedKeys.collect { keys -> _state.value = _state.value.copy(locked = keys) } }
+        viewModelScope.launch { preferences.channelNames.collect { names -> _state.value = _state.value.copy(names = names) } }
+        viewModelScope.launch { preferences.pin.collect { value -> pinCode = value; _state.value = _state.value.copy(pinSet = value.isNotBlank()) } }
+    }
     init {
         viewModelScope.launch {
             preferences.playlistUrl.collect { saved ->
@@ -199,6 +247,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
     fun select(channel: Channel, from: List<Channel>? = null, title: String? = null) {
+        // A locked channel asks for the PIN first.
+        if (channel.key in _state.value.locked) {
+            _state.value = _state.value.copy(pin = PinPrompt("open", channel, from, title), pinError = false)
+            return
+        }
+        play(channel, from, title)
+    }
+    private fun play(channel: Channel, from: List<Channel>?, title: String?) {
         lastChannelId = channel.id
         val current = _state.value.queue
         val queue = from ?: if (current.any { it.key == channel.key }) current else _state.value.channels
@@ -214,12 +270,71 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val channels = _state.value.queue.ifEmpty { _state.value.channels }
         if (channels.isEmpty()) return
         val current = channels.indexOfFirst { it.key == _state.value.selected?.key }.let { if (it < 0) 0 else it }
-        val next = (current + delta + channels.size) % channels.size
-        val selected = channels[next]
+        // Zapping skips channels that are hidden or locked.
+        val skip = _state.value.hidden + _state.value.locked
+        var next = current
+        var selected: Channel? = null
+        for (step in 1..channels.size) {
+            next = (next + delta + channels.size) % channels.size
+            if (channels[next].key !in skip) { selected = channels[next]; break }
+        }
+        if (selected == null || selected.key == _state.value.selected?.key) return
         lastChannelId = selected.id
         _state.value = _state.value.copy(selected = selected)
         rememberWatched(selected)
         viewModelScope.launch { preferences.saveLastChannel(selected.id) }
+    }
+    fun hideChannel(channel: Channel) {
+        val hidden = _state.value.hidden + channel.key
+        _state.value = _state.value.copy(hidden = hidden)
+        viewModelScope.launch { preferences.saveHidden(hidden) }
+        if (_state.value.playing && _state.value.selected?.key == channel.key) {
+            zap(1)
+            if (_state.value.selected?.key == channel.key) stopPlaying()
+        }
+    }
+    fun restoreHidden() {
+        _state.value = _state.value.copy(hidden = emptySet())
+        viewModelScope.launch { preferences.saveHidden(emptySet()) }
+    }
+    fun renameChannel(channel: Channel, name: String) {
+        val clean = name.trim().replace("\t", " ").replace("\n", " ")
+        val names = if (clean.isBlank()) _state.value.names - channel.key else _state.value.names + (channel.key to clean)
+        _state.value = _state.value.copy(names = names)
+        viewModelScope.launch { preferences.saveChannelNames(names) }
+    }
+    fun toggleLock(channel: Channel) {
+        when {
+            channel.key in _state.value.locked -> _state.value = _state.value.copy(pin = PinPrompt("unlock", channel), pinError = false)
+            pinCode.isBlank() -> _state.value = _state.value.copy(pin = PinPrompt("set", channel), pinError = false)
+            else -> setLocked(_state.value.locked + channel.key)
+        }
+    }
+    private fun setLocked(keys: Set<String>) {
+        _state.value = _state.value.copy(locked = keys)
+        viewModelScope.launch { preferences.saveLocked(keys) }
+    }
+    fun changePin() {
+        _state.value = _state.value.copy(pin = PinPrompt(if (pinCode.isBlank()) "set" else "verify"), pinError = false)
+    }
+    fun cancelPin() { _state.value = _state.value.copy(pin = null, pinError = false) }
+    fun submitPin(value: String) {
+        val prompt = _state.value.pin ?: return
+        if (prompt.purpose == "set") {
+            if (!Regex("\\d{4}").matches(value)) { _state.value = _state.value.copy(pinError = true); return }
+            pinCode = value
+            _state.value = _state.value.copy(pin = null, pinError = false, pinSet = true)
+            viewModelScope.launch { preferences.savePin(value) }
+            prompt.channel?.let { setLocked(_state.value.locked + it.key) }
+            return
+        }
+        if (value != pinCode) { _state.value = _state.value.copy(pinError = true); return }
+        _state.value = _state.value.copy(pin = null, pinError = false)
+        when (prompt.purpose) {
+            "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
+            "unlock" -> prompt.channel?.let { setLocked(_state.value.locked - it.key) }
+            "verify" -> _state.value = _state.value.copy(pin = PinPrompt("set"))
+        }
     }
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()

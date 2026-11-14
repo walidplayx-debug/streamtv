@@ -77,7 +77,7 @@ private const val ListIdleMillis = 8000L
 private const val StallMillis = 20000L
 private val PlayerAccent = Color(0xFFD5DADF)
 
-private enum class OverlayState { None, InfoBar, ChannelList }
+private enum class OverlayState { None, InfoBar, ChannelList, Options }
 
 /** requestFocus() throws while the target is not on screen yet; wait a few frames for it. */
 private suspend fun FocusRequester.requestFocusSafely() {
@@ -99,7 +99,9 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onZap: (Int) -> Unit,
     onSelect: (Channel, List<Channel>, String) -> Unit,
-    onFavorite: (Channel) -> Unit
+    onFavorite: (Channel) -> Unit,
+    locked: Boolean = false,
+    onOption: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     // In a right-to-left layout the panel sits on the right, so the arrow keys swap roles.
@@ -148,6 +150,9 @@ fun PlayerScreen(
     var pickerOpen by remember { mutableStateOf(false) }
     val lastBack = remember { longArrayOf(0L) }
     val okArmed = remember { booleanArrayOf(false) }
+    // OK while watching: a short press acts on release, a held press opens the options panel.
+    val okShort = remember { booleanArrayOf(false) }
+    val okSwallow = remember { booleanArrayOf(false) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         listTitle = queueTitle
@@ -227,10 +232,16 @@ fun PlayerScreen(
             if (overlayState == OverlayState.ChannelList) overlayState = OverlayState.None
         }
     }
-    val showErrorCard = failed && overlayState != OverlayState.ChannelList
-    LaunchedEffect(overlayState == OverlayState.ChannelList, showErrorCard) {
+    LaunchedEffect(overlayState, listTick) {
+        if (overlayState == OverlayState.Options) {
+            delay(ListIdleMillis)
+            if (overlayState == OverlayState.Options) overlayState = OverlayState.None
+        }
+    }
+    val showErrorCard = failed && overlayState != OverlayState.ChannelList && overlayState != OverlayState.Options
+    LaunchedEffect(overlayState == OverlayState.ChannelList, overlayState == OverlayState.Options, showErrorCard) {
         when {
-            overlayState == OverlayState.ChannelList -> Unit
+            overlayState == OverlayState.ChannelList || overlayState == OverlayState.Options -> Unit
             showErrorCard -> retryFocusRequester.requestFocusSafely()
             else -> playerFocusRequester.requestFocusSafely()
         }
@@ -271,13 +282,32 @@ fun PlayerScreen(
                         // Back is fully handled on key down; swallow the release so nothing else reacts.
                         Key.Back -> true
                         // The list of lists opens on release, so the same press cannot also pick a row in it.
-                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect ->
-                            if (okArmed[0]) { okArmed[0] = false; pickerOpen = true; true } else false
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> when {
+                            // Release of the press that opened the options panel: must not click a row in it.
+                            okSwallow[0] -> { okSwallow[0] = false; true }
+                            okArmed[0] -> { okArmed[0] = false; pickerOpen = true; true }
+                            okShort[0] -> {
+                                okShort[0] = false
+                                // Short press: show the info bar; again while it is up toggles the favourite star.
+                                if (overlayState == OverlayState.InfoBar) onFavorite(channel)
+                                showInfoBar()
+                                true
+                            }
+                            else -> false
+                        }
                         else -> false
                     }
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (listOpen) listTick++
+                val optionsOpen = overlayState == OverlayState.Options
+                if (listOpen || optionsOpen) listTick++
+                if (optionsOpen) {
+                    return@onPreviewKeyEvent when (event.key) {
+                        Key.Back, Key.DirectionLeft, Key.DirectionRight -> { overlayState = OverlayState.None; true }
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> okSwallow[0]
+                        else -> false
+                    }
+                }
                 when (event.key) {
                     Key.ChannelUp -> { onZap(1); showInfoBar(); true }
                     Key.ChannelDown -> { onZap(-1); showInfoBar(); true }
@@ -305,9 +335,16 @@ fun PlayerScreen(
                         // OK on the list name opens the list of lists (on release, see above).
                         listOpen && nameFocused && !pickerOpen -> { okArmed[0] = true; true }
                         listOpen || showErrorCard -> false
-                        // OK shows the info bar; OK again while it is up toggles the favourite star.
-                        overlayState == OverlayState.InfoBar -> { onFavorite(channel); showInfoBar(); true }
-                        else -> { showInfoBar(); true }
+                        // First key down arms a short press; a repeat means the key is being held.
+                        event.nativeKeyEvent.repeatCount == 0 -> { okShort[0] = true; true }
+                        okShort[0] -> {
+                            okShort[0] = false
+                            okSwallow[0] = true
+                            listTick++
+                            overlayState = OverlayState.Options
+                            true
+                        }
+                        else -> true
                     }
                     else -> false
                 }
@@ -413,6 +450,34 @@ fun PlayerScreen(
                 StarIcon(starred, Modifier.size(26.dp).scale(starPop.value))
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
+            }
+        }
+
+        AnimatedVisibility(
+            visible = overlayState == OverlayState.Options,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(24.dp).width(300.dp),
+            enter = slideInHorizontally(initialOffsetX = { -side * it },
+                animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
+            exit = slideOutHorizontally(targetOffsetX = { -side * it }, animationSpec = tween(220)) + fadeOut(tween(180))
+        ) {
+            val first = remember { FocusRequester() }
+            LaunchedEffect(Unit) { first.requestFocusSafely() }
+            Column(
+                Modifier.clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
+                    .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
+                    .padding(horizontal = 14.dp, vertical = 16.dp)
+            ) {
+                Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+                Spacer(Modifier.height(10.dp))
+                val starred = channel.id in favorites
+                OptionRow(if (starred) "Remove from favorites" else "Add to favorites", Modifier.focusRequester(first)) {
+                    onFavorite(channel)
+                    overlayState = OverlayState.None
+                }
+                OptionRow("Hide channel") { overlayState = OverlayState.None; onOption("hide") }
+                OptionRow(if (locked) "Unlock channel" else "Lock channel") { overlayState = OverlayState.None; onOption("lock") }
+                OptionRow("Rename") { overlayState = OverlayState.None; onOption("rename") }
             }
         }
 
@@ -643,6 +708,24 @@ private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
         } else {
             drawPath(path, Color.White.copy(alpha = .55f), style = Stroke(width = size.minDimension * .075f, join = StrokeJoin.Round))
         }
+    }
+}
+
+/** One action in the channel options panel. */
+@Composable
+private fun OptionRow(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(dampingRatio = .78f, stiffness = 420f), label = "optionScale")
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(16.dp))
+            .background(if (focused) Color(0xF2F2F2F7) else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(t(label), color = if (focused) Color(0xFF1C1C1E) else PlayerWhite, fontSize = 17.sp,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
