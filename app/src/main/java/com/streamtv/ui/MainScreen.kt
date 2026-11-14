@@ -296,6 +296,15 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
+                .background(Brush.linearGradient(channelGradient(channel.name))),
+            contentAlignment = Alignment.Center
+        ) {
+            val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
+            Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
         if (!channel.logo.isNullOrBlank()) {
             AsyncImage(
                 model = channel.logo,
@@ -303,16 +312,6 @@ private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: 
                 modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
                 contentScale = ContentScale.Fit
             )
-        } else {
-            Box(
-                Modifier.fillMaxSize().padding(8.dp).clip(RoundedCornerShape(8.dp))
-                    .background(Brush.linearGradient(channelGradient(channel.name))),
-                contentAlignment = Alignment.Center
-            ) {
-                val initials = channel.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-                    .let { words -> if (words.size > 1) words.take(2).mapNotNull { it.firstOrNull() }.joinToString("") else channel.name.trim().take(2) }
-                Text(initials.uppercase(), color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
         }
         if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
     }
