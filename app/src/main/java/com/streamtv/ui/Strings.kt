@@ -65,6 +65,7 @@ private val French = mapOf(
     "Allow STV to install updates in the next screen, then return and choose Install update." to "Autorisez STV à installer les mises à jour, puis revenez et choisissez Installer la mise à jour.",
     "Could not check for updates. Check your internet connection and try again." to "Impossible de vérifier les mises à jour. Vérifiez votre connexion Internet et réessayez.",
     "This update is not compatible with this app." to "Cette mise à jour n’est pas compatible avec cette application.",
+    "Available version" to "Version disponible",
     // text entry
     "Name (optional)" to "Nom (facultatif)", "Playlist address  https://…" to "Adresse de la playlist  https://…",
     "Save & load" to "Enregistrer et charger", "Cancel" to "Annuler", "Paste" to "Coller", "Clear" to "Effacer", "Example" to "Exemple",
@@ -120,6 +121,7 @@ private val Arabic = mapOf(
     "Allow STV to install updates in the next screen, then return and choose Install update." to "اسمح لـ STV بتثبيت التحديثات في الشاشة التالية، ثم ارجع واختر تثبيت التحديث.",
     "Could not check for updates. Check your internet connection and try again." to "تعذّر التحقق من التحديثات. تحقق من اتصال الإنترنت وحاول مجدداً.",
     "This update is not compatible with this app." to "هذا التحديث غير متوافق مع التطبيق.",
+    "Available version" to "الإصدار المتاح",
     // text entry
     "Name (optional)" to "الاسم (اختياري)", "Playlist address  https://…" to "رابط القائمة  https://…",
     "Save & load" to "حفظ وتحميل", "Cancel" to "إلغاء", "Paste" to "لصق", "Clear" to "مسح", "Example" to "مثال",
