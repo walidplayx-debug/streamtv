@@ -1,5 +1,7 @@
 package com.streamtv.ui
 
+import android.content.ActivityNotFoundException
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -420,7 +422,13 @@ private fun SettingsContent(state: TvState, model: MainViewModel) {
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    WhiteButton("Import M3U file") { filePicker.launch(arrayOf("*/*")) }
+                    WhiteButton("Import M3U file") {
+                        try {
+                            filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
+                        } catch (_: ActivityNotFoundException) {
+                            model.setError("No file picker is available on this TV. Paste your M3U URL above and choose Save & load playlist.")
+                        }
+                    }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(24.dp))
                         Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
