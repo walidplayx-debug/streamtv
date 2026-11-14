@@ -59,7 +59,7 @@ import kotlinx.coroutines.delay
 
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
-private val PlayerGlass = Color(0xB81C1C1E)
+private val PlayerGlass = Color(0xF01C1C1E)
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
 private const val StallMillis = 20000L
@@ -185,11 +185,11 @@ fun PlayerScreen(
                     }
                     Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
                     Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
-                    Key.DirectionRight -> when {
+                    Key.DirectionLeft -> when {
                         listOpen || showErrorCard -> false
                         else -> { overlayState = OverlayState.ChannelList; true }
                     }
-                    Key.DirectionLeft -> if (listOpen) { overlayState = OverlayState.None; true } else false
+                    Key.DirectionRight -> if (listOpen) { overlayState = OverlayState.None; true } else false
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
                     Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
                         if (listOpen || showErrorCard) false else { showInfoBar(); true }
@@ -293,10 +293,10 @@ fun PlayerScreen(
 
         AnimatedVisibility(
             visible = overlayState == OverlayState.ChannelList,
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(24.dp).width(420.dp),
-            enter = slideInHorizontally(initialOffsetX = { it },
+            modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().padding(24.dp).width(420.dp),
+            enter = slideInHorizontally(initialOffsetX = { -it },
                 animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
-            exit = slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(220)) + fadeOut(tween(180))
+            exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(220)) + fadeOut(tween(180))
         ) {
             // Created on every open so the list starts at, and focuses, the playing channel.
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentChannelIndex - 2).coerceAtLeast(0))
@@ -308,8 +308,12 @@ fun PlayerScreen(
                     .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
                     .padding(top = 20.dp)
             ) {
-                Text("Channels", color = PlayerWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Start, modifier = Modifier.padding(horizontal = 26.dp))
+                Row(Modifier.fillMaxWidth().padding(horizontal = 26.dp), verticalAlignment = Alignment.Bottom) {
+                    Text("Channels", color = PlayerWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f))
+                    Text(channels.size.toString(), color = Color(0x99FFFFFF), fontSize = 15.sp,
+                        modifier = Modifier.padding(bottom = 4.dp))
+                }
                 Spacer(Modifier.height(10.dp))
                 LazyColumn(
                     state = listState,
@@ -331,12 +335,11 @@ fun PlayerScreen(
                                 .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(18.dp))
                                 .background(
                                     when {
-                                        focused -> Color(0x33FFFFFF)
-                                        playing -> Color(0x14FFFFFF)
+                                        focused -> Color(0xF2F2F2F7)
+                                        playing -> Color(0x1FFFFFFF)
                                         else -> Color.Transparent
                                     }
                                 )
-                                .border(1.dp, if (focused) Color(0x73FFFFFF) else Color.Transparent, RoundedCornerShape(18.dp))
                                 .onFocusChanged { focused = it.isFocused }
                                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                                     overlayState = OverlayState.None
@@ -350,7 +353,7 @@ fun PlayerScreen(
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                                 Text(
                                     channelDisplayName(item.name),
-                                    color = PlayerWhite,
+                                    color = if (focused) Color(0xFF1C1C1E) else PlayerWhite,
                                     fontSize = 19.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     textAlign = TextAlign.Start,
@@ -359,7 +362,7 @@ fun PlayerScreen(
                                 )
                                 Text(
                                     item.group,
-                                    color = Color(0x99FFFFFF),
+                                    color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF),
                                     fontSize = 14.sp,
                                     textAlign = TextAlign.Start,
                                     maxLines = 1,
@@ -371,10 +374,10 @@ fun PlayerScreen(
                                 Spacer(Modifier.width(10.dp))
                                 Box(
                                     Modifier.clip(RoundedCornerShape(7.dp))
-                                        .background(Color(0x24FFFFFF))
+                                        .background(if (focused) Color(0x1F000000) else Color(0x24FFFFFF))
                                         .padding(horizontal = 7.dp, vertical = 3.dp)
                                 ) {
-                                    Text(quality, color = Color(0xD9FFFFFF), fontSize = 11.sp,
+                                    Text(quality, color = if (focused) Color(0xCC1C1C1E) else Color(0xD9FFFFFF), fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold, maxLines = 1)
                                 }
                             }

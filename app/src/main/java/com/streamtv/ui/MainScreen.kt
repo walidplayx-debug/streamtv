@@ -65,12 +65,12 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     if (state.playing && state.selected != null) {
         PlayerScreen(
             channel = state.selected,
-            channels = state.channels,
+            channels = state.queue.ifEmpty { state.channels },
             programs = state.programs,
             favorites = state.favorites,
             onBack = model::stopPlaying,
             onZap = model::zap,
-            onSelect = model::select,
+            onSelect = { model.select(it) },
             onFavorite = model::toggleFavorite
         )
         return
@@ -224,12 +224,12 @@ private fun HomeContent(state: TvState, model: MainViewModel) {
                 Text(currentProgram(hero, state.programs)?.title ?: hero.group, color = Muted, fontSize = 21.sp, maxLines = 2)
                 Spacer(Modifier.height(24.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    WhiteButton("Watch live") { model.select(hero) }
+                    WhiteButton("Watch live") { model.select(hero, state.channels) }
                     Spacer(Modifier.width(14.dp))
                     GlassCircle(if (hero.id in state.favorites) "★" else "+") { model.toggleFavorite(hero) }
                 }
             }
-            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp)).clickable { model.select(hero) }.focusable()) {
+            Box(Modifier.weight(1.15f).fillMaxHeight(.92f).clip(RoundedCornerShape(24.dp)).clickable { model.select(hero, state.channels) }.focusable()) {
                 ChannelArtwork(hero, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Ink.copy(alpha = .48f), Color.Transparent))))
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .82f)))))
@@ -321,7 +321,7 @@ private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, fav
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         gridItems(channels, key = { it.key }) { channel ->
-            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel) }
+            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels) }
         }
     }
 }
@@ -334,7 +334,7 @@ private fun ChannelShelf(channels: List<Channel>, programs: List<EpgProgram>, fa
     ) {
         items(channels.take(18), key = { it.key }) { channel ->
             Column(Modifier.width(232.dp)) {
-                ChannelCard(channel, programs, channel.id in favorites, Modifier.width(232.dp).height(130.dp)) { model.select(channel) }
+                ChannelCard(channel, programs, channel.id in favorites, Modifier.width(232.dp).height(130.dp)) { model.select(channel, channels) }
                 Spacer(Modifier.height(8.dp))
                 Text(channel.name, color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(currentProgram(channel, programs)?.title ?: channel.group, color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

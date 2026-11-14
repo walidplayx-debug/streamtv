@@ -23,7 +23,9 @@ data class TvState(
     val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
     val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
-    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false, val searchQuery: String = ""
+    val favorites: Set<String> = emptySet(), val tab: String = "Home", val playing: Boolean = false, val searchQuery: String = "",
+    /** The list the playing channel was opened from; the player browses and zaps inside it. */
+    val queue: List<Channel> = emptyList()
 )
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PlaylistRepository()
@@ -168,14 +170,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
-    fun select(channel: Channel) {
+    fun select(channel: Channel, from: List<Channel>? = null) {
         lastChannelId = channel.id
-        _state.value = _state.value.copy(selected = channel, playing = true)
+        val current = _state.value.queue
+        val queue = from ?: if (current.any { it.key == channel.key }) current else _state.value.channels
+        _state.value = _state.value.copy(selected = channel, playing = true, queue = queue)
         viewModelScope.launch { preferences.saveLastChannel(channel.id) }
     }
     fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
     fun zap(delta: Int) {
-        val channels = _state.value.channels
+        val channels = _state.value.queue.ifEmpty { _state.value.channels }
         if (channels.isEmpty()) return
         val current = channels.indexOfFirst { it.key == _state.value.selected?.key }.let { if (it < 0) 0 else it }
         val next = (current + delta + channels.size) % channels.size
