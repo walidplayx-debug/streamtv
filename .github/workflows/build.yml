@@ -43,7 +43,7 @@ jobs:
             git push origin HEAD:main
           fi
       - name: Sign APK
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'pull_request'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -82,12 +82,12 @@ jobs:
           path: release/streamtv.apk
           if-no-files-found: ignore
       - name: Publish latest release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+        if: ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'pull_request') && success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: streamtv latest
-          target_commitish: main
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
           make_latest: true
           prerelease: false
           overwrite_files: true
