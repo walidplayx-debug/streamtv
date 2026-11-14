@@ -96,6 +96,69 @@ fun PlayerScreen(
     LaunchedEffect(channel.id) { zapLabel = true }
     LaunchedEffect(zapLabel, channel.id) {
         if (zapLabel) {
+            delay(5500)
+            zapLabel = false
+        }
+    }
+    BackHandler {
+        if (showChannelPanel) showChannelPanel = false else onBack()
+    }
+
+    Box(
+        Modifier.fillMaxSize().background(Color.Black)
+            .focusRequester(playerFocusRequester).focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> {
+                        onZap(1); zapLabel = true; true
+                    }
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> {
+                        onZap(-1); zapLabel = true; true
+                    }
+                    Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
+                        if (showChannelPanel) { showChannelPanel = false; true } else false
+                    }
+                    else -> when (event.key) {
+                        Key.DirectionUp -> {
+                            if (showChannelPanel) false else { onZap(1); zapLabel = true; true }
+                        }
+                        Key.DirectionDown -> {
+                            if (showChannelPanel) false else { onZap(-1); zapLabel = true; true }
+                        }
+                        Key.DirectionRight -> {
+                            if (showChannelPanel) false else {
+                                showChannelPanel = true
+                                true
+                            }
+                        }
+                        Key.DirectionLeft -> {
+                            if (showChannelPanel) { showChannelPanel = false; true } else false
+                        }
+                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
+                        Key(AndroidKeyEvent.KEYCODE_DPAD_CENTER.toLong()),
+                        Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
+                            if (showChannelPanel) false else { zapLabel = true; true }
+                        }
+                        else -> false
+                    }
+                }
+            }
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                PlayerView(it).apply {
+                    this.player = player
+                    useController = false
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                }
+            },
+            update = { it.player = player }
+        )
+
+        if (zapLabel) {
             val progress = current?.let {
                 ((System.currentTimeMillis() - it.startEpochMillis).toFloat() /
                     (it.endEpochMillis - it.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
