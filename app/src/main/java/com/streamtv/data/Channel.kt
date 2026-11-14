@@ -3,7 +3,10 @@ package com.streamtv.data
 data class Channel(
     val id: String, val name: String, val url: String, val logo: String? = null,
     val group: String = "Other", val country: String = "", val language: String = ""
-)
+) {
+    /** Unique per playlist entry: several streams may share one tvg-id. */
+    val key: String get() = "$id|$url"
+}
 
 
 fun Channel.detectedLanguage(): String {

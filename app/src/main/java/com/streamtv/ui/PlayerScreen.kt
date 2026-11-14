@@ -17,12 +17,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,19 +49,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
 import com.streamtv.data.Channel
 import com.streamtv.data.EpgProgram
 import kotlinx.coroutines.delay
 
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
-private val PlayerGlass = Color(0xB8202024)
+private val PlayerGlass = Color(0xB81C1C1E)
+private val PlayerGlassBorder = Color(0x33FFFFFF)
+private const val InfoBarMillis = 4000L
+private const val StallMillis = 20000L
 private val PlayerAccent = Color(0xFFD5DADF)
 
 private enum class OverlayState { None, InfoBar, ChannelList }
+
+/** requestFocus() throws while the target is not on screen yet; wait a few frames for it. */
+private suspend fun FocusRequester.requestFocusSafely() {
+    repeat(20) {
+        if (runCatching { requestFocus() }.isSuccess) return
+        withFrameNanos { }
+    }
+}
 
 @Composable
 fun PlayerScreen(
@@ -80,42 +94,76 @@ fun PlayerScreen(
             playWhenReady = true
         }
     }
-    var error by remember(channel.url) { mutableStateOf<String?>(null) }
+    var buffering by remember(channel.url) { mutableStateOf(true) }
+    var failed by remember(channel.url) { mutableStateOf(false) }
+    var autoRetries by remember(channel.url) { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
+    var infoBarTick by remember { mutableIntStateOf(0) }
     val playerFocusRequester = remember { FocusRequester() }
-    val channelListFocusRequester = remember { FocusRequester() }
-    val channelListState = rememberLazyListState()
-    val currentChannelIndex = channels.indexOfFirst { it.id == channel.id }.coerceAtLeast(0)
-
-    LaunchedEffect(Unit) { playerFocusRequester.requestFocus() }
-    LaunchedEffect(overlayState, channel.id) {
-        if (overlayState == OverlayState.ChannelList && channels.isNotEmpty()) {
-            channelListState.scrollToItem(currentChannelIndex)
-            kotlinx.coroutines.delay(80)
-            channelListFocusRequester.requestFocus()
-        } else if (overlayState != OverlayState.ChannelList) {
-            playerFocusRequester.requestFocus()
-        }
-    }
-
+    val retryFocusRequester = remember { FocusRequester() }
+    val currentChannelIndex = channels.indexOfFirst { it.key == channel.key }.coerceAtLeast(0)
     val current = playerProgram(channel, programs)
 
+    fun restart() {
+        failed = false
+        buffering = true
+        player.stop()
+        player.setMediaItem(MediaItem.fromUri(channel.url))
+        player.prepare()
+        player.playWhenReady = true
+    }
+    // One silent retry, then the error card.
+    fun onStreamProblem() {
+        if (autoRetries < 1) {
+            autoRetries++
+            restart()
+        } else {
+            player.stop()
+            buffering = false
+            failed = true
+        }
+    }
+    fun showInfoBar() {
+        overlayState = OverlayState.InfoBar
+        infoBarTick++
+    }
+
     DisposableEffect(player) {
-        val listener = object : androidx.media3.common.Player.Listener {
-            override fun onPlayerError(exception: androidx.media3.common.PlaybackException) {
-                error = exception.message ?: "Playback error"
-                overlayState = OverlayState.InfoBar
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> buffering = true
+                    Player.STATE_READY -> { buffering = false; failed = false }
+                    Player.STATE_ENDED -> onStreamProblem()
+                    else -> Unit
+                }
             }
+            override fun onPlayerError(error: PlaybackException) = onStreamProblem()
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
     }
+    // A stream that buffers forever is treated like a broken one.
+    LaunchedEffect(player, buffering, failed, autoRetries) {
+        if (buffering && !failed) {
+            delay(StallMillis)
+            onStreamProblem()
+        }
+    }
 
-    LaunchedEffect(channel.id) { if (overlayState != OverlayState.ChannelList) overlayState = OverlayState.InfoBar }
-    LaunchedEffect(overlayState, channel.id) {
+    LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
+    LaunchedEffect(overlayState, infoBarTick) {
         if (overlayState == OverlayState.InfoBar) {
-            delay(4000)
+            delay(InfoBarMillis)
             if (overlayState == OverlayState.InfoBar) overlayState = OverlayState.None
+        }
+    }
+    val showErrorCard = failed && overlayState != OverlayState.ChannelList
+    LaunchedEffect(overlayState == OverlayState.ChannelList, showErrorCard) {
+        when {
+            overlayState == OverlayState.ChannelList -> Unit
+            showErrorCard -> retryFocusRequester.requestFocusSafely()
+            else -> playerFocusRequester.requestFocusSafely()
         }
     }
 
@@ -128,46 +176,23 @@ fun PlayerScreen(
             .focusRequester(playerFocusRequester).focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val listOpen = overlayState == OverlayState.ChannelList
                 when (event.key) {
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> {
-                        onZap(1)
-                        overlayState = OverlayState.InfoBar
-                        true
-                    }
-                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> {
-                        onZap(-1)
-                        overlayState = OverlayState.InfoBar
-                        true
-                    }
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> { onZap(1); showInfoBar(); true }
+                    Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> { onZap(-1); showInfoBar(); true }
                     Key(AndroidKeyEvent.KEYCODE_BACK.toLong()) -> {
-                        if (overlayState == OverlayState.ChannelList) {
-                            overlayState = OverlayState.None
-                            true
-                        } else false
+                        if (listOpen) { overlayState = OverlayState.None; true } else false
                     }
-                    Key.DirectionUp -> {
-                        if (overlayState == OverlayState.ChannelList) false
-                        else { onZap(1); overlayState = OverlayState.InfoBar; true }
+                    Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
+                    Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
+                    Key.DirectionRight -> when {
+                        listOpen || showErrorCard -> false
+                        else -> { overlayState = OverlayState.ChannelList; true }
                     }
-                    Key.DirectionDown -> {
-                        if (overlayState == OverlayState.ChannelList) false
-                        else { onZap(-1); overlayState = OverlayState.InfoBar; true }
-                    }
-                    Key.DirectionRight -> {
-                        if (overlayState == OverlayState.ChannelList) false
-                        else { overlayState = OverlayState.ChannelList; true }
-                    }
-                    Key.DirectionLeft -> {
-                        if (overlayState == OverlayState.ChannelList) {
-                            overlayState = OverlayState.None
-                            true
-                        } else false
-                    }
+                    Key.DirectionLeft -> if (listOpen) { overlayState = OverlayState.None; true } else false
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
-                    Key(AndroidKeyEvent.KEYCODE_DPAD_CENTER.toLong()),
                     Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                        if (overlayState == OverlayState.ChannelList) false
-                        else { overlayState = OverlayState.InfoBar; true }
+                        if (listOpen || showErrorCard) false else { showInfoBar(); true }
                     }
                     else -> false
                 }
@@ -179,6 +204,7 @@ fun PlayerScreen(
                 PlayerView(it).apply {
                     this.player = player
                     useController = false
+                    isFocusable = false
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 }
@@ -186,36 +212,69 @@ fun PlayerScreen(
             update = { it.player = player }
         )
 
+        if (buffering && !failed) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center).size(46.dp),
+                color = PlayerWhite.copy(alpha = .9f),
+                trackColor = PlayerWhite.copy(alpha = .14f),
+                strokeWidth = 3.dp
+            )
+        }
+
+        if (showErrorCard) {
+            Column(
+                Modifier.align(Alignment.Center).width(440.dp).clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xE61C1C1E))
+                    .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
+                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Can't play this channel", color = PlayerWhite, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Text(channelDisplayName(channel.name), color = PlayerMuted, fontSize = 16.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Text("The stream is not responding right now.", color = PlayerMuted, fontSize = 14.sp,
+                    textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CardButton("Retry", Modifier.focusRequester(retryFocusRequester)) { autoRetries = 0; restart() }
+                    CardButton("Next channel") { onZap(1) }
+                }
+            }
+        }
+
+        // The info bar never coexists with the channel list and never changes size.
         if (overlayState != OverlayState.ChannelList) AnimatedVisibility(
             visible = overlayState == OverlayState.InfoBar,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(.65f).padding(bottom = 32.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).fillMaxWidth(.65f).height(80.dp),
             enter = fadeIn(animationSpec = tween(260)) +
                 slideInVertically(animationSpec = spring(dampingRatio = .82f, stiffness = 360f)) { it / 2 },
             exit = fadeOut(animationSpec = tween(220)) +
                 slideOutVertically(animationSpec = tween(220)) { it / 3 }
         ) {
-            val channelNumber = channels.indexOfFirst { it.id == channel.id }
-                .let { if (it < 0) "—" else (it + 1).toString() }
             Row(
-                Modifier.fillMaxWidth().height(72.dp)
+                Modifier.fillMaxSize()
                     .clip(RoundedCornerShape(28.dp))
                     .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
                     .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                    .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text("CH", color = PlayerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Text(channelNumber, color = PlayerWhite, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Column(Modifier.width(52.dp), horizontalAlignment = Alignment.Start) {
+                    Text("CH", color = PlayerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text((currentChannelIndex + 1).toString(), color = PlayerWhite, fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
-                Spacer(Modifier.width(20.dp))
+                Spacer(Modifier.width(14.dp))
                 Box(Modifier.width(1.dp).height(46.dp).background(PlayerWhite.copy(alpha = .22f)))
                 Spacer(Modifier.width(18.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    Text(channel.name, color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOf(channel.group, channelQuality(channel.name)).filter { it.isNotBlank() }.joinToString("  ·  "),
+                        listOf(current?.title ?: channel.group, channelQuality(channel.name))
+                            .filter { it.isNotBlank() }.joinToString("  ·  "),
                         color = PlayerMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     if (current != null) {
@@ -226,18 +285,9 @@ fun PlayerScreen(
                             Box(Modifier.fillMaxWidth(progress).height(3.dp).clip(CircleShape).background(PlayerAccent))
                         }
                     }
-                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 10.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 Spacer(Modifier.width(18.dp))
-                if (!channel.logo.isNullOrBlank()) {
-                    AsyncImage(model = channel.logo, contentDescription = channel.name,
-                        modifier = Modifier.width(60.dp).height(40.dp).clip(RoundedCornerShape(10.dp)))
-                } else {
-                    Box(Modifier.size(width = 60.dp, height = 40.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                        Text(channel.name.take(2).uppercase(), color = PlayerWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
         }
 
@@ -248,92 +298,65 @@ fun PlayerScreen(
                 animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
             exit = slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(220)) + fadeOut(tween(180))
         ) {
+            // Created on every open so the list starts at, and focuses, the playing channel.
+            val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentChannelIndex - 2).coerceAtLeast(0))
+            val playingFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) { playingFocusRequester.requestFocusSafely() }
             Column(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))
-                    .background(Color(0xB81C1C1E))
-                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
-                    .padding(horizontal = 22.dp, vertical = 20.dp)
+                    .background(PlayerGlass)
+                    .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
+                    .padding(top = 20.dp)
             ) {
-                Text("Channels", color = PlayerWhite, fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Start)
-                Spacer(Modifier.height(16.dp))
+                Text("Channels", color = PlayerWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start, modifier = Modifier.padding(horizontal = 26.dp))
+                Spacer(Modifier.height(10.dp))
                 LazyColumn(
-                    state = channelListState,
+                    state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // Room on every side so the 1.04 focus scale and the last row are never clipped.
+                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 22.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(channels, key = { it.id }) { item ->
-                        val selected = item.id == channel.id
-                        var focused by remember(item.id) { mutableStateOf(false) }
+                    items(channels, key = { it.key }) { item ->
+                        val playing = item.key == channel.key
+                        var focused by remember { mutableStateOf(false) }
                         val itemScale by animateFloatAsState(
                             if (focused) 1.04f else 1f,
                             spring(dampingRatio = .78f, stiffness = 420f),
                             label = "channelItemScale"
                         )
                         Row(
-                            (if (selected) Modifier.focusRequester(channelListFocusRequester) else Modifier)
-                                .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(20.dp))
-                                .background(if (focused) Color(0x2EFFFFFF) else Color.Transparent)
-                                .border(
-                                    1.dp,
-                                    if (focused) Color(0x66FFFFFF) else Color.Transparent,
-                                    RoundedCornerShape(20.dp)
+                            (if (playing) Modifier.focusRequester(playingFocusRequester) else Modifier)
+                                .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(18.dp))
+                                .background(
+                                    when {
+                                        focused -> Color(0x33FFFFFF)
+                                        playing -> Color(0x14FFFFFF)
+                                        else -> Color.Transparent
+                                    }
                                 )
+                                .border(1.dp, if (focused) Color(0x73FFFFFF) else Color.Transparent, RoundedCornerShape(18.dp))
                                 .onFocusChanged { focused = it.isFocused }
-                                .clickable {
+                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                                     overlayState = OverlayState.None
                                     onSelect(item)
                                 }
-                                .focusable()
-                                .padding(16.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (!item.logo.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = item.logo,
-                                    contentDescription = item.name,
-                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp))
-                                )
-                            } else {
-                                Box(
-                                    Modifier.size(48.dp).clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xFF38383A)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(item.name.trim().take(2).uppercase(), color = PlayerWhite,
-                                        fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            ChannelLogo(item.name, item.logo, Modifier.size(48.dp), fontSize = 16.sp)
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        channelDisplayName(item.name),
-                                        modifier = Modifier.weight(1f),
-                                        color = PlayerWhite,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.Start,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    val quality = channelQuality(item.name)
-                                    if (quality.isNotBlank()) {
-                                        Spacer(Modifier.width(8.dp))
-                                        Box(
-                                            Modifier.clip(RoundedCornerShape(20.dp))
-                                                .background(Color(0x1FFFFFFF))
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text(quality, color = Color(0xCCFFFFFF),
-                                                fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    }
-                                }
+                                Text(
+                                    channelDisplayName(item.name),
+                                    color = PlayerWhite,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Start,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Text(
                                     item.group,
                                     color = Color(0x99FFFFFF),
@@ -343,11 +366,40 @@ fun PlayerScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            val quality = channelQuality(item.name)
+                            if (quality.isNotBlank()) {
+                                Spacer(Modifier.width(10.dp))
+                                Box(
+                                    Modifier.clip(RoundedCornerShape(7.dp))
+                                        .background(Color(0x24FFFFFF))
+                                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                                ) {
+                                    Text(quality, color = Color(0xD9FFFFFF), fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CardButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 430f), label = "cardButtonScale")
+    Box(
+        modifier.scale(scale).clip(CircleShape)
+            .background(if (focused) PlayerWhite else Color(0x29FFFFFF))
+            .border(1.dp, PlayerGlassBorder, CircleShape)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (focused) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

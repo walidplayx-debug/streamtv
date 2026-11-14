@@ -177,7 +177,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun zap(delta: Int) {
         val channels = _state.value.channels
         if (channels.isEmpty()) return
-        val current = channels.indexOfFirst { it.id == _state.value.selected?.id }.let { if (it < 0) 0 else it }
+        val current = channels.indexOfFirst { it.key == _state.value.selected?.key }.let { if (it < 0) 0 else it }
         val next = (current + delta + channels.size) % channels.size
         val selected = channels[next]
         lastChannelId = selected.id
