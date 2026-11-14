@@ -31,7 +31,7 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.14.4
       - name: Build, lint and test
-        run: ./gradlew --no-daemon lint testDebugUnitTest assembleRelease
+        run: ./gradlew --no-daemon lint testDebugUnitTest assembleDebug assembleRelease
       - name: Commit generated Gradle wrapper
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -67,6 +67,13 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks release/signing.jks --ks-pass "pass:$STORE_PASS" --key-pass "pass:$PASS" --ks-key-alias "$ALIAS" --out release/streamtv.apk "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release/streamtv.apk
           rm -f release/signing.jks
+      - name: Upload debug APK artifact
+        if: always() && (success() || failure())
+        uses: actions/upload-artifact@v4
+        with:
+          name: streamtv-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore
       - name: Upload APK artifact
         if: always() && (success() || failure())
         uses: actions/upload-artifact@v4
