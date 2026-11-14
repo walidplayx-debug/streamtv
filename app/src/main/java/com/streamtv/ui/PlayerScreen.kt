@@ -3,6 +3,10 @@ package com.streamtv.ui
 import android.view.ViewGroup
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -95,8 +99,8 @@ fun PlayerScreen(
     }
     LaunchedEffect(channel.id) { zapLabel = true }
     LaunchedEffect(zapLabel, channel.id) {
-        if (zapLabel) {
-            delay(5500)
+        AnimatedVisibility(visible = zapLabel, enter = fadeIn(animationSpec = tween(280)), exit = fadeOut(animationSpec = tween(500))) {
+            delay(8000)
             zapLabel = false
         }
     }
@@ -168,50 +172,50 @@ fun PlayerScreen(
                 if (it < 0) "—" else (it + 1).toString()
             }
             Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.92f).padding(bottom = 28.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xD9161A22))
-                    .border(1.dp, PlayerWhite.copy(alpha = .13f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(.84f).padding(bottom = 30.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xE6222429), Color(0xE00D0E11), Color(0xE61B1D22))))
+                    .border(1.dp, PlayerWhite.copy(alpha = .11f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!channel.logo.isNullOrBlank()) {
                     AsyncImage(model = channel.logo, contentDescription = channel.name,
-                        modifier = Modifier.width(112.dp).height(62.dp))
+                        modifier = Modifier.width(78.dp).height(44.dp))
                 } else {
-                    Box(Modifier.width(112.dp).height(62.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(78.dp).height(44.dp), contentAlignment = Alignment.Center) {
                         Text(channel.name.take(2).uppercase(), color = PlayerWhite,
-                            fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
-                Spacer(Modifier.width(18.dp))
-                Box(Modifier.width(1.dp).height(66.dp).background(PlayerWhite.copy(alpha = .35f)))
-                Spacer(Modifier.width(20.dp))
+                Spacer(Modifier.width(14.dp))
+                Box(Modifier.width(1.dp).height(48.dp).background(PlayerWhite.copy(alpha = .35f)))
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    Text(channel.name, color = PlayerWhite, fontSize = 20.sp,
+                    Text(channel.name, color = PlayerWhite, fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 14.sp,
+                    Text(current?.title ?: channel.group, color = PlayerMuted, fontSize = 12.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (current != null) {
-                        Spacer(Modifier.height(9.dp))
-                        Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape)
+                        Spacer(Modifier.height(7.dp))
+                        Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
                             .background(PlayerWhite.copy(alpha = .25f))) {
-                            Box(Modifier.fillMaxWidth(progress).height(4.dp).clip(CircleShape)
+                            Box(Modifier.fillMaxWidth(progress).height(3.dp).clip(CircleShape)
                                 .background(Color(0xFFE33445)))
                         }
                     }
-                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 11.sp,
+                    error?.let { Text(it, color = Color(0xFFFF9B8F), fontSize = 10.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
-                Spacer(Modifier.width(22.dp))
+                Spacer(Modifier.width(14.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     if (current != null) {
                         Text(timeFormat.format(Date(current.startEpochMillis)) + "  |  " +
                             timeFormat.format(Date(current.endEpochMillis)),
-                            color = PlayerMuted, fontSize = 12.sp)
+                            color = PlayerMuted, fontSize = 11.sp)
                     }
                     Text("CH " + channelNumber, color = PlayerWhite, fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold)
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }
