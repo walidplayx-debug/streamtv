@@ -103,6 +103,19 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             )
             return
         }
+        "xtream" -> {
+            XtreamEntryScreen(
+                onSave = { name, url ->
+                    model.setPlaylistName(name.ifBlank { "Xtream" })
+                    model.setUrl(url)
+                    model.savePlaylistEntry()
+                    model.loadPlaylist()
+                    entry = ""
+                },
+                onCancel = { entry = "" }
+            )
+            return
+        }
         "epg" -> {
             TextEntryScreen(
                 title = "TV guide address (XMLTV)", urlHint = "https://…", initialUrl = state.epgUrl,
@@ -122,6 +135,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         WelcomeScreen(
             loading = state.loading, error = state.error,
             onAdd = { entry = "playlist" },
+            onXtream = { entry = "xtream" },
             onExample = {
                 model.setPlaylistName("Example")
                 model.setUrl(ExamplePlaylistUrl)
@@ -154,7 +168,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
 @Composable
 private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(120.dp), contentAlignment = Alignment.CenterStart) { Clock() }
+        Box(Modifier.width(150.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Spacer(Modifier.weight(1f))
         Row(
             Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
@@ -166,7 +180,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
             }
         }
         Spacer(Modifier.weight(1f))
-        Box(Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.width(150.dp), contentAlignment = Alignment.CenterEnd) {
             Text("STREEM", color = Accent, fontSize = 27.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, maxLines = 1)
         }
     }
@@ -306,7 +320,7 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
 }
 
 @Composable
-private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, onExample: () -> Unit) {
+private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, onXtream: () -> Unit, onExample: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         repeat(20) {
@@ -318,7 +332,7 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 640.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 760.dp)) {
             Image(painterResource(R.drawable.banner), contentDescription = "STV",
                 modifier = Modifier.width(240.dp).height(135.dp).clip(RoundedCornerShape(20.dp)))
             Spacer(Modifier.height(26.dp))
@@ -329,7 +343,8 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 WhiteButton(if (loading) "Loading…" else "Add M3U playlist", Modifier.focusRequester(first)) { if (!loading) onAdd() }
-                WhiteButton("Try an example playlist") { if (!loading) onExample() }
+                WhiteButton("Xtream login") { if (!loading) onXtream() }
+                WhiteButton("Try an example") { if (!loading) onExample() }
             }
             error?.let {
                 Spacer(Modifier.height(18.dp))
@@ -428,44 +443,45 @@ private fun SettingsContent(
             Spacer(Modifier.height(18.dp))
             when (section) {
                 "Playlist" -> {
-                    SettingsRow("Current playlist", state.playlistUrl.ifBlank { "None yet" })
-                    Spacer(Modifier.height(14.dp))
-                    WhiteButton(if (state.loading) "Loading…" else "Add M3U playlist") {
-                        if (!state.loading) onEntry("playlist")
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    WhiteButton("Import M3U file") {
-                        try {
-                            filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
-                        } catch (_: ActivityNotFoundException) {
-                            model.setError("No file picker is available on this TV. Paste your M3U URL above and choose Save & load playlist.")
-                        }
-                    }
-                    if (state.playlists.isNotEmpty()) {
-                        Spacer(Modifier.height(24.dp))
-                        Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    val counts = remember(state.channels) { state.channels.groupingBy { it.kind() }.eachCount() }
+                    val activeName = state.playlists.firstOrNull { it.url == state.playlistUrl }?.name
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(White.copy(alpha = .07f)).padding(20.dp)) {
+                        Text("NOW PLAYING FROM", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(activeName ?: "Playlist", color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(playlistLabel(state.playlistUrl), color = Muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(10.dp))
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            for (entry in state.playlists) {
-                                Row(
-                                    Modifier.clip(RoundedCornerShape(18.dp))
-                                        .background(if (entry.url == state.playlistUrl) White.copy(alpha = .16f) else Glass)
-                                        .border(1.dp, White.copy(alpha = if (entry.url == state.playlistUrl) .34f else .10f), RoundedCornerShape(18.dp))
-                                        .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(entry.name, color = White, fontSize = 16.sp,
-                                        modifier = Modifier.clickable { model.selectPlaylist(entry) }.focusable().padding(vertical = 7.dp))
-                                    Spacer(Modifier.width(10.dp))
-                                    Text("×", color = Muted, fontSize = 21.sp,
-                                        modifier = Modifier.clip(CircleShape).clickable { model.removePlaylist(entry) }.focusable()
-                                            .padding(horizontal = 8.dp, vertical = 3.dp))
-                                }
+                        Text(
+                            if (state.loading) "Loading…"
+                            else "${counts[ChannelKind.Live] ?: 0} live  ·  ${counts[ChannelKind.Movie] ?: 0} movies  ·  ${counts[ChannelKind.Series] ?: 0} series",
+                            color = White.copy(alpha = .86f), fontSize = 16.sp
+                        )
+                        state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
+                    }
+                    Spacer(Modifier.height(22.dp))
+                    Text("Add a playlist", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        WhiteButton("M3U link") { if (!state.loading) onEntry("playlist") }
+                        WhiteButton("Xtream login") { if (!state.loading) onEntry("xtream") }
+                        WhiteButton("Import file") {
+                            try {
+                                filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
+                            } catch (_: ActivityNotFoundException) {
+                                model.setError("No file picker is available on this TV. Use M3U link or Xtream login instead.")
                             }
                         }
+                        if (state.playlistUrl.startsWith("http")) WhiteButton("Reload") { if (!state.loading) model.loadPlaylist() }
                     }
-                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
-                    Text("${state.channels.size} channels loaded", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
+                    if (state.playlists.isNotEmpty()) {
+                        Spacer(Modifier.height(22.dp))
+                        Text("Your playlists", color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        for (item in state.playlists) {
+                            PlaylistRow(item, item.url == state.playlistUrl, { model.selectPlaylist(item) }) { model.removePlaylist(item) }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
                 }
                 "TV guide" -> {
                     SettingsRow("XMLTV guide URL", state.epgUrl.ifBlank { "Optional programme guide · not set" })
@@ -483,6 +499,36 @@ private fun SettingsContent(
                 "Appearance" -> SettingsRow("Theme", "Dark · tvOS inspired")
                 else -> SettingsRow("streamtv", "Version 1.0.0")
             }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Unit, onRemove: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    var removeFocused by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+                .background(if (focused) White else if (active) White.copy(alpha = .12f) else White.copy(alpha = .05f))
+                .onFocusChanged { focused = it.isFocused }.clickable(onClick = onOpen).focusable()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(entry.name, color = if (focused) Ink else White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(playlistLabel(entry.url), color = if (focused) Ink.copy(alpha = .6f) else Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (active) Text("Active", color = if (focused) Ink.copy(alpha = .7f) else Accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier.clip(RoundedCornerShape(15.dp)).background(if (removeFocused) Color(0xFFFF6B5E) else White.copy(alpha = .05f))
+                .onFocusChanged { removeFocused = it.isFocused }.clickable(onClick = onRemove).focusable()
+                .padding(horizontal = 16.dp, vertical = 19.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Remove", color = if (removeFocused) White else Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

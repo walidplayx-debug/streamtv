@@ -147,6 +147,104 @@ fun TextEntryScreen(
     }
 }
 
+/** Builds the M3U address an Xtream Codes server exposes for an account. */
+fun xtreamPlaylistUrl(server: String, username: String, password: String): String {
+    val trimmed = server.trim().trimEnd('/')
+    val base = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
+    fun enc(value: String) = java.net.URLEncoder.encode(value.trim(), "UTF-8")
+    return "$base/get.php?username=${enc(username)}&password=${enc(password)}&type=m3u_plus&output=ts"
+}
+
+/** Playlist addresses can carry a password; show only what identifies the playlist. */
+fun playlistLabel(url: String): String = when {
+    url.isBlank() -> "None yet"
+    url.startsWith("local://") -> "Imported file"
+    url.contains("/get.php?") -> {
+        val host = url.substringAfter("://").substringBefore('/')
+        val user = url.substringAfter("username=", "").substringBefore('&')
+        "Xtream  ·  $host  ·  $user"
+    }
+    else -> url
+}
+
+/** Xtream Codes login. Same top-half layout as [TextEntryScreen]. */
+@Composable
+fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var server by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val nameField = remember { FocusRequester() }
+    val serverField = remember { FocusRequester() }
+    val userField = remember { FocusRequester() }
+    val passField = remember { FocusRequester() }
+    val saveButton = remember { FocusRequester() }
+
+    fun submit() {
+        if (server.isBlank() || username.isBlank() || password.isBlank()) {
+            message = "Fill in the server, username and password"
+            return
+        }
+        keyboard?.hide()
+        onSave(name.trim(), xtreamPlaylistUrl(server, username, password))
+    }
+
+    BackHandler { keyboard?.hide(); onCancel() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { nameField.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(EntryInk)) {
+        Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
+            Text("Xtream Codes login", color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                EntryField(
+                    value = name, hint = "Name (optional)", onValueChange = { name = it },
+                    modifier = Modifier.weight(.32f).focusRequester(nameField),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { runCatching { serverField.requestFocus() } })
+                )
+                EntryField(
+                    value = server, hint = "Server  http://example.com:8080", onValueChange = { server = it; message = null },
+                    modifier = Modifier.weight(.68f).focusRequester(serverField),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { runCatching { userField.requestFocus() } })
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                EntryField(
+                    value = username, hint = "Username", onValueChange = { username = it; message = null },
+                    modifier = Modifier.weight(.5f).focusRequester(userField),
+                    keyboardOptions = KeyboardOptions(autoCorrect = false, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { runCatching { passField.requestFocus() } })
+                )
+                EntryField(
+                    value = password, hint = "Password", onValueChange = { password = it; message = null },
+                    modifier = Modifier.weight(.5f).focusRequester(passField),
+                    keyboardOptions = KeyboardOptions(autoCorrect = false, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        keyboard?.hide()
+                        runCatching { saveButton.requestFocus() }
+                    })
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                EntryButton("Save & load", primary = true, modifier = Modifier.focusRequester(saveButton)) { submit() }
+                EntryButton("Cancel") { keyboard?.hide(); onCancel() }
+                message?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EntryField(
     value: String,
