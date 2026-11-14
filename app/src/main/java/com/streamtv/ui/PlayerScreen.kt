@@ -3,7 +3,9 @@ package com.streamtv.ui
 import android.view.ViewGroup
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -54,6 +56,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.streamtv.data.Channel
+import com.streamtv.data.ChannelKind
+import com.streamtv.data.kind
 import com.streamtv.data.EpgProgram
 import kotlinx.coroutines.delay
 
@@ -62,6 +66,7 @@ private val PlayerMuted = Color(0xFFB5B5BA)
 private val PlayerGlass = Color(0xF01C1C1E)
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
+private const val ListIdleMillis = 8000L
 private const val StallMillis = 20000L
 private val PlayerAccent = Color(0xFFD5DADF)
 
@@ -79,11 +84,14 @@ private suspend fun FocusRequester.requestFocusSafely() {
 fun PlayerScreen(
     channel: Channel,
     channels: List<Channel>,
+    queueTitle: String,
+    allChannels: List<Channel>,
+    recent: List<String>,
     programs: List<EpgProgram>,
     favorites: Set<String>,
     onBack: () -> Unit,
     onZap: (Int) -> Unit,
-    onSelect: (Channel) -> Unit,
+    onSelect: (Channel, List<Channel>, String) -> Unit,
     onFavorite: (Channel) -> Unit
 ) {
     val context = LocalContext.current
@@ -103,6 +111,38 @@ fun PlayerScreen(
     val retryFocusRequester = remember { FocusRequester() }
     val currentChannelIndex = channels.indexOfFirst { it.key == channel.key }.coerceAtLeast(0)
     val current = playerProgram(channel, programs)
+
+    // The lists the side panel can page through with left/right.
+    val isLive = remember(channel.url) { channel.kind() == ChannelKind.Live }
+    val lists: List<Pair<String, List<Channel>>> = remember(allChannels, recent, favorites, queueTitle, channels, isLive) {
+        if (!isLive) listOf(queueTitle to channels) else buildList {
+            val live = allChannels.filter { it.kind() == ChannelKind.Live }
+            val byKey = live.associateBy { it.key }
+            val watched = recent.mapNotNull { byKey[it] }
+            if (watched.isNotEmpty()) add("Last watched" to watched)
+            add("All channels" to live)
+            val starred = live.filter { it.id in favorites }
+            if (starred.isNotEmpty()) add("Favorites" to starred)
+            live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap().forEach { (name, items) -> add(name to items) }
+            if (none { it.first == queueTitle }) add(0, queueTitle to channels)
+        }
+    }
+    var listTitle by remember { mutableStateOf(queueTitle) }
+    var listDirection by remember { mutableIntStateOf(1) }
+    var listTick by remember { mutableIntStateOf(0) }
+    val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
+    fun openList() {
+        listTitle = queueTitle
+        listTick++
+        overlayState = OverlayState.ChannelList
+    }
+    fun stepList(delta: Int) {
+        if (lists.size < 2) return
+        listDirection = delta
+        // Park focus on the player while the old page leaves; the new page takes it back.
+        runCatching { playerFocusRequester.requestFocus() }
+        listTitle = lists[(listIndex + delta + lists.size) % lists.size].first
+    }
 
     fun restart() {
         failed = false
@@ -158,6 +198,13 @@ fun PlayerScreen(
             if (overlayState == OverlayState.InfoBar) overlayState = OverlayState.None
         }
     }
+    // The list stays open after choosing a channel and closes only when left alone for a while.
+    LaunchedEffect(overlayState, listTick) {
+        if (overlayState == OverlayState.ChannelList) {
+            delay(ListIdleMillis)
+            if (overlayState == OverlayState.ChannelList) overlayState = OverlayState.None
+        }
+    }
     val showErrorCard = failed && overlayState != OverlayState.ChannelList
     LaunchedEffect(overlayState == OverlayState.ChannelList, showErrorCard) {
         when {
@@ -177,6 +224,7 @@ fun PlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val listOpen = overlayState == OverlayState.ChannelList
+                if (listOpen) listTick++
                 when (event.key) {
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_UP.toLong()) -> { onZap(1); showInfoBar(); true }
                     Key(AndroidKeyEvent.KEYCODE_CHANNEL_DOWN.toLong()) -> { onZap(-1); showInfoBar(); true }
@@ -186,13 +234,14 @@ fun PlayerScreen(
                     Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
                     Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
                     Key.DirectionLeft -> when {
-                        listOpen || showErrorCard -> false
-                        else -> { overlayState = OverlayState.ChannelList; true }
+                        listOpen -> { stepList(-1); true }
+                        showErrorCard -> false
+                        else -> { openList(); true }
                     }
-                    Key.DirectionRight -> if (listOpen) { overlayState = OverlayState.None; true } else false
+                    Key.DirectionRight -> if (listOpen) { stepList(1); true } else false
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter,
                     Key(AndroidKeyEvent.KEYCODE_BUTTON_SELECT.toLong()) -> {
-                        if (listOpen || showErrorCard) false else { showInfoBar(); true }
+                        if (listOpen || showErrorCard) false else { openList(); true }
                     }
                     else -> false
                 }
@@ -293,95 +342,125 @@ fun PlayerScreen(
 
         AnimatedVisibility(
             visible = overlayState == OverlayState.ChannelList,
-            modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().padding(24.dp).width(420.dp),
+            modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().padding(24.dp).width(340.dp),
             enter = slideInHorizontally(initialOffsetX = { -it },
                 animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
             exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(220)) + fadeOut(tween(180))
         ) {
-            // Created on every open so the list starts at, and focuses, the playing channel.
-            val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentChannelIndex - 2).coerceAtLeast(0))
-            val playingFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) { playingFocusRequester.requestFocusSafely() }
             Column(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))
                     .background(PlayerGlass)
                     .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
-                    .padding(top = 20.dp)
+                    .padding(top = 18.dp)
             ) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 26.dp), verticalAlignment = Alignment.Bottom) {
-                    Text("Channels", color = PlayerWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f))
-                    Text(channels.size.toString(), color = Color(0x99FFFFFF), fontSize = 15.sp,
-                        modifier = Modifier.padding(bottom = 4.dp))
-                }
-                Spacer(Modifier.height(10.dp))
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    // Room on every side so the 1.04 focus scale and the last row are never clipped.
-                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 22.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(channels, key = { it.key }) { item ->
-                        val playing = item.key == channel.key
-                        var focused by remember { mutableStateOf(false) }
-                        val itemScale by animateFloatAsState(
-                            if (focused) 1.04f else 1f,
-                            spring(dampingRatio = .78f, stiffness = 420f),
-                            label = "channelItemScale"
-                        )
-                        Row(
-                            (if (playing) Modifier.focusRequester(playingFocusRequester) else Modifier)
-                                .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    when {
-                                        focused -> Color(0xF2F2F2F7)
-                                        playing -> Color(0x1FFFFFFF)
-                                        else -> Color.Transparent
-                                    }
-                                )
-                                .onFocusChanged { focused = it.isFocused }
-                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                                    overlayState = OverlayState.None
-                                    onSelect(item)
-                                }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ChannelLogo(item.name, item.logo, Modifier.size(48.dp), fontSize = 16.sp)
-                            Spacer(Modifier.width(14.dp))
-                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                                Text(
-                                    channelDisplayName(item.name),
-                                    color = if (focused) Color(0xFF1C1C1E) else PlayerWhite,
-                                    fontSize = 19.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Start,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    item.group,
-                                    color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF),
-                                    fontSize = 14.sp,
-                                    textAlign = TextAlign.Start,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            val quality = channelQuality(item.name)
-                            if (quality.isNotBlank()) {
-                                Spacer(Modifier.width(10.dp))
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(7.dp))
-                                        .background(if (focused) Color(0x1F000000) else Color(0x24FFFFFF))
-                                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                                ) {
-                                    Text(quality, color = if (focused) Color(0xCC1C1C1E) else Color(0xD9FFFFFF), fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                }
-                            }
+                val many = lists.size > 1
+                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("‹", color = PlayerWhite.copy(alpha = if (many) .55f else 0f), fontSize = 24.sp)
+                    AnimatedContent(
+                        targetState = listTitle,
+                        modifier = Modifier.weight(1f),
+                        transitionSpec = {
+                            (slideInHorizontally(tween(260)) { listDirection * it / 3 } + fadeIn(tween(260))) togetherWith
+                                (slideOutHorizontally(tween(200)) { -listDirection * it / 3 } + fadeOut(tween(160)))
+                        },
+                        label = "listTitle"
+                    ) { title ->
+                        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(title, color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val size = lists.firstOrNull { it.first == title }?.second?.size ?: 0
+                            Text("$size channels", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
                         }
+                    }
+                    Text("›", color = PlayerWhite.copy(alpha = if (many) .55f else 0f), fontSize = 24.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                AnimatedContent(
+                    targetState = listTitle,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    transitionSpec = {
+                        (slideInHorizontally(tween(280)) { listDirection * it / 2 } + fadeIn(tween(280))) togetherWith
+                            (slideOutHorizontally(tween(220)) { -listDirection * it / 2 } + fadeOut(tween(160)))
+                    },
+                    label = "listPage"
+                ) { title ->
+                    val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
+                    ChannelListPage(page, channel) { item -> onSelect(item, page, title) }
+                }
+            }
+        }
+    }
+}
+
+/** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
+@Composable
+private fun ChannelListPage(items: List<Channel>, playing: Channel, onPick: (Channel) -> Unit) {
+    val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
+    val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
+    val anchor = remember { FocusRequester() }
+    LaunchedEffect(Unit) { anchor.requestFocusSafely() }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        // Room on every side so the 1.04 focus scale and the last row are never clipped.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(items, key = { it.key }) { item ->
+            val isPlaying = item.key == playing.key
+            var focused by remember { mutableStateOf(false) }
+            val itemScale by animateFloatAsState(
+                if (focused) 1.04f else 1f,
+                spring(dampingRatio = .78f, stiffness = 420f),
+                label = "channelItemScale"
+            )
+            Row(
+                (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
+                    .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
+                    .background(
+                        when {
+                            focused -> Color(0xF2F2F2F7)
+                            isPlaying -> Color(0x1FFFFFFF)
+                            else -> Color.Transparent
+                        }
+                    )
+                    .onFocusChanged { focused = it.isFocused }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onPick(item) }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ChannelLogo(item.name, item.logo, Modifier.size(40.dp), fontSize = 14.sp, corner = 9.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                    Text(
+                        channelDisplayName(item.name),
+                        color = if (focused) Color(0xFF1C1C1E) else PlayerWhite,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        item.group,
+                        color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val quality = channelQuality(item.name)
+                if (quality.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier.clip(RoundedCornerShape(6.dp))
+                            .background(if (focused) Color(0x1F000000) else Color(0x24FFFFFF))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(quality, color = if (focused) Color(0xCC1C1C1E) else Color(0xD9FFFFFF), fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }

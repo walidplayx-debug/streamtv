@@ -75,11 +75,14 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         PlayerScreen(
             channel = state.selected,
             channels = state.queue.ifEmpty { state.channels },
+            queueTitle = state.queueTitle,
+            allChannels = state.channels,
+            recent = state.recent,
             programs = state.programs,
             favorites = state.favorites,
             onBack = model::stopPlaying,
             onZap = model::zap,
-            onSelect = { model.select(it) },
+            onSelect = { item, list, title -> model.select(item, list, title) },
             onFavorite = model::toggleFavorite
         )
         return
@@ -157,7 +160,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} saved channels")
                 Spacer(Modifier.height(20.dp))
-                ChannelGrid(state.channels.filter { it.id in state.favorites }, state.programs, state.favorites, model)
+                ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model)
             }
             "Search" -> SearchContent(state, model)
             "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }) { entry = it }
@@ -182,8 +185,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
             }
         }
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
-            Text("STREEM", color = Accent, fontSize = 25.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp,
-                maxLines = 1, softWrap = false)
+            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -304,7 +306,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
                 Text("${filtered.size} channels", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(14.dp))
-            ChannelGrid(filtered, state.programs, state.favorites, model)
+            ChannelGrid(filtered, heading, state.programs, state.favorites, model)
         }
     }
 }
@@ -319,32 +321,36 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
             model.selectTab("Settings")
         }
     } else {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(6),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 6.dp, top = 6.dp, end = 6.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            gridItems(items, key = { it.key }) { item ->
-                PosterCard(item, item.id in state.favorites) { model.select(item, items) }
+        val glass = remember { GlassFocus() }
+        Box(Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                gridItems(items, key = { it.key }) { item ->
+                    PosterCard(item, glass, item.id in state.favorites) { model.select(item, items, title) }
+                }
             }
+            GlassFocusOverlay(glass, radius = 12.dp)
         }
     }
 }
 
 /** Poster-shaped card with the title underneath, for movies and series. */
 @Composable
-private fun PosterCard(channel: Channel, favorite: Boolean, onClick: () -> Unit) {
+private fun PosterCard(channel: Channel, glass: GlassFocus, favorite: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.05f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "posterScale")
+    val scale by animateFloatAsState(if (focused) 1.03f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "posterScale")
     Column(
         Modifier.scale(scale).onFocusChanged { focused = it.isFocused }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp))
-                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f).glassTarget(glass, focused).clip(RoundedCornerShape(12.dp))
+                .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
                 channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,
@@ -395,32 +401,36 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
 }
 
 @Composable
-private fun ChannelGrid(channels: List<Channel>, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
+private fun ChannelGrid(channels: List<Channel>, title: String, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel) {
     if (channels.isEmpty()) {
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
         return
     }
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp, end = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        gridItems(channels, key = { it.key }) { channel ->
-            ChannelCard(channel, programs, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels) }
+    val glass = remember { GlassFocus() }
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 8.dp, top = 8.dp, bottom = 24.dp, end = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            gridItems(channels, key = { it.key }) { channel ->
+                ChannelCard(channel, glass, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels, title) }
+            }
         }
+        GlassFocusOverlay(glass, radius = 10.dp)
     }
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, programs: List<EpgProgram>, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, glass: GlassFocus, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.035f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "cardScale")
     Box(
-        modifier.scale(scale).then(modifier).clip(RoundedCornerShape(10.dp))
+        modifier.glassTarget(glass, focused).scale(scale).clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(Color(0xFF252A33), Color(0xFF171B22))))
-            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .82f else .07f), RoundedCornerShape(10.dp))
+            .border(1.dp, White.copy(alpha = .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
@@ -453,7 +463,7 @@ private fun SearchContent(state: TvState, model: MainViewModel) {
     val matches = if (q.isEmpty()) emptyList() else state.channels.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
     Text(if (q.isEmpty()) "Start typing to search" else "${matches.size} results", color = Muted, fontSize = 17.sp)
     Spacer(Modifier.height(14.dp))
-    ChannelGrid(matches, state.programs, state.favorites, model)
+    ChannelGrid(matches, "Search results", state.programs, state.favorites, model)
 }
 
 @Composable

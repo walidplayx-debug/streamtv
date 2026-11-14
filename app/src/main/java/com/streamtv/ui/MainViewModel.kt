@@ -26,6 +26,8 @@ data class TvState(
     val favorites: Set<String> = emptySet(), val tab: String = "Live TV", val playing: Boolean = false, val searchQuery: String = "",
     /** The list the playing channel was opened from; the player browses and zaps inside it. */
     val queue: List<Channel> = emptyList(),
+    /** Name of that list, shown as the heading of the in-player channel list. */
+    val queueTitle: String = "All channels",
     /** Keys of recently watched channels, newest first. */
     val recent: List<String> = emptyList(),
     /** True once the saved settings were read, so first-run screens do not flash. */
@@ -185,11 +187,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }
-    fun select(channel: Channel, from: List<Channel>? = null) {
+    fun select(channel: Channel, from: List<Channel>? = null, title: String? = null) {
         lastChannelId = channel.id
         val current = _state.value.queue
         val queue = from ?: if (current.any { it.key == channel.key }) current else _state.value.channels
-        _state.value = _state.value.copy(selected = channel, playing = true, queue = queue)
+        _state.value = _state.value.copy(
+            selected = channel, playing = true, queue = queue,
+            queueTitle = title ?: if (from == null && queue === current) _state.value.queueTitle else "All channels"
+        )
         rememberWatched(channel)
         viewModelScope.launch { preferences.saveLastChannel(channel.id) }
     }
