@@ -99,7 +99,7 @@ fun PlayerScreen(
     }
     LaunchedEffect(channel.id) { zapLabel = true }
     LaunchedEffect(zapLabel, channel.id) {
-        AnimatedVisibility(visible = zapLabel, enter = fadeIn(animationSpec = tween(280)), exit = fadeOut(animationSpec = tween(500))) {
+        if (zapLabel) {
             delay(8000)
             zapLabel = false
         }
@@ -162,7 +162,11 @@ fun PlayerScreen(
             update = { it.player = player }
         )
 
-        if (zapLabel) {
+        AnimatedVisibility(
+            visible = zapLabel,
+            enter = fadeIn(animationSpec = tween(280)),
+            exit = fadeOut(animationSpec = tween(500))
+        ) {
             val progress = current?.let {
                 ((System.currentTimeMillis() - it.startEpochMillis).toFloat() /
                     (it.endEpochMillis - it.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
@@ -215,7 +219,7 @@ fun PlayerScreen(
                             color = PlayerMuted, fontSize = 11.sp)
                     }
                     Text("CH " + channelNumber, color = PlayerWhite, fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        fontWeight = FontWeight.SemiBold)
                 }
             }
         }
