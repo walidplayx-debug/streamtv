@@ -177,12 +177,12 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit) {
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Row(
-                Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
+                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Live TV", "Movies", "Series", "Favorites", "Search", "Settings").forEach { item ->
+                listOf("Live TV", "Movies", "Series", "Search", "Settings").forEach { item ->
                     val selected = tab == item
-                    FocusPill(item, selected, Modifier.padding(horizontal = 2.dp)) { onSelect(item) }
+                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth()) { onSelect(item) }
                 }
             }
         }
@@ -258,6 +258,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
     ).filter { it.third > 0 }
     val filtered = when {
         state.searchQuery == "__recent" -> recent
+        state.searchQuery == "__favorites" -> live.filter { it.id in state.favorites }
         state.searchQuery.isBlank() || state.searchQuery == "__all" -> live
         state.searchQuery == "__language_ar" -> live.filter { it.detectedLanguage() == "ar" }
         state.searchQuery == "__language_fr" -> live.filter { it.detectedLanguage() == "fr" }
@@ -266,6 +267,7 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
     }
     val heading = when {
         state.searchQuery == "__recent" -> "Last watched"
+        state.searchQuery == "__favorites" -> "Favorites"
         state.searchQuery == "__language_ar" -> "العربية"
         state.searchQuery == "__language_fr" -> "Français"
         state.searchQuery.startsWith("__country:") -> state.searchQuery.removePrefix("__country:")
@@ -277,6 +279,9 @@ private fun LiveContent(state: TvState, model: MainViewModel) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), state.searchQuery == "__recent") { model.setSearchQuery("__recent") } }
+                }
+                if (state.favorites.any { favoriteId -> live.any { it.id == favoriteId } }) {
+                    item { FocusRow("Favorites", live.count { it.id in state.favorites }.toString(), state.searchQuery == "__favorites") { model.setSearchQuery("__favorites") } }
                 }
                 item { FocusRow("All channels", live.size.toString(), state.searchQuery.isBlank() || state.searchQuery == "__all") { model.setSearchQuery("__all") } }
                 if (languageGroups.isNotEmpty()) {
