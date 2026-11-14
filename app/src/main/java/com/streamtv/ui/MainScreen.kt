@@ -31,7 +31,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -322,36 +323,36 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
             model.selectTab("Settings")
         }
     } else {
-        val glass = remember { GlassFocus() }
-        Box(Modifier.fillMaxSize().clipToBounds()) {
+        Box(Modifier.fillMaxSize()) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 gridItems(items, key = { it.key }) { item ->
-                    PosterCard(item, glass, item.id in state.favorites) { model.select(item, items, title) }
+                    PosterCard(item, item.id in state.favorites) { model.select(item, items, title) }
                 }
             }
-            GlassFocusOverlay(glass, radius = 12.dp)
         }
     }
 }
 
 /** Poster-shaped card with the title underneath, for movies and series. */
 @Composable
-private fun PosterCard(channel: Channel, glass: GlassFocus, favorite: Boolean, onClick: () -> Unit) {
+private fun PosterCard(channel: Channel, favorite: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.03f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "posterScale")
+    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
     Column(
-        Modifier.scale(scale).onFocusChanged { focused = it.isFocused }
+        Modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(2f / 3f).glassTarget(glass, focused, channel.key).clip(RoundedCornerShape(12.dp))
-                .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(12.dp))
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+                .shadow(if (focused) 18.dp else 0.dp, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
                 channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,
@@ -407,31 +408,33 @@ private fun ChannelGrid(channels: List<Channel>, title: String, programs: List<E
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
         return
     }
-    val glass = remember { GlassFocus() }
-    Box(Modifier.fillMaxSize().clipToBounds()) {
+    Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 8.dp, top = 8.dp, bottom = 24.dp, end = 18.dp),
+            // Room around the grid so the enlarged, focused tile is never cut off.
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, bottom = 24.dp, end = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, glass, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels, title) }
+                ChannelCard(channel, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp)) { model.select(channel, channels, title) }
             }
         }
-        GlassFocusOverlay(glass, radius = 10.dp)
     }
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, glass: GlassFocus, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.035f else 1f, spring(dampingRatio = .82f, stiffness = 420f), label = "cardScale")
+    val scale by animateFloatAsState(if (focused) 1.14f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
-        modifier.glassTarget(glass, focused, channel.key).scale(scale).clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF252A33), Color(0xFF171B22))))
-            .border(1.dp, White.copy(alpha = .07f), RoundedCornerShape(10.dp))
+        // The focused tile grows and sits above its neighbours.
+        modifier.zIndex(if (focused) 1f else 0f).scale(scale)
+            .shadow(if (focused) 18.dp else 0.dp, RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF323946), Color(0xFF20252E)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
+            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = onClick).focusable(),
         contentAlignment = Alignment.Center
