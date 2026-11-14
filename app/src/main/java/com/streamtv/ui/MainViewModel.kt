@@ -48,7 +48,9 @@ data class TvState(
     val names: Map<String, String> = emptyMap(),
     val pinSet: Boolean = false,
     val pin: PinPrompt? = null,
-    val pinError: Boolean = false
+    val pinError: Boolean = false,
+    /** What is typed in the Search tab; separate from the Live TV list choice (searchQuery). */
+    val searchText: String = ""
 )
 
 /** Applies the viewer's hidden channels and custom names to a list, remembering the last result. */
@@ -243,6 +245,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
         }
     }
+    fun setSearchText(value: String) { _state.value = _state.value.copy(searchText = value) }
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
     fun setUrl(value: String) { _state.value = _state.value.copy(playlistUrl = value) }
     fun selectTab(value: String) { _state.value = _state.value.copy(tab = value) }

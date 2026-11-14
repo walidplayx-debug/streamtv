@@ -101,10 +101,10 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // PIN question (locking a channel, opening a locked one, changing the PIN).
     state.pin?.let { prompt ->
         val choosing = prompt.purpose == "set"
-        SingleFieldScreen(
-            title = if (choosing) "Choose a 4-digit PIN" else "Enter PIN", hint = "••••", initial = "", pin = true,
-            error = if (!state.pinError) null else if (choosing) "The PIN must be 4 digits" else "Wrong PIN",
-            saveLabel = "Save", onSave = model::submitPin, onCancel = model::cancelPin
+        PinPadScreen(
+            title = if (choosing) "Choose a 4-digit PIN" else "Enter PIN",
+            error = if (state.pinError) "Wrong PIN" else null,
+            onSubmit = model::submitPin, onCancel = model::cancelPin
         )
         return
     }
@@ -312,10 +312,19 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         state.recent.mapNotNull { byKey[it] }
     }
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
-    val query = state.searchQuery.ifBlank { if (recent.isNotEmpty()) "__recent" else "__all" }
     val countryGroups = live.filter { it.country.isNotBlank() }
         .groupBy { it.country.trim().uppercase() }.toSortedMap()
     val categoryGroups = live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap()
+    // A choice that no longer matches anything falls back to the default list instead of "no channels".
+    val chosen = state.searchQuery
+    val stillValid = when {
+        chosen.isBlank() -> false
+        chosen == "__recent" -> recent.isNotEmpty()
+        chosen == "__favorites" -> live.any { it.id in state.favorites }
+        chosen.startsWith("__") -> true
+        else -> categoryGroups.keys.any { it.equals(chosen, true) }
+    }
+    val query = if (stillValid) chosen else if (recent.isNotEmpty()) "__recent" else "__all"
     val languageGroups = listOf(
         Triple("العربية", "__language_ar", live.count { it.detectedLanguage() == "ar" }),
         Triple("Français", "__language_fr", live.count { it.detectedLanguage() == "fr" })
@@ -327,7 +336,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         query == "__language_ar" -> live.filter { it.detectedLanguage() == "ar" }
         query == "__language_fr" -> live.filter { it.detectedLanguage() == "fr" }
         query.startsWith("__country:") -> live.filter { it.country.equals(query.removePrefix("__country:"), true) }
-        else -> live.filter { it.group.equals(query, true) }
+        else -> live.filter { it.group.ifBlank { "Other" }.equals(query, true) }
     }
     val heading = when {
         query == "__recent" -> "Last watched"
@@ -497,12 +506,13 @@ private fun ChannelGrid(
         return
     }
     val restoreIndex = remember(channels, restoreKey) { if (restoreKey == null) -1 else channels.indexOfFirst { it.key == restoreKey } }
-    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex / 4 * 4 - 4).coerceAtLeast(0) else 0)
+    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex - 8).coerceAtLeast(0) else 0)
     val restoreFocus = remember { FocusRequester() }
     RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            // Tiles keep one size: four across beside the Live TV lists, more when the grid is wider (Search).
+            columns = GridCells.Adaptive(110.dp),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             // Room around the grid so the enlarged, focused tile is never cut off.
@@ -555,9 +565,9 @@ private fun channelGradient(name: String): List<Color> {
 private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit) {
     ScreenHeading("Search", "Find a channel or category")
     Spacer(Modifier.height(16.dp))
-    GlassInput(state.searchQuery, "Search channels", model::setSearchQuery, Modifier.fillMaxWidth(.62f))
+    GlassInput(state.searchText, "Search channels", model::setSearchText, Modifier.fillMaxWidth(.62f))
     Spacer(Modifier.height(16.dp))
-    val q = state.searchQuery.trim()
+    val q = state.searchText.trim()
     val matches = if (q.isEmpty()) emptyList() else state.channels.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
     Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 17.sp)
     Spacer(Modifier.height(14.dp))
@@ -579,16 +589,19 @@ private fun SettingsContent(
     }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.width(270.dp)) {
-            Text(t("Settings"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(26.dp))
             listOf("Playback", "Playlist", "Language", "About", "Parental control", "TV guide").forEach { item ->
                 FocusRow(item, if (item == section) "●" else "", item == section) { onSection(item) }
             }
         }
         Spacer(Modifier.width(44.dp))
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-            Text(t(section), color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(18.dp))
+            // The tab already says "Settings" and the Playlist page opens with its own heading.
+            if (section != "Playlist") {
+                Text(t(section), color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(18.dp))
+            } else {
+                Spacer(Modifier.height(6.dp))
+            }
             when (section) {
                 "Playlist" -> {
                     val counts = remember(state.channels) { state.channels.groupingBy { it.kind() }.eachCount() }

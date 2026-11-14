@@ -48,6 +48,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -244,6 +251,99 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
                 message?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
+    }
+}
+
+/**
+ * Floating PIN card in the middle of the screen with its own number pad, so no system keyboard
+ * is needed. The PIN is sent as soon as the fourth digit is entered.
+ */
+@Composable
+fun PinPadScreen(title: String, error: String?, onSubmit: (String) -> Unit, onCancel: () -> Unit) {
+    var digits by remember { mutableStateOf("") }
+    val first = remember { FocusRequester() }
+    fun type(digit: Char) {
+        if (digits.length >= 4) return
+        val next = digits + digit
+        if (next.length == 4) { digits = ""; onSubmit(next) } else digits = next
+    }
+    BackHandler { onCancel() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            Modifier.fillMaxSize().background(Color(0xFF050506))
+                // Number keys on the remote work too.
+                .onPreviewKeyEvent { event ->
+                    val code = event.nativeKeyEvent.keyCode
+                    val digit = when (code) {
+                        in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_0)
+                        in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_NUMPAD_0)
+                        else -> null
+                    }
+                    if (digit == null) false else { if (event.type == KeyEventType.KeyDown) type(digit); true }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                Modifier.clip(RoundedCornerShape(28.dp)).background(Color(0xF01C1C1E))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
+                    .padding(horizontal = 30.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(t(title), color = EntryWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    repeat(4) { index ->
+                        Box(
+                            Modifier.size(13.dp).clip(CircleShape)
+                                .background(if (index < digits.length) EntryWhite else Color.Transparent)
+                                .border(1.5.dp, EntryWhite.copy(alpha = .55f), CircleShape)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(if (error != null && digits.isEmpty()) t(error) else " ", color = Color(0xFFFF8B7B), fontSize = 14.sp, maxLines = 1)
+                Spacer(Modifier.height(8.dp))
+                val rows = listOf("123", "456", "789", "<0x")
+                for (row in rows) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        for (key in row) {
+                            PinKey(
+                                label = when (key) { '<' -> "⌫"; 'x' -> "✕"; else -> key.toString() },
+                                modifier = if (key == '1') Modifier.focusRequester(first) else Modifier
+                            ) {
+                                when (key) {
+                                    '<' -> digits = digits.dropLast(1)
+                                    'x' -> onCancel()
+                                    else -> type(key)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PinKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(stiffness = 430f), label = "pinKeyScale")
+    Box(
+        modifier.size(52.dp).scale(scale).clip(CircleShape)
+            .background(if (focused) EntryWhite else Color(0x1FFFFFFF))
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (focused) EntryInk else EntryWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

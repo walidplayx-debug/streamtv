@@ -471,13 +471,13 @@ fun PlayerScreen(
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
                 Spacer(Modifier.height(10.dp))
                 val starred = channel.id in favorites
-                OptionRow(if (starred) "Remove from favorites" else "Add to favorites", Modifier.focusRequester(first)) {
+                OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", Modifier.focusRequester(first)) {
                     onFavorite(channel)
                     overlayState = OverlayState.None
                 }
-                OptionRow("Hide channel") { overlayState = OverlayState.None; onOption("hide") }
-                OptionRow(if (locked) "Unlock channel" else "Lock channel") { overlayState = OverlayState.None; onOption("lock") }
-                OptionRow("Rename") { overlayState = OverlayState.None; onOption("rename") }
+                OptionRow("Hide channel", "hide") { overlayState = OverlayState.None; onOption("hide") }
+                OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock") { overlayState = OverlayState.None; onOption("lock") }
+                OptionRow("Rename", "edit") { overlayState = OverlayState.None; onOption("rename") }
             }
         }
 
@@ -713,7 +713,7 @@ private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
 
 /** One action in the channel options panel. */
 @Composable
-private fun OptionRow(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun OptionRow(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(dampingRatio = .78f, stiffness = 420f), label = "optionScale")
     Row(
@@ -724,8 +724,64 @@ private fun OptionRow(label: String, modifier: Modifier = Modifier, onClick: () 
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        OptionIcon(icon, if (focused) Color(0xB31C1C1E) else Color(0xB3FFFFFF), Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
         Text(t(label), color = if (focused) Color(0xFF1C1C1E) else PlayerWhite, fontSize = 17.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Simple one-colour line icons for the options panel: "star", "hide", "lock" or "edit". */
+@Composable
+private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val line = Stroke(width = w * .09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        when (kind) {
+            "star" -> {
+                val path = Path()
+                val outer = w * .46f
+                val inner = outer * .46f
+                for (i in 0 until 10) {
+                    val r = if (i % 2 == 0) outer else inner
+                    val angle = Math.toRadians(-90.0 + i * 36.0)
+                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
+                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                drawPath(path, tint, style = line)
+            }
+            "hide" -> {
+                // An eye with a line through it.
+                val eye = Path().apply {
+                    moveTo(w * .06f, h * .5f)
+                    quadraticBezierTo(w * .5f, h * .08f, w * .94f, h * .5f)
+                    quadraticBezierTo(w * .5f, h * .92f, w * .06f, h * .5f)
+                    close()
+                }
+                drawPath(eye, tint, style = line)
+                drawCircle(tint, radius = w * .12f, center = androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), style = line)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .16f, h * .86f), androidx.compose.ui.geometry.Offset(w * .84f, h * .14f),
+                    strokeWidth = w * .09f, cap = StrokeCap.Round)
+            }
+            "lock" -> {
+                drawRoundRect(tint, topLeft = androidx.compose.ui.geometry.Offset(w * .18f, h * .44f),
+                    size = androidx.compose.ui.geometry.Size(w * .64f, h * .48f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * .1f), style = line)
+                drawArc(tint, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(w * .3f, h * .1f),
+                    size = androidx.compose.ui.geometry.Size(w * .4f, h * .68f), style = line)
+            }
+            else -> {
+                // A pencil over a baseline.
+                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .26f, h * .68f), androidx.compose.ui.geometry.Offset(w * .76f, h * .18f),
+                    strokeWidth = w * .17f, cap = StrokeCap.Round)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .14f, h * .9f), androidx.compose.ui.geometry.Offset(w * .86f, h * .9f),
+                    strokeWidth = w * .09f, cap = StrokeCap.Round)
+            }
+        }
     }
 }
 
