@@ -502,7 +502,7 @@ private fun SettingsContent(
                     val activeName = state.playlists.firstOrNull { it.url == state.playlistUrl }?.name
                     var summaryFocused by remember { mutableStateOf(false) }
                     Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                        Modifier.fillMaxWidth(.72f).clip(RoundedCornerShape(18.dp))
                             .background(White.copy(alpha = if (summaryFocused) .13f else .07f))
                             .border(1.dp, White.copy(alpha = if (summaryFocused) .5f else 0f), RoundedCornerShape(18.dp))
                             .onFocusChanged { summaryFocused = it.isFocused }.focusable()
@@ -523,20 +523,23 @@ private fun SettingsContent(
                     Spacer(Modifier.height(22.dp))
                     Text(t("Add a playlist"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        WhiteButton("M3U link") { if (!state.loading) onEntry("playlist") }
-                        WhiteButton("Xtream login") { if (!state.loading) onEntry("xtream") }
-                        WhiteButton("Import file") {
+                    Row(
+                        Modifier.fillMaxWidth().clip(CircleShape)
+                            .background(Glass.copy(alpha = .72f)).padding(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FocusPill("M3U link", false, Modifier.weight(1f)) { if (!state.loading) onEntry("playlist") }
+                        FocusPill("Xtream login", false, Modifier.weight(1f)) { if (!state.loading) onEntry("xtream") }
+                        FocusPill("Import file", false, Modifier.weight(1f)) {
                             try {
                                 filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
                             } catch (_: ActivityNotFoundException) {
                                 model.setError("No file picker is available on this TV. Use M3U link or Xtream login instead.")
                             }
                         }
-                    }
-                    if (state.playlistUrl.startsWith("http")) {
-                        Spacer(Modifier.height(10.dp))
-                        WhiteButton("Reload") { if (!state.loading) model.loadPlaylist() }
+                        if (state.playlistUrl.startsWith("http")) {
+                            FocusPill("Reload", false, Modifier.weight(1f)) { if (!state.loading) model.loadPlaylist() }
+                        }
                     }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
