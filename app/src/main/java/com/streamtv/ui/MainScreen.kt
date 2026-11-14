@@ -567,6 +567,7 @@ private fun SettingsContent(
                 }
                 "Parental control" -> SettingsRow("Parental lock", "Not configured")
                 "Appearance" -> SettingsRow("Theme", "Dark · tvOS inspired")
+                "About" -> AppUpdateSection()
                 else -> SettingsRow("streamtv", "Version 1.0.0")
             }
         }
