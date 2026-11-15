@@ -9,6 +9,8 @@ concurrency:
 on:
   push:
     branches: ['**']
+    paths-ignore:
+      - '.github/workflows/cleanup-old-actions.yml'
   workflow_dispatch:
 permissions:
   contents: write
