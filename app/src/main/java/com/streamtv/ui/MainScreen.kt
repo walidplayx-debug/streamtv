@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -26,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -40,13 +44,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -624,6 +631,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
     val language = LocalAppLanguage.current
     var arabicKeys by remember { mutableStateOf(language == "ar") }
     var scope by remember { mutableStateOf("All") }
+    val fieldSeen = remember { booleanArrayOf(false) }
     val text = state.searchText
     val q = text.trim()
     val pool = remember(state.channels, scope) {
@@ -637,39 +645,91 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
     val matches = remember(pool, q) {
         if (q.isEmpty()) emptyList() else pool.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
     }
+    // The search bar is a real text field: OK on it opens the TV keyboard, so voice search and
+    // typing or pasting from a phone remote app keep working. The keys below are for the D-pad.
+    var editing by remember { mutableStateOf(false) }
+    var barFocused by remember { mutableStateOf(false) }
+    val barFocus = remember { FocusRequester() }
+    val fieldFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val backToBar = remember { booleanArrayOf(false) }
+    BackHandler(enabled = editing) { backToBar[0] = true; editing = false }
+    LaunchedEffect(editing) {
+        if (editing) {
+            repeat(20) {
+                if (runCatching { fieldFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+                withFrameNanos { }
+            }
+        } else {
+            fieldSeen[0] = false
+            keyboard?.hide()
+            // Finished with Back or the keyboard's search key: focus returns to the search bar.
+            if (backToBar[0]) { backToBar[0] = false; runCatching { barFocus.requestFocus() } }
+        }
+    }
+    // Both halves ease in instead of snapping onto the screen.
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, tween(360)) }
     Row(Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            Column(Modifier.width(300.dp)) {
+            Column(Modifier.width(300.dp).graphicsLayer { alpha = appear.value; translationY = (1f - appear.value) * 24f }) {
                 Row(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Glass)
-                        .border(1.dp, White.copy(alpha = .14f), RoundedCornerShape(14.dp)).padding(horizontal = 16.dp),
+                    Modifier.fillMaxWidth().height(48.dp).clip(CircleShape)
+                        .background(if (barFocused || editing) FocusBrush else SolidColor(Glass.copy(alpha = .72f)))
+                        .border(1.dp, White.copy(alpha = if (barFocused || editing) .5f else .14f), CircleShape)
+                        .focusRequester(barFocus)
+                        .onFocusChanged { barFocused = it.isFocused }
+                        .clickable { editing = true }
+                        .padding(horizontal = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        if (text.isEmpty()) t("Search channels") else text,
-                        color = if (text.isEmpty()) Muted else White, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
+                    if (editing) {
+                        BasicTextField(
+                            value = text, onValueChange = model::setSearchText, singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp),
+                            cursorBrush = SolidColor(White),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { backToBar[0] = true; editing = false }),
+                            modifier = Modifier.weight(1f).focusRequester(fieldFocus)
+                                // Leaving the field with the D-pad ends typing; the keys below take over.
+                                .onFocusChanged { field ->
+                                    if (field.isFocused) fieldSeen[0] = true
+                                    else if (fieldSeen[0] && editing) { fieldSeen[0] = false; editing = false }
+                                }
+                        )
+                    } else {
+                        Text(
+                            if (text.isEmpty()) t("Search channels") else text, Modifier.weight(1f),
+                            color = if (text.isEmpty()) White.copy(alpha = .6f) else White, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-                Spacer(Modifier.height(10.dp))
-                val keys = if (arabicKeys) "ابتثجحخدذرزسشصضطظعغفقكلمنهويءةىأإؤئآ" else "abcdefghijklmnopqrstuvwxyz0123456789"
-                for (row in keys.chunked(6)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        for (key in row) {
-                            SearchKey(key.toString(), Modifier.weight(1f)) { model.setSearchText(text + key) }
+                Spacer(Modifier.height(12.dp))
+                // One soft panel holding plain letters; only the key in focus is filled.
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Glass.copy(alpha = .72f))
+                        .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(22.dp)).padding(8.dp)
+                ) {
+                    val keys = if (arabicKeys) "ابتثجحخدذرزسشصضطظعغفقكلمنهويءةىأإؤئآ" else "abcdefghijklmnopqrstuvwxyz0123456789"
+                    for (row in keys.chunked(6)) {
+                        Row(Modifier.fillMaxWidth()) {
+                            for (key in row) {
+                                SearchKey(key.toString(), Modifier.weight(1f)) { model.setSearchText(text + key) }
+                            }
                         }
                     }
-                    Spacer(Modifier.height(5.dp))
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    SearchKey("␣", Modifier.weight(2f)) { if (text.isNotEmpty()) model.setSearchText("$text ") }
-                    SearchKey("⌫", Modifier.weight(1f)) { model.setSearchText(text.dropLast(1)) }
-                    SearchKey("✕", Modifier.weight(1f)) { model.setSearchText("") }
-                    SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f)) { arabicKeys = !arabicKeys }
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SearchKey("space", Modifier.weight(2f), outlined = true) { if (text.isNotEmpty()) model.setSearchText("$text ") }
+                        SearchKey("⌫", Modifier.weight(1f), outlined = true) { model.setSearchText(text.dropLast(1)) }
+                        SearchKey("✕", Modifier.weight(1f), outlined = true) { model.setSearchText("") }
+                        SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
+                    }
                 }
             }
         }
         Spacer(Modifier.width(28.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
+        Column(Modifier.weight(1f).fillMaxHeight().graphicsLayer { alpha = appear.value; translationY = (1f - appear.value) * 24f }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(4.dp),
@@ -702,20 +762,21 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
     }
 }
 
-/** One key of the in-app search keyboard. */
+/** One key of the in-app search keyboard: a plain letter that fills with the focus colour. */
 @Composable
-private fun SearchKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun SearchKey(label: String, modifier: Modifier = Modifier, outlined: Boolean = false, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) .92f else if (focused) 1.1f else 1f, spring(stiffness = 500f), label = "searchKeyScale")
+    val scale by animateFloatAsState(if (pressed) .92f else if (focused) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 480f), label = "searchKeyScale")
     Box(
-        modifier.height(38.dp).zIndex(if (focused) 1f else 0f).scale(scale).clip(RoundedCornerShape(10.dp))
-            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = .08f)))
+        modifier.height(if (outlined) 40.dp else 41.dp).zIndex(if (focused) 1f else 0f).scale(scale).clip(CircleShape)
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(Color.Transparent))
+            .border(1.dp, White.copy(alpha = if (focused) .5f else if (outlined) .16f else 0f), CircleShape)
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = White.copy(alpha = if (focused) 1f else .86f), fontSize = 17.sp,
+        Text(t(label), color = White.copy(alpha = if (focused) 1f else .8f), fontSize = if (outlined) 15.sp else 19.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
     }
 }
