@@ -37,7 +37,8 @@ jobs:
             echo "STV_KEYSTORE_FILE=$RUNNER_TEMP/private.jks" >> "$GITHUB_ENV"
             echo "Signing with the private key from the repository secrets"
           else
-            echo "Signing with the public key in keystore/stv-public.jks"
+            echo "::error::The signing secrets are missing. Refusing to build an APK that the installed app could not update to."
+            exit 1
           fi
       - name: Build, lint and test
         env:

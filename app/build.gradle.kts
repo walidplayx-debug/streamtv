@@ -18,22 +18,23 @@ android {
         buildConfigField("String", "UPDATE_CHANNEL", "\"$updateChannel\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    // Release builds are signed only by CI, with the private keystore kept in the repository
+    // secrets. No key lives in the repository: a build without it stays unsigned.
+    val ciStore = System.getenv("STV_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
     signingConfigs {
-        // One fixed key for every build, so a new APK always installs over the previous one.
-        // CI uses the private keystore from the repository secrets when they exist; otherwise the
-        // public key committed in keystore/ is used (fine for a personal, side-loaded app).
-        create("stv") {
-            val ciStore = System.getenv("STV_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
-            storeFile = if (ciStore != null) file(ciStore) else rootProject.file("keystore/stv-public.jks")
-            storePassword = if (ciStore != null) System.getenv("STV_KEYSTORE_PASSWORD") else "stvpublic"
-            keyAlias = if (ciStore != null) System.getenv("STV_KEY_ALIAS") else "stv"
-            keyPassword = if (ciStore != null) System.getenv("STV_KEY_PASSWORD") else "stvpublic"
+        if (ciStore != null) {
+            create("stv") {
+                storeFile = file(ciStore)
+                storePassword = System.getenv("STV_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("STV_KEY_ALIAS")
+                keyPassword = System.getenv("STV_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
-            signingConfig = signingConfigs.getByName("stv")
+            if (ciStore != null) signingConfig = signingConfigs.getByName("stv")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

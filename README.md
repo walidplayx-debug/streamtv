@@ -33,9 +33,9 @@ Open streamtv, paste your own M3U or M3U8 URL, and choose **Load channels**. Pla
 
 ## Signing and updates
 
-Every build is signed with the same key, so a new APK installs over the previous one. By default that is the public key in `keystore/` (see `keystore/README.md`). To sign with a private key instead, configure the repository Actions secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. Switching keys requires uninstalling the app once.
+Release APKs are signed only by GitHub Actions, with a private keystore stored in the repository Actions secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. No signing key is kept in the repository, and CI refuses to build if the secrets are missing. Every build therefore carries the same signature, so a new APK installs over the previous one.
 
-Builds of branches other than `main` are published as the `preview` pre-release: [stv-preview.apk](https://github.com/walidplayx-debug/streamtv/releases/download/preview/stv-preview.apk).
+`main` publishes the `latest` release (`stv.apk`) and also refreshes the `preview` pre-release ([stv-preview.apk](https://github.com/walidplayx-debug/streamtv/releases/download/preview/stv-preview.apk)).
 
 ## Troubleshooting
 
