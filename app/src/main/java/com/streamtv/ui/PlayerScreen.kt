@@ -132,7 +132,7 @@ fun PlayerScreen(
 
     // The lists the side panel can page through with left/right.
     val isLive = remember(channel.url) { channel.kind() == ChannelKind.Live }
-    val lists: List<Pair<String, List<Channel>>> = remember(allChannels, recent, favorites, queueTitle, channels, isLive) {
+    val liveLists: List<Pair<String, List<Channel>>> = remember(allChannels, recent, favorites, queueTitle, channels, isLive) {
         if (!isLive) listOf(queueTitle to channels) else buildList {
             val live = allChannels.filter { it.kind() == ChannelKind.Live }
             val byKey = live.associateBy { it.key }
@@ -145,6 +145,10 @@ fun PlayerScreen(
             if (none { it.first == queueTitle }) add(0, queueTitle to channels)
         }
     }
+    // Keep the side panel's pages and their order stable for the entire time it is open.
+    // Fresh recent-watch data is picked up the next time the viewer opens the panel.
+    var frozenLists by remember { mutableStateOf<List<Pair<String, List<Channel>>>?>(null) }
+    val lists = frozenLists ?: liveLists
     var listTitle by remember { mutableStateOf(queueTitle) }
     var listDirection by remember { mutableIntStateOf(1) }
     var listTick by remember { mutableIntStateOf(0) }
@@ -162,6 +166,7 @@ fun PlayerScreen(
     val okSwallow = remember { booleanArrayOf(false) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
+        frozenLists = liveLists
         listTitle = queueTitle
         listPaged = false
         nameFocused = false
