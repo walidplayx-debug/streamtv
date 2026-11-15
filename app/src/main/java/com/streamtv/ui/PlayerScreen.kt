@@ -673,6 +673,8 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
         items(items, key = { it.key }) { item ->
             val isPlaying = item.key == playing.key
             val focused = focusedKey == item.key
+            // The "now playing" mark fades out instead of snapping off when another channel is picked.
+            val playingMark by animateFloatAsState(if (isPlaying) 1f else 0f, tween(260), label = "playingMark")
             val itemScale by animateFloatAsState(
                 if (focused) 1.04f else 1f,
                 spring(dampingRatio = .78f, stiffness = 420f),
@@ -684,8 +686,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     .background(
                         when {
                             focused -> Color(0xF2F2F2F7)
-                            isPlaying -> Color(0x1FFFFFFF)
-                            else -> Color.Transparent
+                            else -> Color.White.copy(alpha = .12f * playingMark)
                         }
                     )
                     .onFocusChanged { state ->
