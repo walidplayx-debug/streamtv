@@ -5,6 +5,9 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
@@ -705,25 +708,29 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                // One soft panel holding plain letters; only the key in focus is filled.
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Glass.copy(alpha = .72f))
-                        .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(22.dp)).padding(8.dp)
-                ) {
-                    val keys = if (arabicKeys) "ابتثجحخدذرزسشصضطظعغفقكلمنهويءةىأإؤئآ" else "abcdefghijklmnopqrstuvwxyz0123456789"
-                    for (row in keys.chunked(6)) {
-                        Row(Modifier.fillMaxWidth()) {
-                            for (key in row) {
-                                SearchKey(key.toString(), Modifier.weight(1f)) { model.setSearchText(text + key) }
+                // The TV keyboard and these keys never show together: while the TV keyboard is up
+                // (typing in the search bar), the in-app keys step aside, and come back after.
+                AnimatedVisibility(visible = !editing, enter = fadeIn(tween(220)), exit = fadeOut(tween(140))) {
+                    // One soft panel holding plain letters; only the key in focus is filled.
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Glass.copy(alpha = .72f))
+                            .border(1.dp, White.copy(alpha = .08f), RoundedCornerShape(22.dp)).padding(8.dp)
+                    ) {
+                        val keys = if (arabicKeys) "ابتثجحخدذرزسشصضطظعغفقكلمنهويءةىأإؤئآ" else "abcdefghijklmnopqrstuvwxyz0123456789"
+                        for (row in keys.chunked(6)) {
+                            Row(Modifier.fillMaxWidth()) {
+                                for (key in row) {
+                                    SearchKey(key.toString(), Modifier.weight(1f)) { model.setSearchText(text + key) }
+                                }
                             }
                         }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SearchKey("space", Modifier.weight(2f), outlined = true) { if (text.isNotEmpty()) model.setSearchText("$text ") }
-                        SearchKey("⌫", Modifier.weight(1f), outlined = true) { model.setSearchText(text.dropLast(1)) }
-                        SearchKey("✕", Modifier.weight(1f), outlined = true) { model.setSearchText("") }
-                        SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
+                        Spacer(Modifier.height(4.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SearchKey("space", Modifier.weight(2f), outlined = true) { if (text.isNotEmpty()) model.setSearchText("$text ") }
+                            SearchKey("⌫", Modifier.weight(1f), outlined = true) { model.setSearchText(text.dropLast(1)) }
+                            SearchKey("✕", Modifier.weight(1f), outlined = true) { model.setSearchText("") }
+                            SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
+                        }
                     }
                 }
             }
