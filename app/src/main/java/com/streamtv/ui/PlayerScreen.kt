@@ -736,6 +736,45 @@ private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The channel options as a floating card, opened by holding OK on a channel tile.
+ * Returns "favorite", "hide", "lock" or "rename" through [onPick].
+ */
+@Composable
+fun ChannelOptionsScreen(channel: Channel, starred: Boolean, locked: Boolean, onPick: (String) -> Unit, onClose: () -> Unit) {
+    val first = remember { FocusRequester() }
+    // The OK press that opened this card is still held down; ignore it until it is released.
+    val armed = remember { booleanArrayOf(false) }
+    BackHandler { onClose() }
+    LaunchedEffect(Unit) { first.requestFocusSafely() }
+    Box(
+        Modifier.fillMaxSize().background(Color(0xFF050506))
+            .onPreviewKeyEvent { event ->
+                val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                when {
+                    !ok || armed[0] -> false
+                    event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { armed[0] = true; false }
+                    else -> true
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            Modifier.width(340.dp).clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
+                .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
+                .padding(horizontal = 14.dp, vertical = 16.dp)
+        ) {
+            Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+            Spacer(Modifier.height(10.dp))
+            OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", Modifier.focusRequester(first)) { onPick("favorite") }
+            OptionRow("Hide channel", "hide") { onPick("hide") }
+            OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock") { onPick("lock") }
+            OptionRow("Rename", "edit") { onPick("rename") }
+        }
+    }
+}
+
 /** One action in the channel options panel. */
 @Composable
 private fun OptionRow(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {

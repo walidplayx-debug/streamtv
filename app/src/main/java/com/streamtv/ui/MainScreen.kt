@@ -53,6 +53,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -139,8 +144,31 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         )
         return
     }
+    val handleOption: (Channel, String) -> Unit = { target, option ->
+        when (option) {
+            "favorite" -> model.toggleFavorite(target)
+            "hide" -> confirm = ConfirmRequest("Hide this channel?", target.name, "Hide channel") { model.hideChannel(target) }
+            "lock" -> model.toggleLock(target)
+            "rename" -> renaming = target
+        }
+    }
+    // Holding OK on a channel tile opens its options as a floating card.
+    var optionsFor by remember { mutableStateOf<Channel?>(null) }
+    optionsFor?.let { target ->
+        ChannelOptionsScreen(
+            channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
+            onPick = { option -> optionsFor = null; handleOption(target, option) },
+            onClose = { optionsFor = null }
+        )
+        return
+    }
+    val openOptions: (Channel) -> Unit = { target -> returnKey = target.key; optionsFor = target }
+
     if (state.playing && state.selected != null) {
         SideEffect { returnKey = state.selected.key }
+        // The player keeps one layout in every language: channel names are mostly Latin, and the
+        // list sliding in from the other side in Arabic felt wrong.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         PlayerScreen(
             channel = state.selected,
             channels = state.queue.ifEmpty { state.channels },
@@ -154,17 +182,9 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             onSelect = { item, list, title -> model.select(item, list, title) },
             onFavorite = model::toggleFavorite,
             locked = state.selected.key in state.locked,
-            onOption = { option ->
-                when (option) {
-                    "hide" -> {
-                        val target = state.selected
-                        confirm = ConfirmRequest("Hide this channel?", target.name, "Hide channel") { model.hideChannel(target) }
-                    }
-                    "lock" -> model.toggleLock(state.selected)
-                    "rename" -> renaming = state.selected
-                }
-            }
+            onOption = { option -> handleOption(state.selected, option) }
         )
+        }
         return
     }
 
@@ -242,11 +262,11 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
                 Spacer(Modifier.height(20.dp))
-                ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model, returnKey) { returnKey = null }
+                ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions)
             }
-            "Search" -> SearchContent(state, model, returnKey) { returnKey = null }
+            "Search" -> SearchContent(state, model, returnKey, { returnKey = null }, openOptions)
             "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { confirm = it }) { entry = it }
-            else -> LiveContent(state, model, returnKey) { returnKey = null }
+            else -> LiveContent(state, model, returnKey, { returnKey = null }, openOptions)
         }
     }
 }
@@ -330,7 +350,7 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
 }
 
 @Composable
-private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit) {
+private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
     val live = remember(state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } }
     val recent = remember(live, state.recent) {
         val byKey = live.associateBy { it.key }
@@ -407,7 +427,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 Text("${filtered.size} ${t("channels")}", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(14.dp))
-            ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored)
+            ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
         }
     }
 }
@@ -569,7 +589,7 @@ private fun RestoreFocus(restoreKey: String?, found: Boolean, target: FocusReque
 @Composable
 private fun ChannelGrid(
     channels: List<Channel>, title: String, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel,
-    restoreKey: String? = null, onRestored: () -> Unit = {}
+    restoreKey: String? = null, onRestored: () -> Unit = {}, onOptions: (Channel) -> Unit = {}
 ) {
     if (channels.isEmpty()) {
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
@@ -591,15 +611,17 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, channel.id in favorites, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier)) { model.select(channel, channels, title) }
+                ChannelCard(channel, channel.id in favorites, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier)) { model.select(channel, channels, title) }
             }
         }
     }
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
+    // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
+    val held = remember { booleanArrayOf(false) }
     val (pressed, press) = rememberPress(onClick)
     val scale by animateFloatAsState(if (pressed) 1.05f else if (focused) 1.14f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
@@ -610,6 +632,18 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, modifier: Modifier 
             .background(Brush.linearGradient(if (focused) listOf(Color(0xFF323946), Color(0xFF20252E)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
             .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                when {
+                    !ok -> false
+                    event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0 -> {
+                        if (!held[0]) { held[0] = true; onLongPress() }
+                        true
+                    }
+                    event.type == KeyEventType.KeyUp && held[0] -> { held[0] = false; true }
+                    else -> false
+                }
+            }
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
@@ -632,7 +666,7 @@ private fun channelGradient(name: String): List<Color> {
 }
 
 @Composable
-private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit) {
+private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
     // The TV's own keyboard floats wherever it likes and covers the results, so Search has a
     // keyboard of its own: it stays on one side and the results fill the other.
     val language = LocalAppLanguage.current
@@ -767,7 +801,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                         PosterCard(item, item.id in state.favorites) { model.select(item, matches, "Search results") }
                     }
                 }
-                else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored)
+                else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
             }
         }
     }

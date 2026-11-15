@@ -22,7 +22,7 @@ import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
 
-/** A PIN question on screen. purpose: "set", "open", "unlock", "verify" or "confirm". */
+/** A PIN question on screen. purpose: "set", "open", "lock", "unlock", "verify" or "confirm". */
 data class PinPrompt(val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null)
 
 data class TvState(
@@ -326,7 +326,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when {
             channel.key in _state.value.locked -> _state.value = _state.value.copy(pin = PinPrompt("unlock", channel), pinError = false)
             pinCode.isBlank() -> _state.value = _state.value.copy(pin = PinPrompt("set", channel), pinError = false)
-            else -> setLocked(_state.value.locked + channel.key)
+            // Locking asks for the PIN too, so nobody can lock channels by accident or as a prank.
+            else -> _state.value = _state.value.copy(pin = PinPrompt("lock", channel), pinError = false)
         }
     }
     private fun setLocked(keys: Set<String>) {
@@ -361,6 +362,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (prompt.purpose) {
             "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
             "unlock" -> prompt.channel?.let { setLocked(_state.value.locked - it.key) }
+            "lock" -> prompt.channel?.let { setLocked(_state.value.locked + it.key) }
             "verify" -> _state.value = _state.value.copy(pin = PinPrompt("set"))
             "confirm" -> { val action = pendingAction; pendingAction = null; action?.invoke() }
         }
