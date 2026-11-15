@@ -303,6 +303,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         rememberWatched(selected)
         viewModelScope.launch { preferences.saveLastChannel(selected.id) }
     }
+    /** Privacy: forget that this channel was watched. */
+    fun removeFromHistory(channel: Channel) {
+        val updated = _state.value.recent.filterNot { it == channel.key }
+        _state.value = _state.value.copy(recent = updated)
+        viewModelScope.launch {
+            preferences.saveRecent(updated)
+            // It is also remembered as "the last channel"; forget that too.
+            if (lastChannelId == channel.id) { lastChannelId = ""; preferences.saveLastChannel("") }
+        }
+    }
     fun hideChannel(channel: Channel) {
         val hidden = _state.value.hidden + channel.key
         _state.value = _state.value.copy(hidden = hidden)

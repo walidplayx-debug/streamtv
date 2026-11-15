@@ -147,18 +147,20 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     val handleOption: (Channel, String) -> Unit = { target, option ->
         when (option) {
             "favorite" -> model.toggleFavorite(target)
+            "history" -> model.removeFromHistory(target)
             "hide" -> confirm = ConfirmRequest("Hide this channel?", target.name, "Hide channel") { model.hideChannel(target) }
             "lock" -> model.toggleLock(target)
             "rename" -> renaming = target
         }
         // These open a screen of their own; come back to the same tile afterwards.
-        if (option != "favorite" && !state.playing) returnKey = target.key
+        if (option != "favorite" && option != "history" && !state.playing) returnKey = target.key
     }
     // Holding OK on a channel tile opens its options as a card floating over the current screen.
     var optionsFor by remember { mutableStateOf<Channel?>(null) }
     optionsFor?.let { target ->
         ChannelOptionsDialog(
             channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
+            inHistory = target.key in state.recent,
             onPick = { option -> optionsFor = null; handleOption(target, option) },
             onClose = { optionsFor = null }
         )

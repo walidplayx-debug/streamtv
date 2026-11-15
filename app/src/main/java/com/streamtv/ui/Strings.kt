@@ -102,7 +102,8 @@ private val French = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Choisissez comment ajouter votre playlist. Vous pouvez la changer à tout moment dans Réglages.",
     "Paste the address of an M3U or M3U8 playlist" to "Collez l'adresse d'une playlist M3U ou M3U8",
     "Sign in with a server, username and password" to "Connectez-vous avec un serveur, un nom d'utilisateur et un mot de passe",
-    "Pick an M3U file stored on this TV" to "Choisissez un fichier M3U enregistré sur ce téléviseur"
+    "Pick an M3U file stored on this TV" to "Choisissez un fichier M3U enregistré sur ce téléviseur",
+    "Remove from history" to "Retirer de l'historique"
 )
 
 private val Arabic = mapOf(
@@ -174,5 +175,6 @@ private val Arabic = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "اختر طريقة إضافة قائمتك. يمكنك تغييرها في أي وقت من الإعدادات.",
     "Paste the address of an M3U or M3U8 playlist" to "الصق رابط قائمة M3U أو M3U8",
     "Sign in with a server, username and password" to "سجّل الدخول بالسيرفر واسم المستخدم وكلمة السر",
-    "Pick an M3U file stored on this TV" to "اختر ملف M3U محفوظاً على هذا التلفزيون"
+    "Pick an M3U file stored on this TV" to "اختر ملف M3U محفوظاً على هذا التلفزيون",
+    "Remove from history" to "إزالة من سجل المشاهدة"
 )

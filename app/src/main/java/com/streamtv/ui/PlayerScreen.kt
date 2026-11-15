@@ -742,10 +742,12 @@ private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
 /**
  * The channel options as a card floating over the screen it was opened from (the screen stays
  * visible, dimmed, behind it). Opened by holding OK on a channel tile.
- * Returns "favorite", "hide", "lock" or "rename" through [onPick].
+ * Returns "favorite", "history", "hide", "lock" or "rename" through [onPick].
  */
 @Composable
-fun ChannelOptionsDialog(channel: Channel, starred: Boolean, locked: Boolean, onPick: (String) -> Unit, onClose: () -> Unit) {
+fun ChannelOptionsDialog(
+    channel: Channel, starred: Boolean, locked: Boolean, inHistory: Boolean, onPick: (String) -> Unit, onClose: () -> Unit
+) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val first = remember { FocusRequester() }
         // The OK press that opened this card is still held down; ignore it until it is released.
@@ -776,6 +778,8 @@ fun ChannelOptionsDialog(channel: Channel, starred: Boolean, locked: Boolean, on
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
             Spacer(Modifier.height(10.dp))
             OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", Modifier.focusRequester(first)) { onPick("favorite") }
+            // Only for channels that are in "Last watched".
+            if (inHistory) OptionRow("Remove from history", "history") { onPick("history") }
             OptionRow("Hide channel", "hide") { onPick("hide") }
             OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock") { onPick("lock") }
             OptionRow("Rename", "edit") { onPick("rename") }
@@ -836,6 +840,14 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
                 drawPath(eye, tint, style = line)
                 drawCircle(tint, radius = w * .12f, center = androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), style = line)
                 drawLine(tint, androidx.compose.ui.geometry.Offset(w * .16f, h * .86f), androidx.compose.ui.geometry.Offset(w * .84f, h * .14f),
+                    strokeWidth = w * .09f, cap = StrokeCap.Round)
+            }
+            "history" -> {
+                // A clock face.
+                drawCircle(tint, radius = w * .42f, center = androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), style = line)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), androidx.compose.ui.geometry.Offset(w * .5f, h * .26f),
+                    strokeWidth = w * .09f, cap = StrokeCap.Round)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), androidx.compose.ui.geometry.Offset(w * .68f, h * .6f),
                     strokeWidth = w * .09f, cap = StrokeCap.Round)
             }
             "lock" -> {

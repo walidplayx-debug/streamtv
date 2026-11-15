@@ -118,7 +118,8 @@ internal val Spanish: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Elige cómo añadir tu lista. Puedes cambiarla cuando quieras en Ajustes.",
     "Paste the address of an M3U or M3U8 playlist" to "Pega la dirección de una lista M3U o M3U8",
     "Sign in with a server, username and password" to "Inicia sesión con servidor, usuario y contraseña",
-    "Pick an M3U file stored on this TV" to "Elige un archivo M3U guardado en este televisor"
+    "Pick an M3U file stored on this TV" to "Elige un archivo M3U guardado en este televisor",
+    "Remove from history" to "Quitar del historial"
 )
 
 internal val Russian: Map<String, String> = mapOf(
@@ -237,7 +238,8 @@ internal val Russian: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Выберите способ добавления плейлиста. Его можно изменить в настройках в любой момент.",
     "Paste the address of an M3U or M3U8 playlist" to "Вставьте адрес плейлиста M3U или M3U8",
     "Sign in with a server, username and password" to "Войдите, указав сервер, имя пользователя и пароль",
-    "Pick an M3U file stored on this TV" to "Выберите файл M3U, сохранённый на этом телевизоре"
+    "Pick an M3U file stored on this TV" to "Выберите файл M3U, сохранённый на этом телевизоре",
+    "Remove from history" to "Удалить из истории"
 )
 
 internal val Chinese: Map<String, String> = mapOf(
@@ -356,7 +358,8 @@ internal val Chinese: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "选择添加播放列表的方式。可随时在设置中更改。",
     "Paste the address of an M3U or M3U8 playlist" to "粘贴 M3U 或 M3U8 播放列表的地址",
     "Sign in with a server, username and password" to "使用服务器、用户名和密码登录",
-    "Pick an M3U file stored on this TV" to "选择保存在此电视上的 M3U 文件"
+    "Pick an M3U file stored on this TV" to "选择保存在此电视上的 M3U 文件",
+    "Remove from history" to "从观看记录中移除"
 )
 
 internal val Turkish: Map<String, String> = mapOf(
@@ -475,7 +478,8 @@ internal val Turkish: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Listenizi nasıl ekleyeceğinizi seçin. İstediğiniz zaman Ayarlar'dan değiştirebilirsiniz.",
     "Paste the address of an M3U or M3U8 playlist" to "Bir M3U veya M3U8 listesinin adresini yapıştırın",
     "Sign in with a server, username and password" to "Sunucu, kullanıcı adı ve şifreyle giriş yapın",
-    "Pick an M3U file stored on this TV" to "Bu TV'de kayıtlı bir M3U dosyası seçin"
+    "Pick an M3U file stored on this TV" to "Bu TV'de kayıtlı bir M3U dosyası seçin",
+    "Remove from history" to "Geçmişten kaldır"
 )
 
 internal val German: Map<String, String> = mapOf(
@@ -594,7 +598,8 @@ internal val German: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Wähle, wie du deine Playlist hinzufügst. Du kannst sie jederzeit in den Optionen ändern.",
     "Paste the address of an M3U or M3U8 playlist" to "Adresse einer M3U- oder M3U8-Playlist einfügen",
     "Sign in with a server, username and password" to "Mit Server, Benutzername und Passwort anmelden",
-    "Pick an M3U file stored on this TV" to "M3U-Datei auswählen, die auf diesem TV gespeichert ist"
+    "Pick an M3U file stored on this TV" to "M3U-Datei auswählen, die auf diesem TV gespeichert ist",
+    "Remove from history" to "Aus Verlauf entfernen"
 )
 
 internal val Portuguese: Map<String, String> = mapOf(
@@ -713,7 +718,8 @@ internal val Portuguese: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Escolha como adicionar a sua lista. Pode alterá-la a qualquer momento nos Ajustes.",
     "Paste the address of an M3U or M3U8 playlist" to "Cole o endereço de uma lista M3U ou M3U8",
     "Sign in with a server, username and password" to "Inicie sessão com servidor, utilizador e palavra-passe",
-    "Pick an M3U file stored on this TV" to "Escolha um ficheiro M3U guardado nesta TV"
+    "Pick an M3U file stored on this TV" to "Escolha um ficheiro M3U guardado nesta TV",
+    "Remove from history" to "Remover do histórico"
 )
 
 internal val Dutch: Map<String, String> = mapOf(
@@ -832,5 +838,6 @@ internal val Dutch: Map<String, String> = mapOf(
     "Choose how to add your playlist. You can change it any time in Settings." to "Kies hoe je je afspeellijst toevoegt. Je kunt dit altijd wijzigen bij Opties.",
     "Paste the address of an M3U or M3U8 playlist" to "Plak het adres van een M3U- of M3U8-afspeellijst",
     "Sign in with a server, username and password" to "Meld je aan met server, gebruikersnaam en wachtwoord",
-    "Pick an M3U file stored on this TV" to "Kies een M3U-bestand dat op deze tv staat"
+    "Pick an M3U file stored on this TV" to "Kies een M3U-bestand dat op deze tv staat",
+    "Remove from history" to "Verwijderen uit geschiedenis"
 )
