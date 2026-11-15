@@ -10,6 +10,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -449,6 +454,8 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
         val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex / 6 * 6 - 6).coerceAtLeast(0) else 0)
         val restoreFocus = remember { FocusRequester() }
         RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
+        var focusedKey by remember { mutableStateOf<String?>(null) }
+        GlideToFocus(gridState, focusedKey)
         Box(Modifier.fillMaxSize()) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
@@ -459,7 +466,7 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 gridItems(items, key = { it.key }) { item ->
-                    PosterCard(item, item.id in state.favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier) { model.select(item, items, title) }
+                    PosterCard(item, item.id in state.favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { model.select(item, items, title) }
                 }
             }
         }
@@ -468,18 +475,18 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
 
 /** Poster-shaped card with the title underneath, for movies and series. */
 @Composable
-private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
+    val scale by animateFloatAsState(if (focused) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
     Column(
-        modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused }
+        modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
-                .shadow(if (focused) 18.dp else 0.dp, RoundedCornerShape(12.dp))
+                .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
-                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
+                .border(1.dp, White.copy(alpha = if (focused) .16f else .08f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
                 channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,
@@ -574,6 +581,34 @@ private fun WelcomeCard(title: String, description: String, modifier: Modifier =
     }
 }
 
+/**
+ * Apple TV feel: the page glides under the focus instead of the focus walking down the screen.
+ * The focused row is brought to one fixed height (the second row when three rows fit, else the
+ * first), so only the first and last rows of a list move the focus itself.
+ */
+@Composable
+private fun GlideToFocus(gridState: LazyGridState, focusedKey: String?) {
+    LaunchedEffect(focusedKey) {
+        val key = focusedKey ?: return@LaunchedEffect
+        repeat(3) {
+            val info = gridState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.key == key } ?: return@LaunchedEffect
+            val stride = item.size.height + info.mainAxisItemSpacing
+            val pivot = if (info.viewportSize.height >= stride * 3) stride else 0
+            val delta = (item.offset.y - pivot).toFloat()
+            if (kotlin.math.abs(delta) < 1f) return@LaunchedEffect
+            try {
+                gridState.animateScrollBy(delta, tween(320, easing = FastOutSlowInEasing))
+                return@LaunchedEffect
+            } catch (e: CancellationException) {
+                // The built-in "keep the focus visible" scroll took over; try again on the next frame.
+                ensureActive()
+                withFrameNanos { }
+            }
+        }
+    }
+}
+
 /** After the player closes, puts focus back on the channel that was opened. */
 @Composable
 private fun RestoreFocus(restoreKey: String?, found: Boolean, target: FocusRequester, onRestored: () -> Unit) {
@@ -602,6 +637,8 @@ private fun ChannelGrid(
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex - 8).coerceAtLeast(0) else 0)
     val restoreFocus = remember { FocusRequester() }
     RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
+    var focusedKey by remember { mutableStateOf<String?>(null) }
+    GlideToFocus(gridState, focusedKey)
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             // Tiles keep one size: four across beside the Live TV lists, more when the grid is wider (Search).
@@ -614,27 +651,28 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, channel.id in favorites, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier)) { model.select(channel, channels, title) }
+                ChannelCard(channel, channel.id in favorites, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
     }
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) 1.05f else if (focused) 1.14f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
+    val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
         // The focused tile grows and sits above its neighbours.
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)
-            .shadow(if (focused) 18.dp else 0.dp, RoundedCornerShape(10.dp))
+            .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF323946), Color(0xFF20252E)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
-            .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .07f), RoundedCornerShape(10.dp))
-            .onFocusChanged { focused = it.isFocused }
+            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF465064), Color(0xFF2B3240)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
+            // No white frame: the tile is picked out by its size, its lighter face and its shadow.
+            .border(1.dp, White.copy(alpha = if (focused) .16f else .07f), RoundedCornerShape(10.dp))
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .onPreviewKeyEvent { event ->
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
                 when {
@@ -793,17 +831,21 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                 Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 16.sp, maxLines = 1)
             }
             Spacer(Modifier.height(10.dp))
+            val posterState = rememberLazyGridState()
+            var posterFocus by remember { mutableStateOf<String?>(null) }
+            GlideToFocus(posterState, posterFocus)
             when {
                 matches.isEmpty() -> Unit
                 scope == "Movies" || scope == "Series" -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(96.dp),
+                    state = posterState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     gridItems(matches, key = { it.key }) { item ->
-                        PosterCard(item, item.id in state.favorites) { model.select(item, matches, "Search results") }
+                        PosterCard(item, item.id in state.favorites, onFocus = { posterFocus = item.key }) { model.select(item, matches, "Search results") }
                     }
                 }
                 else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
