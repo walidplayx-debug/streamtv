@@ -85,7 +85,13 @@ private val French = mapOf(
     "Wrong PIN" to "Code PIN incorrect", "The PIN must be 4 digits" to "Le code PIN doit comporter 4 chiffres",
     "PIN" to "Code PIN", "Set" to "Défini", "Not set" to "Non défini", "Set PIN" to "Définir le code PIN", "Change PIN" to "Changer le code PIN",
     "Locked channels" to "Chaînes verrouillées", "Hidden channels" to "Chaînes masquées", "Restore hidden channels" to "Restaurer les chaînes masquées",
-    "Remove this playlist?" to "Supprimer cette playlist ?", "Hide this channel?" to "Masquer cette chaîne ?"
+    "Remove this playlist?" to "Supprimer cette playlist ?", "Hide this channel?" to "Masquer cette chaîne ?",
+    // welcome
+    "Welcome" to "Bienvenue",
+    "Choose how to add your playlist. You can change it any time in Settings." to "Choisissez comment ajouter votre playlist. Vous pouvez la changer à tout moment dans Réglages.",
+    "Paste the address of an M3U or M3U8 playlist" to "Collez l'adresse d'une playlist M3U ou M3U8",
+    "Sign in with a server, username and password" to "Connectez-vous avec un serveur, un nom d'utilisateur et un mot de passe",
+    "Pick an M3U file stored on this TV" to "Choisissez un fichier M3U enregistré sur ce téléviseur"
 )
 
 private val Arabic = mapOf(
@@ -150,5 +156,11 @@ private val Arabic = mapOf(
     "Wrong PIN" to "الرمز السري غير صحيح", "The PIN must be 4 digits" to "الرمز السري يجب أن يكون 4 أرقام",
     "PIN" to "الرمز السري", "Set" to "محدّد", "Not set" to "غير محدّد", "Set PIN" to "تحديد الرمز السري", "Change PIN" to "تغيير الرمز السري",
     "Locked channels" to "القنوات المقفلة", "Hidden channels" to "القنوات المخفية", "Restore hidden channels" to "استرجاع القنوات المخفية",
-    "Remove this playlist?" to "حذف هذه القائمة؟", "Hide this channel?" to "إخفاء هذه القناة؟"
+    "Remove this playlist?" to "حذف هذه القائمة؟", "Hide this channel?" to "إخفاء هذه القناة؟",
+    // welcome
+    "Welcome" to "أهلاً بك",
+    "Choose how to add your playlist. You can change it any time in Settings." to "اختر طريقة إضافة قائمتك. يمكنك تغييرها في أي وقت من الإعدادات.",
+    "Paste the address of an M3U or M3U8 playlist" to "الصق رابط قائمة M3U أو M3U8",
+    "Sign in with a server, username and password" to "سجّل الدخول بالسيرفر واسم المستخدم وكلمة السر",
+    "Pick an M3U file stored on this TV" to "اختر ملف M3U محفوظاً على هذا التلفزيون"
 )

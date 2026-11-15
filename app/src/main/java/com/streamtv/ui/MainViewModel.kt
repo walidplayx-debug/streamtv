@@ -209,13 +209,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun removePlaylist(entry: PlaylistEntry) {
         val updated = _state.value.playlists.filterNot { it.url == entry.url }
-        _state.value = _state.value.copy(playlists = updated)
+        val wasActive = entry.url == _state.value.playlistUrl
+        val nothingLeft = updated.isEmpty()
+        _state.value = if (nothingLeft) {
+            // No playlist left: drop its channels too, so the app goes back to the welcome screen.
+            _state.value.copy(
+                playlists = updated, playlistUrl = "", playlistName = "", channels = emptyList(), queue = emptyList(),
+                selected = null, playing = false, error = null, searchQuery = "", searchText = ""
+            )
+        } else {
+            _state.value.copy(playlists = updated)
+        }
         viewModelScope.launch {
+            // Clear the active address first, so nothing reloads the playlist that was just removed.
+            if (nothingLeft) preferences.savePlaylist("")
             preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
+            if (nothingLeft) dao.clear()
             if (entry.url.startsWith("local://")) {
                 File(playlistDirectory, entry.url.removePrefix("local://")).delete()
             }
         }
+        // The playing playlist was removed but others remain: move to the first of them.
+        if (!nothingLeft && wasActive) selectPlaylist(updated.first())
     }
     fun selectPlaylist(entry: PlaylistEntry) {
         _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)

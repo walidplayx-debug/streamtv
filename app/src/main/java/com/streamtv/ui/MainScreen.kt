@@ -72,7 +72,6 @@ private val White = Color(0xFFFFFFFF)
 private val Muted = Color(0xFF99999E)
 private val Accent = Color(0xFFD5DADF)
 private val Glass = Color(0xFF29292C)
-private const val ExamplePlaylistUrl = "https://iptv-org.github.io/iptv/countries/be.m3u"
 
 /** Something destructive waiting for the viewer to say yes. */
 private class ConfirmRequest(val question: String, val subject: String, val confirmLabel: String, val action: () -> Unit)
@@ -166,7 +165,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         "playlist" -> {
             TextEntryScreen(
                 title = "Add M3U playlist", urlHint = "Playlist address  https://…", initialUrl = "",
-                exampleUrl = ExamplePlaylistUrl, showName = true, saveLabel = "Save & load",
+                exampleUrl = null, showName = true, saveLabel = "Save & load",
                 onSave = { name, url ->
                     model.setPlaylistName(name)
                     model.setUrl(url)
@@ -211,12 +210,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             loading = state.loading, error = state.error,
             onAdd = { entry = "playlist" },
             onXtream = { entry = "xtream" },
-            onExample = {
-                model.setPlaylistName("Example")
-                model.setUrl(ExamplePlaylistUrl)
-                model.savePlaylistEntry()
-                model.loadPlaylist()
-            }
+            onImport = model::importPlaylist,
+            onError = model::setError
         )
         return
     }
@@ -462,8 +457,21 @@ private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier =
     }
 }
 
+/** First screen of a fresh install: the wordmark and the three ways to add a playlist. */
 @Composable
-private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, onXtream: () -> Unit, onExample: () -> Unit) {
+private fun WelcomeScreen(
+    loading: Boolean, error: String?, onAdd: () -> Unit, onXtream: () -> Unit,
+    onImport: (String) -> Unit, onError: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    ?: error("Unable to open the selected M3U file")
+            }.onSuccess(onImport).onFailure { onError(it.message ?: "Unable to import playlist") }
+        }
+    }
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         repeat(20) {
@@ -475,25 +483,57 @@ private fun WelcomeScreen(loading: Boolean, error: String?, onAdd: () -> Unit, o
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 760.dp)) {
-            Image(painterResource(R.drawable.banner), contentDescription = "STV",
-                modifier = Modifier.width(240.dp).height(135.dp).clip(RoundedCornerShape(20.dp)))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(66.dp))
             Spacer(Modifier.height(26.dp))
-            Text(t("Welcome to STV"), color = White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Text(t("Add your M3U playlist to start watching live TV, movies and series.\nYou can change it any time in Settings."),
-                color = Muted, fontSize = 18.sp, textAlign = TextAlign.Center, lineHeight = 26.sp)
-            Spacer(Modifier.height(28.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                WhiteButton(if (loading) "Loading…" else "Add M3U playlist", Modifier.focusRequester(first)) { if (!loading) onAdd() }
-                WhiteButton("Xtream login") { if (!loading) onXtream() }
-                WhiteButton("Try an example") { if (!loading) onExample() }
+            Text(t("Welcome"), color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(t("Choose how to add your playlist. You can change it any time in Settings."),
+                color = Muted, fontSize = 17.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(30.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                WelcomeCard("M3U link", "Paste the address of an M3U or M3U8 playlist", Modifier.focusRequester(first)) { if (!loading) onAdd() }
+                WelcomeCard("Xtream login", "Sign in with a server, username and password") { if (!loading) onXtream() }
+                WelcomeCard("Import file", "Pick an M3U file stored on this TV") {
+                    if (!loading) {
+                        try {
+                            filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
+                        } catch (_: ActivityNotFoundException) {
+                            onError("No file picker is available on this TV. Use M3U link or Xtream login instead.")
+                        }
+                    }
+                }
             }
-            error?.let {
-                Spacer(Modifier.height(18.dp))
-                Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, textAlign = TextAlign.Center)
-            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                when {
+                    loading -> t("Loading…")
+                    error != null -> t(error)
+                    else -> " "
+                },
+                color = if (loading) Muted else Color(0xFFFF8B7B), fontSize = 16.sp, textAlign = TextAlign.Center, maxLines = 2
+            )
         }
+    }
+}
+
+@Composable
+private fun WelcomeCard(title: String, description: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(if (pressed) .97f else if (focused) 1.06f else 1f, spring(dampingRatio = .75f, stiffness = 400f), label = "welcomeCardScale")
+    Column(
+        modifier.width(230.dp).height(128.dp).scale(scale).clip(RoundedCornerShape(22.dp))
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = .07f)))
+            .border(1.dp, White.copy(alpha = if (focused) .5f else .10f), RoundedCornerShape(22.dp))
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = press)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(t(title), color = White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Spacer(Modifier.height(6.dp))
+        Text(t(description), color = White.copy(alpha = if (focused) .9f else .6f), fontSize = 14.sp, lineHeight = 19.sp, maxLines = 3)
     }
 }
 

@@ -50,6 +50,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +58,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -210,6 +213,29 @@ fun PlayerScreen(
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
     }
+    // Home (or anything else that takes the app off screen) stops playback, sound included;
+    // coming back starts the channel again.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val stoppedInBackground = remember(channel.url) { booleanArrayOf(false) }
+    DisposableEffect(lifecycleOwner, player) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    stoppedInBackground[0] = true
+                    buffering = false
+                    player.playWhenReady = false
+                    player.stop()
+                }
+                Lifecycle.Event.ON_START -> if (stoppedInBackground[0]) {
+                    stoppedInBackground[0] = false
+                    restart()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     // A stream that buffers forever is treated like a broken one.
     LaunchedEffect(player, buffering, failed, autoRetries) {
         if (buffering && !failed) {
@@ -318,15 +344,14 @@ fun PlayerScreen(
                     // On the list name, left/right page between lists; on the channels they close the panel.
                     // "Open" is the arrow pointing at the panel's side of the screen.
                     Key.DirectionLeft, Key.DirectionRight -> {
-                        val towardsPanel = (event.key == Key.DirectionLeft) != rtl
                         val step = if ((event.key == Key.DirectionRight) != rtl) 1 else -1
                         when {
                             listOpen && pickerOpen -> true
                             listOpen && nameFocused -> { stepList(step); true }
                             listOpen -> { overlayState = OverlayState.None; true }
                             showErrorCard -> false
-                            towardsPanel -> { openList(); true }
-                            else -> false
+                            // Either arrow brings the list up; the same arrow puts it away again.
+                            else -> { openList(); true }
                         }
                     }
                     // OK only brings up the info bar; the channel list opens with the arrow key.
