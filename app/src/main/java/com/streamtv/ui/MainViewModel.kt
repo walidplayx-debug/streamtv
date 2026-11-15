@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
@@ -117,7 +119,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     init {
         viewModelScope.launch {
-            preferences.epgUrl.collect { saved -> if (saved.isNotBlank() && _state.value.epgUrl.isBlank()) _state.value = _state.value.copy(epgUrl = saved) }
+            preferences.epgUrl.collect { saved ->
+                if (saved.isNotBlank() && _state.value.epgUrl.isBlank()) {
+                    _state.value = _state.value.copy(epgUrl = saved)
+                    // The saved guide loads by itself on start; a failure here stays quiet.
+                    loadEpg(silent = true)
+                }
+            }
         }
     }
     init {
@@ -171,15 +179,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importPlaylist(text: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
+            val name = _state.value.playlistName.trim().ifBlank { "Imported playlist ${_state.value.playlists.size + 1}" }
             runCatching {
-                val channels = M3uParser.parse(text).also {
-                    require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }
+                // Parsing and writing a large file must not freeze the screen.
+                withContext(Dispatchers.IO) {
+                    val channels = M3uParser.parse(text).also {
+                        require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }
+                    }
+                    val fileName = "import-${System.currentTimeMillis()}.m3u"
+                    playlistDirectory.mkdirs()
+                    File(playlistDirectory, fileName).writeText(text)
+                    Triple(channels, name, fileName)
                 }
-                val name = _state.value.playlistName.trim().ifBlank { "Imported playlist ${_state.value.playlists.size + 1}" }
-                val fileName = "import-${System.currentTimeMillis()}.m3u"
-                playlistDirectory.mkdirs()
-                File(playlistDirectory, fileName).writeText(text)
-                Triple(channels, name, fileName)
             }
                 .onSuccess { (channels, name, fileName) ->
                     val localUrl = "local://$fileName"
@@ -241,8 +252,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching {
-                M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
-                    .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
+                withContext(Dispatchers.IO) {
+                    M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
+                        .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
+                }
             }.onSuccess { channels ->
                 _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
                 dao.clear()
@@ -252,13 +265,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    fun loadEpg() {
+    fun loadEpg(silent: Boolean = false) {
         val url = _state.value.epgUrl
         viewModelScope.launch {
             runCatching { epgRepository.load(url) }.onSuccess { items ->
                 _state.value = _state.value.copy(programs = items)
                 preferences.saveEpg(url)
-            }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
+            }.onFailure { e -> if (!silent) _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
         }
     }
     fun setSearchText(value: String) { _state.value = _state.value.copy(searchText = value) }

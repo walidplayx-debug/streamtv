@@ -49,4 +49,17 @@ class M3uParserTest {
         assertEquals("abc", item.id)
         assertEquals("Local News", item.group)
     }
+    @Test fun parsesLargePlaylistAndDropsDuplicates() {
+        val text = buildString {
+            append("#EXTM3U\n")
+            repeat(40_000) { n -> append("#EXTINF:-1 tvg-id=\"id").append(n % 100).append("\",Channel ").append(n).append("\nhttps://x/").append(n).append("\n") }
+            // the first thousand again: exact duplicates must be dropped
+            repeat(1_000) { n -> append("#EXTINF:-1 tvg-id=\"id").append(n % 100).append("\",Channel ").append(n).append("\nhttps://x/").append(n).append("\n") }
+        }
+        val started = System.nanoTime()
+        val result = M3uParser.parse(text)
+        val millis = (System.nanoTime() - started) / 1_000_000
+        assertEquals(40_000, result.size)
+        assertTrue("parsing took $millis ms", millis < 5_000)
+    }
 }
