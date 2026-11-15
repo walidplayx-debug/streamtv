@@ -314,13 +314,17 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
             .clickable(onClick = press).padding(horizontal = 15.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center
     ) {
+        // A word too long for its tab is drawn smaller rather than cut off.
+        val label = t(text)
+        var fontSize by remember(label) { mutableStateOf(16f) }
         Text(
-            t(text),
+            label,
             color = White.copy(alpha = if (focused || selected) .98f else .72f),
-            fontSize = 16.sp,
+            fontSize = fontSize.sp,
             maxLines = 1,
             softWrap = false,
-            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium,
+            onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
         )
     }
 }

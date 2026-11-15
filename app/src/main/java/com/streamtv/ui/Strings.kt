@@ -4,10 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-/** Interface language code: "en", "fr" or "ar". */
+/** Interface language code, one of the codes in [AppLanguages]. */
 val LocalAppLanguage = staticCompositionLocalOf { "en" }
 
-val AppLanguages = listOf("en" to "English", "fr" to "Français", "ar" to "العربية")
+val AppLanguages = listOf(
+    "en" to "English", "fr" to "Français", "ar" to "العربية", "es" to "Español", "ru" to "Русский",
+    "zh" to "中文", "tr" to "Türkçe", "de" to "Deutsch", "pt" to "Português", "nl" to "Nederlands"
+)
 
 /**
  * Translates an interface text. English is the key; anything without a translation
@@ -20,12 +23,19 @@ fun t(text: String): String = translate(LocalAppLanguage.current, text)
 fun translate(language: String, text: String): String = when (language) {
     "fr" -> French[text]
     "ar" -> Arabic[text]
+    "es" -> Spanish[text]
+    "ru" -> Russian[text]
+    "zh" -> Chinese[text]
+    "tr" -> Turkish[text]
+    "de" -> German[text]
+    "pt" -> Portuguese[text]
+    "nl" -> Dutch[text]
     else -> null
 } ?: text
 
 private val French = mapOf(
     // tabs and headings
-    "Live TV" to "TV en direct", "Movies" to "Films", "Series" to "Séries", "Favorites" to "Favoris",
+    "Live TV" to "En direct", "Movies" to "Films", "Series" to "Séries", "Favorites" to "Favoris",
     "Search" to "Recherche", "Settings" to "Réglages",
     "Last watched" to "Vus récemment", "All channels" to "Toutes les chaînes", "Search results" to "Résultats",
     "BY LANGUAGE" to "PAR LANGUE", "BY COUNTRY" to "PAR PAYS", "BY CATEGORY" to "PAR CATÉGORIE",
@@ -97,7 +107,7 @@ private val French = mapOf(
 
 private val Arabic = mapOf(
     // tabs and headings
-    "Live TV" to "البث المباشر", "Movies" to "أفلام", "Series" to "مسلسلات", "Favorites" to "المفضلة",
+    "Live TV" to "مباشر", "Movies" to "أفلام", "Series" to "مسلسلات", "Favorites" to "المفضلة",
     "Search" to "بحث", "Settings" to "الإعدادات",
     "Last watched" to "آخر مشاهدة", "All channels" to "كل القنوات", "Search results" to "نتائج البحث",
     "BY LANGUAGE" to "حسب اللغة", "BY COUNTRY" to "حسب البلد", "BY CATEGORY" to "حسب التصنيف",
