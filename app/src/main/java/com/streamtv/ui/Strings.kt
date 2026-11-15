@@ -87,6 +87,7 @@ private val French = mapOf(
     "Locked channels" to "Chaînes verrouillées", "Hidden channels" to "Chaînes masquées", "Restore hidden channels" to "Restaurer les chaînes masquées",
     "Remove this playlist?" to "Supprimer cette playlist ?", "Hide this channel?" to "Masquer cette chaîne ?",
     // welcome
+    "All" to "Tout",
     "Welcome" to "Bienvenue",
     "Choose how to add your playlist. You can change it any time in Settings." to "Choisissez comment ajouter votre playlist. Vous pouvez la changer à tout moment dans Réglages.",
     "Paste the address of an M3U or M3U8 playlist" to "Collez l'adresse d'une playlist M3U ou M3U8",
@@ -158,6 +159,7 @@ private val Arabic = mapOf(
     "Locked channels" to "القنوات المقفلة", "Hidden channels" to "القنوات المخفية", "Restore hidden channels" to "استرجاع القنوات المخفية",
     "Remove this playlist?" to "حذف هذه القائمة؟", "Hide this channel?" to "إخفاء هذه القناة؟",
     // welcome
+    "All" to "الكل",
     "Welcome" to "أهلاً بك",
     "Choose how to add your playlist. You can change it any time in Settings." to "اختر طريقة إضافة قائمتك. يمكنك تغييرها في أي وقت من الإعدادات.",
     "Paste the address of an M3U or M3U8 playlist" to "الصق رابط قائمة M3U أو M3U8",

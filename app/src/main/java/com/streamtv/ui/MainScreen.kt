@@ -619,15 +619,105 @@ private fun channelGradient(name: String): List<Color> {
 
 @Composable
 private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit) {
-    ScreenHeading("Search", "Find a channel or category")
-    Spacer(Modifier.height(16.dp))
-    GlassInput(state.searchText, "Search channels", model::setSearchText, Modifier.fillMaxWidth(.62f))
-    Spacer(Modifier.height(16.dp))
-    val q = state.searchText.trim()
-    val matches = if (q.isEmpty()) emptyList() else state.channels.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
-    Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 17.sp)
-    Spacer(Modifier.height(14.dp))
-    ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored)
+    // The TV's own keyboard floats wherever it likes and covers the results, so Search has a
+    // keyboard of its own: it stays on one side and the results fill the other.
+    val language = LocalAppLanguage.current
+    var arabicKeys by remember { mutableStateOf(language == "ar") }
+    var scope by remember { mutableStateOf("All") }
+    val text = state.searchText
+    val q = text.trim()
+    val pool = remember(state.channels, scope) {
+        when (scope) {
+            "Live TV" -> state.channels.filter { it.kind() == ChannelKind.Live }
+            "Movies" -> state.channels.filter { it.kind() == ChannelKind.Movie }
+            "Series" -> state.channels.filter { it.kind() == ChannelKind.Series }
+            else -> state.channels
+        }
+    }
+    val matches = remember(pool, q) {
+        if (q.isEmpty()) emptyList() else pool.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
+    }
+    Row(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Column(Modifier.width(300.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Glass)
+                        .border(1.dp, White.copy(alpha = .14f), RoundedCornerShape(14.dp)).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (text.isEmpty()) t("Search channels") else text,
+                        color = if (text.isEmpty()) Muted else White, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                val keys = if (arabicKeys) "ابتثجحخدذرزسشصضطظعغفقكلمنهويءةىأإؤئآ" else "abcdefghijklmnopqrstuvwxyz0123456789"
+                for (row in keys.chunked(6)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        for (key in row) {
+                            SearchKey(key.toString(), Modifier.weight(1f)) { model.setSearchText(text + key) }
+                        }
+                    }
+                    Spacer(Modifier.height(5.dp))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    SearchKey("␣", Modifier.weight(2f)) { if (text.isNotEmpty()) model.setSearchText("$text ") }
+                    SearchKey("⌫", Modifier.weight(1f)) { model.setSearchText(text.dropLast(1)) }
+                    SearchKey("✕", Modifier.weight(1f)) { model.setSearchText("") }
+                    SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f)) { arabicKeys = !arabicKeys }
+                }
+            }
+        }
+        Spacer(Modifier.width(28.dp))
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (item in listOf("All", "Live TV", "Movies", "Series")) {
+                        FocusPill(item, scope == item) { scope = item }
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 16.sp, maxLines = 1)
+            }
+            Spacer(Modifier.height(10.dp))
+            when {
+                matches.isEmpty() -> Unit
+                scope == "Movies" || scope == "Series" -> LazyVerticalGrid(
+                    columns = GridCells.Adaptive(96.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    gridItems(matches, key = { it.key }) { item ->
+                        PosterCard(item, item.id in state.favorites) { model.select(item, matches, "Search results") }
+                    }
+                }
+                else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored)
+            }
+        }
+    }
+}
+
+/** One key of the in-app search keyboard. */
+@Composable
+private fun SearchKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(if (pressed) .92f else if (focused) 1.1f else 1f, spring(stiffness = 500f), label = "searchKeyScale")
+    Box(
+        modifier.height(38.dp).zIndex(if (focused) 1f else 0f).scale(scale).clip(RoundedCornerShape(10.dp))
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = .08f)))
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = press),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = White.copy(alpha = if (focused) 1f else .86f), fontSize = 17.sp,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
+    }
 }
 
 @Composable
