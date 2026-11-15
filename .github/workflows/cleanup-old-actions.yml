@@ -18,11 +18,6 @@ jobs:
           script: |
             const owner = context.repo.owner;
 
-            if (!process.env.GH_CLEANUP_TOKEN) {
-              core.setFailed('Missing GH_CLEANUP_TOKEN secret. Add a fine-grained token with Actions read/write and Metadata read access to all repositories.');
-              return;
-            }
-
             const repos = await github.paginate(
               github.rest.repos.listForAuthenticatedUser,
               { affiliation: 'owner', per_page: 100 }
