@@ -107,7 +107,7 @@ private val French = mapOf(
 
 private val Arabic = mapOf(
     // tabs and headings
-    "Live TV" to "مباشر", "Movies" to "أفلام", "Series" to "مسلسلات", "Favorites" to "المفضلة",
+    "Live TV" to "البث المباشر", "Movies" to "أفلام", "Series" to "مسلسلات", "Favorites" to "المفضلة",
     "Search" to "بحث", "Settings" to "الإعدادات",
     "Last watched" to "آخر مشاهدة", "All channels" to "كل القنوات", "Search results" to "نتائج البحث",
     "BY LANGUAGE" to "حسب اللغة", "BY COUNTRY" to "حسب البلد", "BY CATEGORY" to "حسب التصنيف",
