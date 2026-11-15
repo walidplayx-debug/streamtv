@@ -1,32 +1,61 @@
-name: Clean old Actions runs
+name: Clean old Actions runs (whole account)
 
 on:
   workflow_dispatch:
 
 permissions:
-  actions: write
+  contents: read
 
 jobs:
   cleanup:
-    name: Keep the latest five runs
+    name: Keep the latest five runs across the account
     runs-on: ubuntu-latest
     steps:
-      - name: Delete older workflow runs
+      - name: Delete older workflow runs across owned repositories
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GH_CLEANUP_TOKEN }}
           script: |
-            const { owner, repo } = context.repo;
+            const owner = context.repo.owner;
 
-            const runs = await github.paginate(
-              github.rest.actions.listWorkflowRunsForRepo,
-              { owner, repo, per_page: 100 }
+            if (!process.env.GH_CLEANUP_TOKEN) {
+              core.setFailed('Missing GH_CLEANUP_TOKEN secret. Add a fine-grained token with Actions read/write and Metadata read access to all repositories.');
+              return;
+            }
+
+            const repos = await github.paginate(
+              github.rest.repos.listForAuthenticatedUser,
+              { affiliation: 'owner', per_page: 100 }
             );
 
-            runs.sort((a, b) =>
+            const allRuns = [];
+            for (const repository of repos) {
+              if (repository.owner.login.toLowerCase() !== owner.toLowerCase()) continue;
+
+              try {
+                const runs = await github.paginate(
+                  github.rest.actions.listWorkflowRunsForRepo,
+                  { owner, repo: repository.name, per_page: 100 }
+                );
+                for (const run of runs) {
+                  allRuns.push({
+                    id: run.id,
+                    name: run.name,
+                    created_at: run.created_at,
+                    repo: repository.name,
+                    status: run.status
+                  });
+                }
+              } catch (error) {
+                core.warning(`Could not list runs in ${repository.full_name}: ${error.message}`);
+              }
+            }
+
+            allRuns.sort((a, b) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
 
-            const toDelete = runs.slice(5);
+            const toDelete = allRuns.slice(5);
             let deleted = 0;
             const failed = [];
 
@@ -34,28 +63,29 @@ jobs:
               try {
                 await github.rest.actions.deleteWorkflowRun({
                   owner,
-                  repo,
+                  repo: run.repo,
                   run_id: run.id
                 });
                 deleted++;
-                core.info(`Deleted run #${run.id}: ${run.name} (${run.status})`);
+                core.info(`Deleted ${run.repo} run #${run.id}: ${run.name}`);
               } catch (error) {
-                failed.push({ id: run.id, message: error.message });
-                core.warning(`Could not delete run #${run.id}: ${error.message}`);
+                failed.push({ repo: run.repo, id: run.id, message: error.message });
+                core.warning(`Could not delete ${run.repo} run #${run.id}: ${error.message}`);
               }
             }
 
             await core.summary
-              .addHeading('Actions run cleanup')
+              .addHeading('Account-wide Actions cleanup')
               .addTable([
                 [{ data: 'Item', header: true }, { data: 'Count', header: true }],
-                ['Runs found', String(runs.length)],
-                ['Runs kept', String(Math.min(5, runs.length))],
+                ['Repositories scanned', String(repos.filter(r => r.owner.login.toLowerCase() === owner.toLowerCase()).length)],
+                ['Runs found', String(allRuns.length)],
+                ['Runs retained account-wide', String(Math.min(5, allRuns.length))],
                 ['Runs deleted', String(deleted)],
                 ['Could not delete', String(failed.length)]
               ])
               .write();
 
-            if (failed.length > 0) {
-              core.warning(`${failed.length} old run(s) could not be deleted. Check the log above.`);
+            if (failed.length) {
+              core.warning(`${failed.length} run(s) could not be deleted. See the log above.`);
             }
