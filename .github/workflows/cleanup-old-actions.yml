@@ -1,0 +1,61 @@
+name: Clean old Actions runs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Keep the latest five runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete older workflow runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, per_page: 100 }
+            );
+
+            runs.sort((a, b) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+
+            const toDelete = runs.slice(5);
+            let deleted = 0;
+            const failed = [];
+
+            for (const run of toDelete) {
+              try {
+                await github.rest.actions.deleteWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id
+                });
+                deleted++;
+                core.info(`Deleted run #${run.id}: ${run.name} (${run.status})`);
+              } catch (error) {
+                failed.push({ id: run.id, message: error.message });
+                core.warning(`Could not delete run #${run.id}: ${error.message}`);
+              }
+            }
+
+            await core.summary
+              .addHeading('Actions run cleanup')
+              .addTable([
+                [{ data: 'Item', header: true }, { data: 'Count', header: true }],
+                ['Runs found', String(runs.length)],
+                ['Runs kept', String(Math.min(5, runs.length))],
+                ['Runs deleted', String(deleted)],
+                ['Could not delete', String(failed.length)]
+              ])
+              .write();
+
+            if (failed.length > 0) {
+              core.warning(`${failed.length} old run(s) could not be deleted. Check the log above.`);
+            }
