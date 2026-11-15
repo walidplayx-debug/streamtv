@@ -456,12 +456,13 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
         RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
         var focusedKey by remember { mutableStateOf<String?>(null) }
         GlideToFocus(gridState, focusedKey)
-        Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(6),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 24.dp),
+                // Free room under the last row, so every row can glide up to the focus height.
+                contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = maxHeight),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
@@ -639,14 +640,15 @@ private fun ChannelGrid(
     RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
     var focusedKey by remember { mutableStateOf<String?>(null) }
     GlideToFocus(gridState, focusedKey)
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             // Tiles keep one size: four across beside the Live TV lists, more when the grid is wider (Search).
             columns = GridCells.Adaptive(110.dp),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             // Room around the grid so the enlarged, focused tile is never cut off.
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, bottom = 24.dp, end = 20.dp),
+            // The free room under the last row lets every row glide up to the focus height.
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, bottom = maxHeight, end = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -836,18 +838,18 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
             GlideToFocus(posterState, posterFocus)
             when {
                 matches.isEmpty() -> Unit
-                scope == "Movies" || scope == "Series" -> LazyVerticalGrid(
+                scope == "Movies" || scope == "Series" -> BoxWithConstraints(Modifier.fillMaxSize()) { LazyVerticalGrid(
                     columns = GridCells.Adaptive(96.dp),
                     state = posterState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = maxHeight),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     gridItems(matches, key = { it.key }) { item ->
                         PosterCard(item, item.id in state.favorites, onFocus = { posterFocus = item.key }) { model.select(item, matches, "Search results") }
                     }
-                }
+                } }
                 else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
             }
         }

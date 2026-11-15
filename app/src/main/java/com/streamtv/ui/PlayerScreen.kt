@@ -72,7 +72,9 @@ import com.streamtv.data.Channel
 import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
 import com.streamtv.data.EpgProgram
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
@@ -132,8 +134,11 @@ fun PlayerScreen(
 
     // The lists the side panel can page through with left/right.
     val isLive = remember(channel.url) { channel.kind() == ChannelKind.Live }
-    val liveLists: List<Pair<String, List<Channel>>> = remember(allChannels, recent, favorites, queueTitle, channels, isLive) {
-        if (!isLive) listOf(queueTitle to channels) else buildList {
+    // Built off the main thread: sorting a whole playlist on every channel change made the
+    // open panel stutter for a moment when a channel was picked.
+    var liveLists by remember { mutableStateOf<List<Pair<String, List<Channel>>>>(listOf(queueTitle to channels)) }
+    LaunchedEffect(allChannels, recent, favorites, queueTitle, channels, isLive) {
+        val built = if (!isLive) listOf(queueTitle to channels) else withContext(Dispatchers.Default) { buildList {
             val live = allChannels.filter { it.kind() == ChannelKind.Live }
             val byKey = live.associateBy { it.key }
             val watched = recent.mapNotNull { byKey[it] }
@@ -143,7 +148,8 @@ fun PlayerScreen(
             if (starred.isNotEmpty()) add("Favorites" to starred)
             live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap().forEach { (name, items) -> add(name to items) }
             if (none { it.first == queueTitle }) add(0, queueTitle to channels)
-        }
+        } }
+        liveLists = built
     }
     // Keep the side panel's pages and their order stable for the entire time it is open.
     // Fresh recent-watch data is picked up the next time the viewer opens the panel.
