@@ -659,6 +659,9 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
     val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
     val anchor = remember { FocusRequester() }
+    // Keep one authoritative focused row for the whole list. Per-row remembered focus
+    // flags can briefly disagree while Compose dispatches focus loss/gain callbacks.
+    var focusedKey by remember(items) { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
     LazyColumn(
         state = listState,
@@ -669,7 +672,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
     ) {
         items(items, key = { it.key }) { item ->
             val isPlaying = item.key == playing.key
-            var focused by remember { mutableStateOf(false) }
+            val focused = focusedKey == item.key
             val itemScale by animateFloatAsState(
                 if (focused) 1.04f else 1f,
                 spring(dampingRatio = .78f, stiffness = 420f),
@@ -685,7 +688,15 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                             else -> Color.Transparent
                         }
                     )
-                    .onFocusChanged { focused = it.isFocused }
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            focusedKey = item.key
+                        } else if (focusedKey == item.key) {
+                            // An older row's delayed focus-loss callback must not clear a
+                            // newer row that has already acquired focus.
+                            focusedKey = null
+                        }
+                    }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
