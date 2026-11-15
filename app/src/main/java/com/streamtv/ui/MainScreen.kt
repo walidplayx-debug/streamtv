@@ -123,12 +123,16 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // PIN question (locking a channel, opening a locked one, changing the PIN).
     state.pin?.let { prompt ->
         val choosing = prompt.purpose == "set"
+        // Locking or unlocking a channel from its options card: the PIN pad takes the card's
+        // place as a small floating card, and the screen (or the video) stays visible behind it.
+        val fromOptions = prompt.channel != null && prompt.purpose != "open"
         PinPadScreen(
             title = if (choosing) "Choose a 4-digit PIN" else "Enter PIN",
             error = if (state.pinError) "Wrong PIN" else null,
-            onSubmit = model::submitPin, onCancel = model::cancelPin
+            onSubmit = model::submitPin, onCancel = model::cancelPin,
+            floating = fromOptions, atEnd = fromOptions && state.playing
         )
-        return
+        if (!fromOptions) return
     }
     // "Are you sure?" before anything is removed; the PIN (when one is set) is asked right after.
     var confirm by remember { mutableStateOf<ConfirmRequest?>(null) }

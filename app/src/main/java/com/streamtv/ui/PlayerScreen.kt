@@ -334,8 +334,7 @@ fun PlayerScreen(
                             okArmed[0] -> { okArmed[0] = false; pickerOpen = true; true }
                             okShort[0] -> {
                                 okShort[0] = false
-                                // Short press: show the info bar; again while it is up toggles the favourite star.
-                                if (overlayState == OverlayState.InfoBar) onFavorite(channel)
+                                // Short press only shows the info bar; favourites are in the hold-OK options.
                                 showInfoBar()
                                 true
                             }
@@ -483,16 +482,6 @@ fun PlayerScreen(
                         }
                     }
                 }
-                Spacer(Modifier.width(14.dp))
-                val starred = channel.id in favorites
-                val starPop = remember { Animatable(1f) }
-                LaunchedEffect(starred) {
-                    if (starred) {
-                        starPop.snapTo(1.35f)
-                        starPop.animateTo(1f, spring(dampingRatio = .4f, stiffness = 380f))
-                    }
-                }
-                StarIcon(starred, Modifier.size(26.dp).scale(starPop.value))
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
@@ -736,34 +725,6 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     }
                 }
             }
-        }
-    }
-}
-
-/** Five-point star with soft corners: a thin outline when off, solid white with a glow when on. */
-@Composable
-private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val outer = size.minDimension / 2f * .92f
-        val inner = outer * .46f
-        val path = Path()
-        for (i in 0 until 10) {
-            val r = if (i % 2 == 0) outer else inner
-            val angle = Math.toRadians(-90.0 + i * 36.0)
-            val x = cx + (r * kotlin.math.cos(angle)).toFloat()
-            val y = cy + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        path.close()
-        val round = Stroke(width = size.minDimension * .11f, join = StrokeJoin.Round, cap = StrokeCap.Round)
-        if (filled) {
-            drawPath(path, Color.White.copy(alpha = .22f), style = Stroke(width = size.minDimension * .34f, join = StrokeJoin.Round))
-            drawPath(path, Color.White)
-            drawPath(path, Color.White, style = round)
-        } else {
-            drawPath(path, Color.White.copy(alpha = .55f), style = Stroke(width = size.minDimension * .075f, join = StrokeJoin.Round))
         }
     }
 }
