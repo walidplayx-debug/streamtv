@@ -155,6 +155,7 @@ fun PlayerScreen(
     // The list of lists, opened with OK on the list name.
     var pickerOpen by remember { mutableStateOf(false) }
     val lastBack = remember { longArrayOf(0L) }
+    val lastStep = remember { longArrayOf(0L) }
     val okArmed = remember { booleanArrayOf(false) }
     // OK while watching: a short press acts on release, a held press opens the options panel.
     val okShort = remember { booleanArrayOf(false) }
@@ -170,6 +171,11 @@ fun PlayerScreen(
     }
     fun stepList(delta: Int) {
         if (lists.size < 2) return
+        // A held arrow repeats many times a second; page at a calm pace so the slide of one
+        // list finishes before the next begins, instead of piling animations on each other.
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastStep[0] < 260L) return
+        lastStep[0] = now
         listDirection = delta
         // Paging is done on the list name: it takes focus, the channels below just follow.
         listPaged = true
@@ -526,12 +532,12 @@ fun PlayerScreen(
                 val pop = remember { Animatable(1f) }
                 LaunchedEffect(listTitle) {
                     if (listPaged) {
-                        pop.snapTo(1.14f)
-                        pop.animateTo(1f, spring(dampingRatio = .45f, stiffness = 380f))
+                        pop.snapTo(1.07f)
+                        pop.animateTo(1f, spring(dampingRatio = .6f, stiffness = 420f))
                     }
                 }
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).scale(pop.value).clip(RoundedCornerShape(18.dp))
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(18.dp))
                         .background(if (nameFocused) Color(0x29FFFFFF) else Color.Transparent)
                         .border(1.dp, if (nameFocused) Color(0x66FFFFFF) else Color.Transparent, RoundedCornerShape(18.dp))
                         .focusRequester(listNameFocusRequester)
@@ -544,10 +550,10 @@ fun PlayerScreen(
                     Text(if (rtl) "›" else "‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
                     AnimatedContent(
                         targetState = listTitle,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).scale(pop.value),
                         transitionSpec = {
-                            (slideInHorizontally(tween(260)) { listDirection * it / 3 } + fadeIn(tween(260))) togetherWith
-                                (slideOutHorizontally(tween(200)) { -listDirection * it / 3 } + fadeOut(tween(160)))
+                            (slideInHorizontally(tween(180)) { listDirection * it / 4 } + fadeIn(tween(180))) togetherWith
+                                (slideOutHorizontally(tween(120)) { -listDirection * it / 4 } + fadeOut(tween(100)))
                         },
                         label = "listTitle"
                     ) { title ->
@@ -565,8 +571,8 @@ fun PlayerScreen(
                     targetState = if (pickerOpen) ListPickerKey else listTitle,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     transitionSpec = {
-                        (slideInHorizontally(tween(280)) { listDirection * it / 2 } + fadeIn(tween(280))) togetherWith
-                            (slideOutHorizontally(tween(220)) { -listDirection * it / 2 } + fadeOut(tween(160)))
+                        (slideInHorizontally(tween(200)) { listDirection * it / 3 } + fadeIn(tween(200))) togetherWith
+                            (slideOutHorizontally(tween(130)) { -listDirection * it / 3 } + fadeOut(tween(110)))
                     },
                     label = "listPage"
                 ) { title ->
