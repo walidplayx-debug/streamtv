@@ -655,22 +655,11 @@ private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String
 /** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
 @Composable
 private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
-    // The playing channel can change while this page remains composed. Derive the anchor
-    // from the current channel instead of remembering an index against the frozen list.
-    val playingIndex = items.indexOfFirst { it.key == playing.key }
-    val anchorKey = (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key
-    val targetIndex = playingIndex.coerceAtLeast(0)
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (targetIndex - 2).coerceAtLeast(0))
+    val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
+    val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
     val anchor = remember { FocusRequester() }
-    // After a channel is picked, move focus to the newly playing row. This prevents the
-    // previous row retaining keyboard focus and briefly flashing its focused background.
-    LaunchedEffect(playing.key, takeFocus, anchorKey) {
-        if (takeFocus && anchorKey != null) {
-            listState.scrollToItem((targetIndex - 2).coerceAtLeast(0))
-            withFrameNanos { }
-            anchor.requestFocusSafely()
-        }
-    }
+    LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
