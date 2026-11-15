@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -58,6 +59,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
@@ -737,31 +740,36 @@ private fun StarIcon(filled: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * The channel options as a floating card, opened by holding OK on a channel tile.
+ * The channel options as a card floating over the screen it was opened from (the screen stays
+ * visible, dimmed, behind it). Opened by holding OK on a channel tile.
  * Returns "favorite", "hide", "lock" or "rename" through [onPick].
  */
 @Composable
-fun ChannelOptionsScreen(channel: Channel, starred: Boolean, locked: Boolean, onPick: (String) -> Unit, onClose: () -> Unit) {
-    val first = remember { FocusRequester() }
-    // The OK press that opened this card is still held down; ignore it until it is released.
-    val armed = remember { booleanArrayOf(false) }
-    BackHandler { onClose() }
-    LaunchedEffect(Unit) { first.requestFocusSafely() }
-    Box(
-        Modifier.fillMaxSize().background(Color(0xFF050506))
-            .onPreviewKeyEvent { event ->
-                val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
-                when {
-                    !ok || armed[0] -> false
-                    event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { armed[0] = true; false }
-                    else -> true
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
+fun ChannelOptionsDialog(channel: Channel, starred: Boolean, locked: Boolean, onPick: (String) -> Unit, onClose: () -> Unit) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val first = remember { FocusRequester() }
+        // The OK press that opened this card is still held down; ignore it until it is released.
+        val armed = remember { booleanArrayOf(false) }
+        val appear = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { first.requestFocusSafely() }
+        LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = .82f, stiffness = 360f)) }
         Column(
-            Modifier.width(340.dp).clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
+            Modifier
+                .graphicsLayer {
+                    alpha = appear.value.coerceIn(0f, 1f)
+                    scaleX = .9f + .1f * appear.value
+                    scaleY = .9f + .1f * appear.value
+                }
+                .width(340.dp).clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
                 .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
+                .onPreviewKeyEvent { event ->
+                    val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                    when {
+                        !ok || armed[0] -> false
+                        event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { armed[0] = true; false }
+                        else -> true
+                    }
+                }
                 .padding(horizontal = 14.dp, vertical = 16.dp)
         ) {
             Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,

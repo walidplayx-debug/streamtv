@@ -151,18 +151,19 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             "lock" -> model.toggleLock(target)
             "rename" -> renaming = target
         }
+        // These open a screen of their own; come back to the same tile afterwards.
+        if (option != "favorite" && !state.playing) returnKey = target.key
     }
-    // Holding OK on a channel tile opens its options as a floating card.
+    // Holding OK on a channel tile opens its options as a card floating over the current screen.
     var optionsFor by remember { mutableStateOf<Channel?>(null) }
     optionsFor?.let { target ->
-        ChannelOptionsScreen(
+        ChannelOptionsDialog(
             channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
             onPick = { option -> optionsFor = null; handleOption(target, option) },
             onClose = { optionsFor = null }
         )
-        return
     }
-    val openOptions: (Channel) -> Unit = { target -> returnKey = target.key; optionsFor = target }
+    val openOptions: (Channel) -> Unit = { target -> optionsFor = target }
 
     if (state.playing && state.selected != null) {
         SideEffect { returnKey = state.selected.key }
@@ -636,6 +637,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
                 when {
                     !ok -> false
+                    // The card opens in its own window and takes the release with it, so start clean on every new press.
+                    event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { held[0] = false; false }
                     event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0 -> {
                         if (!held[0]) { held[0] = true; onLongPress() }
                         true
