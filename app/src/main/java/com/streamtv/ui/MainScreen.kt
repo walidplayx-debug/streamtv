@@ -1340,17 +1340,14 @@ private fun SettingsContent(
                         FocusRow(name, if (state.language == code) "●" else "", state.language == code) { model.setLanguage(code) }
                     }
                 }
+                // Compact rows, each one reachable with the remote; the action sits on its own row.
                 "Parental control" -> {
-                    SettingsRow("PIN", if (state.pinSet) "Set" else "Not set")
-                    Spacer(Modifier.height(12.dp))
-                    WhiteButton(if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
-                    Spacer(Modifier.height(18.dp))
-                    SettingsRow("Locked channels", state.locked.size.toString())
-                    Spacer(Modifier.height(12.dp))
-                    SettingsRow("Hidden channels", state.hidden.size.toString())
+                    SettingItem("PIN", if (state.pinSet) "Set" else "Not set", if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
+                    SettingItem("Locked channels", state.locked.size.toString())
                     if (state.hidden.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        WhiteButton("Restore hidden channels") { model.restoreHidden() }
+                        SettingItem("Hidden channels", state.hidden.size.toString(), "Restore hidden channels") { model.restoreHidden() }
+                    } else {
+                        SettingItem("Hidden channels", state.hidden.size.toString())
                     }
                     Spacer(Modifier.height(24.dp))
                 }
@@ -1393,15 +1390,38 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
     }
 }
 
+/**
+ * One compact settings row: the name and its value on the start side, the action (if any) on the
+ * end side. Every row takes focus, so the remote can always reach and scroll to the last one.
+ */
 @Composable
-private fun SettingsRow(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit = {}) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(White.copy(alpha = .07f)).padding(20.dp)) {
-        Text(t(title), color = White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-        Text(t(subtitle), color = Muted, fontSize = 16.sp)
-        Spacer(Modifier.height(12.dp))
-        content()
+private fun SettingItem(title: String, value: String, action: String? = null, onClick: (() -> Unit)? = null) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress { onClick?.invoke() }
+    val scale by animateFloatAsState(if (pressed) .98f else if (focused) 1.015f else 1f, spring(stiffness = 430f), label = "settingScale")
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(16.dp))
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = .06f)))
+            .border(1.dp, White.copy(alpha = if (focused) .4f else .08f), RoundedCornerShape(16.dp))
+            .onFocusChanged { focused = it.isFocused }
+            .then(if (onClick != null) Modifier.clickable(onClick = press) else Modifier.focusable())
+            .padding(horizontal = 18.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(t(title), color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(t(value), color = if (focused) White.copy(alpha = .8f) else Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (action != null) {
+            Spacer(Modifier.width(12.dp))
+            Text(t(action), color = if (focused) White else Accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text("  ›", color = if (focused) White else Muted, fontSize = 18.sp)
+        }
     }
 }
+
+@Composable
+private fun SettingsRow(title: String, subtitle: String) = SettingItem(title, subtitle)
 
 @Composable
 private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick: () -> Unit) {
