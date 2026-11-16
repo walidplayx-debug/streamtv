@@ -24,14 +24,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.SideEffect
-import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,13 +48,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -262,116 +247,6 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
     }
 }
 
-/**
- * Floating PIN card in the middle of the screen with its own number pad, so no system keyboard
- * is needed. The PIN is sent as soon as the fourth digit is entered.
- */
-@Composable
-fun PinPadScreen(
-    title: String, error: String?, onSubmit: (String) -> Unit, onCancel: () -> Unit,
-    /** Small card floating over the current screen (no black page), where the options card was. */
-    floating: Boolean = false,
-    /** Floating card on the right edge, over the playing video, instead of the centre. */
-    atEnd: Boolean = false
-) {
-    if (floating) {
-        Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            // Over the video nothing is dimmed: only the small card appears.
-            val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-            SideEffect { if (atEnd) window?.setDimAmount(0f) }
-            PinPadBody(title, error, onSubmit, onCancel, floating = true, atEnd = atEnd)
-        }
-    } else {
-        PinPadBody(title, error, onSubmit, onCancel, floating = false, atEnd = false)
-    }
-}
-
-@Composable
-private fun PinPadBody(title: String, error: String?, onSubmit: (String) -> Unit, onCancel: () -> Unit, floating: Boolean, atEnd: Boolean) {
-    var digits by remember { mutableStateOf("") }
-    val first = remember { FocusRequester() }
-    fun type(digit: Char) {
-        if (digits.length >= 4) return
-        val next = digits + digit
-        if (next.length == 4) { digits = ""; onSubmit(next) } else digits = next
-    }
-    BackHandler { onCancel() }
-    LaunchedEffect(Unit) {
-        repeat(20) {
-            if (runCatching { first.requestFocus() }.isSuccess) return@LaunchedEffect
-            withFrameNanos { }
-        }
-    }
-    // The floating card grows in softly, the way the options card does.
-    val appear = remember { Animatable(if (floating) 0f else 1f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = .82f, stiffness = 360f)) }
-    val keySize = if (floating) 42.dp else 52.dp
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Box(
-            (if (floating) Modifier.fillMaxSize().padding(24.dp) else Modifier.fillMaxSize().background(Color(0xFF050506)))
-                // Number keys on the remote work too.
-                .onPreviewKeyEvent { event ->
-                    val code = event.nativeKeyEvent.keyCode
-                    val digit = when (code) {
-                        in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_0)
-                        in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_NUMPAD_0)
-                        else -> null
-                    }
-                    if (digit == null) false else { if (event.type == KeyEventType.KeyDown) type(digit); true }
-                },
-            contentAlignment = if (atEnd) Alignment.CenterEnd else Alignment.Center
-        ) {
-            Column(
-                Modifier
-                    .graphicsLayer {
-                        alpha = appear.value.coerceIn(0f, 1f)
-                        scaleX = .9f + .1f * appear.value
-                        scaleY = .9f + .1f * appear.value
-                    }
-                    .then(if (floating) Modifier.width(300.dp) else Modifier)
-                    .clip(RoundedCornerShape(28.dp)).background(Color(0xF01C1C1E))
-                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
-                    .padding(horizontal = if (floating) 20.dp else 30.dp, vertical = if (floating) 18.dp else 22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(t(title), color = EntryWhite, fontSize = if (floating) 17.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    repeat(4) { index ->
-                        Box(
-                            Modifier.size(13.dp).clip(CircleShape)
-                                .background(if (index < digits.length) EntryWhite else Color.Transparent)
-                                .border(1.5.dp, EntryWhite.copy(alpha = .55f), CircleShape)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(if (error != null && digits.isEmpty()) t(error) else " ", color = Color(0xFFFF8B7B), fontSize = 14.sp, maxLines = 1)
-                Spacer(Modifier.height(8.dp))
-                val rows = listOf("123", "456", "789", "<0x")
-                for (row in rows) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        for (key in row) {
-                            PinKey(
-                                label = when (key) { '<' -> "⌫"; 'x' -> "✕"; else -> key.toString() },
-                                size = keySize,
-                                modifier = if (key == '1') Modifier.focusRequester(first) else Modifier
-                            ) {
-                                when (key) {
-                                    '<' -> digits = digits.dropLast(1)
-                                    'x' -> onCancel()
-                                    else -> type(key)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
-        }
-    }
-}
-
 /** Floating "are you sure?" card. Focus starts on Cancel so a stray OK press deletes nothing. */
 @Composable
 fun ConfirmScreen(question: String, subject: String, confirmLabel: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
@@ -399,21 +274,6 @@ fun ConfirmScreen(question: String, subject: String, confirmLabel: String, onCon
                 EntryButton(confirmLabel) { onConfirm() }
             }
         }
-    }
-}
-
-@Composable
-private fun PinKey(label: String, modifier: Modifier = Modifier, size: Dp = 52.dp, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(stiffness = 430f), label = "pinKeyScale")
-    Box(
-        modifier.size(size).scale(scale).clip(CircleShape)
-            .background(if (focused) EntryWhite else Color(0x1FFFFFFF))
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = if (focused) EntryInk else EntryWhite, fontSize = if (size < 50.dp) 16.sp else 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -120,20 +121,6 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // The channel to put focus back on when the player closes.
     var returnKey by remember { mutableStateOf<String?>(null) }
 
-    // PIN question (locking a channel, opening a locked one, changing the PIN).
-    state.pin?.let { prompt ->
-        val choosing = prompt.purpose == "set"
-        // Locking or unlocking a channel from its options card: the PIN pad takes the card's
-        // place as a small floating card, and the screen (or the video) stays visible behind it.
-        val fromOptions = prompt.channel != null && prompt.purpose != "open"
-        PinPadScreen(
-            title = if (choosing) "Choose a 4-digit PIN" else "Enter PIN",
-            error = if (state.pinError) "Wrong PIN" else null,
-            onSubmit = model::submitPin, onCancel = model::cancelPin,
-            floating = fromOptions, atEnd = fromOptions && state.playing
-        )
-        if (!fromOptions) return
-    }
     // "Are you sure?" before anything is removed; the PIN (when one is set) is asked right after.
     var confirm by remember { mutableStateOf<ConfirmRequest?>(null) }
     confirm?.let { request ->
@@ -153,7 +140,11 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         )
         return
     }
+    // Holding OK on a channel (a tile, or the video while it plays) opens the channel card.
+    var optionsFor by remember { mutableStateOf<Channel?>(null) }
     val handleOption: (Channel, String) -> Unit = { target, option ->
+        // Locking keeps the card open: it turns over to ask for the PIN. Everything else closes it.
+        if (option != "lock") optionsFor = null
         when (option) {
             "favorite" -> model.toggleFavorite(target)
             "history" -> model.removeFromHistory(target)
@@ -164,14 +155,28 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         // These open a screen of their own; come back to the same tile afterwards.
         if (option != "favorite" && option != "history" && !state.playing) returnKey = target.key
     }
-    // Holding OK on a channel tile opens its options as a card floating over the current screen.
-    var optionsFor by remember { mutableStateOf<Channel?>(null) }
-    optionsFor?.let { target ->
-        ChannelOptionsDialog(
-            channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
-            inHistory = target.key in state.recent,
-            onPick = { option -> optionsFor = null; handleOption(target, option) },
-            onClose = { optionsFor = null }
+    // One card for the channel options and every PIN question: the options on its front, the PIN
+    // pad on its back. A PIN asked for on its own (a locked channel, removing a playlist, changing
+    // the PIN) opens the card already turned to its back, over the screen instead of a black page.
+    val prompt = state.pin
+    // Set when the PIN was accepted from the options: the whole card closes instead of turning back.
+    var closeCard by remember { mutableStateOf(false) }
+    if (closeCard && prompt == null) SideEffect { closeCard = false; optionsFor = null }
+    val cardChannel = if (closeCard && prompt == null) null else optionsFor
+    if (cardChannel != null || prompt != null) {
+        FlipCardDialog(
+            atEnd = state.playing,
+            flipped = prompt != null,
+            pin = prompt?.let { pinFace(it, state.pinError) },
+            onPinSubmit = { code -> if (model.submitPin(code) && cardChannel != null) { closeCard = true } },
+            onPinCancel = model::cancelPin,
+            onDismiss = { if (prompt != null) model.cancelPin() else { optionsFor = null } },
+            options = cardChannel?.let { target ->
+                CardOptions(
+                    channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
+                    inHistory = target.key in state.recent
+                ) { option -> handleOption(target, option) }
+            }
         )
     }
     val openOptions: (Channel) -> Unit = { target -> optionsFor = target }
@@ -192,9 +197,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             onBack = model::stopPlaying,
             onZap = model::zap,
             onSelect = { item, list, title -> model.select(item, list, title) },
-            onFavorite = model::toggleFavorite,
-            locked = state.selected.key in state.locked,
-            onOption = { option -> handleOption(state.selected, option) }
+            onOptions = { optionsFor = state.selected }
         )
         }
         return
@@ -212,7 +215,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     model.setPlaylistName(name)
                     model.setUrl(url)
                     model.savePlaylistEntry()
-                    model.loadPlaylist()
+                    // A new playlist opens on Live TV, not on the Settings page it was added from.
+                    model.loadPlaylist(openLive = true)
                     entry = ""
                 },
                 onCancel = { entry = "" }
@@ -225,7 +229,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                     model.setPlaylistName(name.ifBlank { "Xtream" })
                     model.setUrl(url)
                     model.savePlaylistEntry()
-                    model.loadPlaylist()
+                    // A new playlist opens on Live TV, not on the Settings page it was added from.
+                    model.loadPlaylist(openLive = true)
                     entry = ""
                 },
                 onCancel = { entry = "" }
@@ -405,8 +410,9 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         else -> query
     }
     Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(250.dp).fillMaxHeight()) {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        val groupsState = rememberLazyListState()
+        Box(Modifier.width(250.dp).fillMaxHeight()) {
+            LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), query == "__recent") { model.setSearchQuery("__recent") } }
                 }
@@ -432,6 +438,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     FocusRow(name, channels.size.toString(), query == name) { model.setSearchQuery(name) }
                 }
             }
+            ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
         }
         Spacer(Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
@@ -474,6 +481,7 @@ private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, mod
                     PosterCard(item, item.id in state.favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { model.select(item, items, title) }
                 }
             }
+            ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 14.dp))
         }
     }
 }
@@ -660,6 +668,8 @@ private fun ChannelGrid(
                 ChannelCard(channel, channel.id in favorites, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
+        // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
+        ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
     }
 }
 
@@ -853,7 +863,9 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                     gridItems(matches, key = { it.key }) { item ->
                         PosterCard(item, item.id in state.favorites, onFocus = { posterFocus = item.key }) { model.select(item, matches, "Search results") }
                     }
-                } }
+                }
+                    ScrollIndicator(posterState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 14.dp))
+                }
                 else -> ChannelGrid(matches, "Search results", state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
             }
         }
@@ -900,7 +912,10 @@ private fun SettingsContent(
             }
         }
         Spacer(Modifier.width(44.dp))
-        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+        val pageScroll = rememberScrollState()
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+        ScrollIndicator(pageScroll, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+        Column(Modifier.fillMaxSize().padding(end = 14.dp).verticalScroll(pageScroll)) {
             // The tab already says "Settings" and the Playlist page opens with its own heading.
             if (section != "Playlist") {
                 Text(t(section), color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
@@ -1001,6 +1016,7 @@ private fun SettingsContent(
                 "About" -> AppUpdateSection()
                 else -> SettingsRow("streamtv", "Version 1.0.0")
             }
+        }
         }
     }
 }

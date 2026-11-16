@@ -226,7 +226,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // No playlist left: drop its channels too, so the app goes back to the welcome screen.
             _state.value.copy(
                 playlists = updated, playlistUrl = "", playlistName = "", channels = emptyList(), queue = emptyList(),
-                selected = null, playing = false, error = null, searchQuery = "", searchText = ""
+                selected = null, playing = false, error = null, searchQuery = "", searchText = "",
+                // The next playlist is added from the welcome screen; afterwards the app opens on Live TV.
+                tab = "Live TV"
             )
         } else {
             _state.value.copy(playlists = updated)
@@ -370,25 +372,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         pendingAction = null
         _state.value = _state.value.copy(pin = null, pinError = false)
     }
-    fun submitPin(value: String) {
-        val prompt = _state.value.pin ?: return
+    /** Returns true when the PIN was accepted and the question is finished (nothing more to ask). */
+    fun submitPin(value: String): Boolean {
+        val prompt = _state.value.pin ?: return false
         if (prompt.purpose == "set") {
-            if (!Regex("\\d{4}").matches(value)) { _state.value = _state.value.copy(pinError = true); return }
+            if (!Regex("\\d{4}").matches(value)) { _state.value = _state.value.copy(pinError = true); return false }
             pinCode = value
             _state.value = _state.value.copy(pin = null, pinError = false, pinSet = true)
             viewModelScope.launch { preferences.savePin(value) }
             prompt.channel?.let { setLocked(_state.value.locked + it.key) }
-            return
+            return true
         }
-        if (value != pinCode) { _state.value = _state.value.copy(pinError = true); return }
+        if (value != pinCode) { _state.value = _state.value.copy(pinError = true); return false }
         _state.value = _state.value.copy(pin = null, pinError = false)
         when (prompt.purpose) {
             "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
             "unlock" -> prompt.channel?.let { setLocked(_state.value.locked - it.key) }
             "lock" -> prompt.channel?.let { setLocked(_state.value.locked + it.key) }
-            "verify" -> _state.value = _state.value.copy(pin = PinPrompt("set"))
+            // The old PIN was right: the same card now asks for the new one.
+            "verify" -> { _state.value = _state.value.copy(pin = PinPrompt("set")); return false }
             "confirm" -> { val action = pendingAction; pendingAction = null; action?.invoke() }
         }
+        return true
     }
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()
@@ -396,12 +401,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(favorites = f)
         viewModelScope.launch { preferences.saveFavorites(f) }
     }
-    fun loadPlaylist(urlOverride: String? = null) {
+    /** [openLive]: a playlist that was just added opens on Live TV once its channels are in. */
+    fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false) {
         val url = (urlOverride ?: _state.value.playlistUrl).trim()
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching { repository.load(url) }.onSuccess { channels ->
                 _state.value = _state.value.copy(channels = channels, loading = false, selected = channels.firstOrNull())
+                if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
                 dao.clear()
                 dao.insertAll(channels.map { ChannelEntity.from(it) })

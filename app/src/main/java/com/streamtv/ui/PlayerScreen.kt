@@ -15,7 +15,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,11 +38,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -59,8 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
@@ -85,7 +77,7 @@ private const val ListIdleMillis = 8000L
 private const val StallMillis = 20000L
 private val PlayerAccent = Color(0xFFD5DADF)
 
-private enum class OverlayState { None, InfoBar, ChannelList, Options }
+private enum class OverlayState { None, InfoBar, ChannelList }
 
 /** requestFocus() throws while the target is not on screen yet; wait a few frames for it. */
 private suspend fun FocusRequester.requestFocusSafely() {
@@ -107,9 +99,8 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onZap: (Int) -> Unit,
     onSelect: (Channel, List<Channel>, String) -> Unit,
-    onFavorite: (Channel) -> Unit,
-    locked: Boolean = false,
-    onOption: (String) -> Unit = {}
+    /** Holding OK opens the channel card (the same one as on the channel tiles). */
+    onOptions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     // In a right-to-left layout the panel sits on the right, so the arrow keys swap roles.
@@ -167,9 +158,8 @@ fun PlayerScreen(
     val lastBack = remember { longArrayOf(0L) }
     val lastStep = remember { longArrayOf(0L) }
     val okArmed = remember { booleanArrayOf(false) }
-    // OK while watching: a short press acts on release, a held press opens the options panel.
+    // OK while watching: a short press acts on release, a held press opens the channel card.
     val okShort = remember { booleanArrayOf(false) }
-    val okSwallow = remember { booleanArrayOf(false) }
     val listIndex = lists.indexOfFirst { it.first == listTitle }.coerceAtLeast(0)
     fun openList() {
         frozenLists = liveLists
@@ -278,16 +268,10 @@ fun PlayerScreen(
             if (overlayState == OverlayState.ChannelList) overlayState = OverlayState.None
         }
     }
-    LaunchedEffect(overlayState, listTick) {
-        if (overlayState == OverlayState.Options) {
-            delay(ListIdleMillis)
-            if (overlayState == OverlayState.Options) overlayState = OverlayState.None
-        }
-    }
-    val showErrorCard = failed && overlayState != OverlayState.ChannelList && overlayState != OverlayState.Options
-    LaunchedEffect(overlayState == OverlayState.ChannelList, overlayState == OverlayState.Options, showErrorCard) {
+    val showErrorCard = failed && overlayState != OverlayState.ChannelList
+    LaunchedEffect(overlayState == OverlayState.ChannelList, showErrorCard) {
         when {
-            overlayState == OverlayState.ChannelList || overlayState == OverlayState.Options -> Unit
+            overlayState == OverlayState.ChannelList -> Unit
             showErrorCard -> retryFocusRequester.requestFocusSafely()
             else -> playerFocusRequester.requestFocusSafely()
         }
@@ -329,8 +313,6 @@ fun PlayerScreen(
                         Key.Back -> true
                         // The list of lists opens on release, so the same press cannot also pick a row in it.
                         Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> when {
-                            // Release of the press that opened the options panel: must not click a row in it.
-                            okSwallow[0] -> { okSwallow[0] = false; true }
                             okArmed[0] -> { okArmed[0] = false; pickerOpen = true; true }
                             okShort[0] -> {
                                 okShort[0] = false
@@ -344,15 +326,7 @@ fun PlayerScreen(
                     }
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                val optionsOpen = overlayState == OverlayState.Options
-                if (listOpen || optionsOpen) listTick++
-                if (optionsOpen) {
-                    return@onPreviewKeyEvent when (event.key) {
-                        Key.Back, Key.DirectionLeft, Key.DirectionRight -> { overlayState = OverlayState.None; true }
-                        Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> okSwallow[0]
-                        else -> false
-                    }
-                }
+                if (listOpen) listTick++
                 when (event.key) {
                     Key.ChannelUp -> { onZap(1); showInfoBar(); true }
                     Key.ChannelDown -> { onZap(-1); showInfoBar(); true }
@@ -383,9 +357,8 @@ fun PlayerScreen(
                         event.nativeKeyEvent.repeatCount == 0 -> { okShort[0] = true; true }
                         okShort[0] -> {
                             okShort[0] = false
-                            okSwallow[0] = true
-                            listTick++
-                            overlayState = OverlayState.Options
+                            // The card opens in its own window, which also takes the release of this press.
+                            onOptions()
                             true
                         }
                         else -> true
@@ -484,34 +457,6 @@ fun PlayerScreen(
                 }
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
-            }
-        }
-
-        AnimatedVisibility(
-            visible = overlayState == OverlayState.Options,
-            modifier = Modifier.align(Alignment.CenterEnd).padding(24.dp).width(300.dp),
-            enter = slideInHorizontally(initialOffsetX = { -side * it },
-                animationSpec = spring(dampingRatio = .86f, stiffness = 300f)) + fadeIn(tween(220)),
-            exit = slideOutHorizontally(targetOffsetX = { -side * it }, animationSpec = tween(220)) + fadeOut(tween(180))
-        ) {
-            val first = remember { FocusRequester() }
-            LaunchedEffect(Unit) { first.requestFocusSafely() }
-            Column(
-                Modifier.clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
-                    .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
-                    .padding(horizontal = 14.dp, vertical = 16.dp)
-            ) {
-                Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
-                Spacer(Modifier.height(10.dp))
-                val starred = channel.id in favorites
-                OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", Modifier.focusRequester(first)) {
-                    onFavorite(channel)
-                    overlayState = OverlayState.None
-                }
-                OptionRow("Hide channel", "hide") { overlayState = OverlayState.None; onOption("hide") }
-                OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock") { overlayState = OverlayState.None; onOption("lock") }
-                OptionRow("Rename", "edit") { overlayState = OverlayState.None; onOption("rename") }
             }
         }
 
@@ -652,6 +597,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
     // flags can briefly disagree while Compose dispatches focus loss/gain callbacks.
     var focusedKey by remember(items) { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -727,135 +673,8 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
             }
         }
     }
-}
-
-/**
- * The channel options as a card floating over the screen it was opened from (the screen stays
- * visible, dimmed, behind it). Opened by holding OK on a channel tile.
- * Returns "favorite", "history", "hide", "lock" or "rename" through [onPick].
- */
-@Composable
-fun ChannelOptionsDialog(
-    channel: Channel, starred: Boolean, locked: Boolean, inHistory: Boolean, onPick: (String) -> Unit, onClose: () -> Unit
-) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        val first = remember { FocusRequester() }
-        // The OK press that opened this card is still held down; ignore it until it is released.
-        val armed = remember { booleanArrayOf(false) }
-        val appear = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { first.requestFocusSafely() }
-        LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = .82f, stiffness = 360f)) }
-        Column(
-            Modifier
-                .graphicsLayer {
-                    alpha = appear.value.coerceIn(0f, 1f)
-                    scaleX = .9f + .1f * appear.value
-                    scaleY = .9f + .1f * appear.value
-                }
-                .width(340.dp).clip(RoundedCornerShape(28.dp)).background(PlayerGlass)
-                .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
-                .onPreviewKeyEvent { event ->
-                    val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
-                    when {
-                        !ok || armed[0] -> false
-                        event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { armed[0] = true; false }
-                        else -> true
-                    }
-                }
-                .padding(horizontal = 14.dp, vertical = 16.dp)
-        ) {
-            Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
-            Spacer(Modifier.height(10.dp))
-            OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", Modifier.focusRequester(first)) { onPick("favorite") }
-            // Only for channels that are in "Last watched".
-            if (inHistory) OptionRow("Remove from history", "history") { onPick("history") }
-            OptionRow("Hide channel", "hide") { onPick("hide") }
-            OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock") { onPick("lock") }
-            OptionRow("Rename", "edit") { onPick("rename") }
-        }
-    }
-}
-
-/** One action in the channel options panel. */
-@Composable
-private fun OptionRow(label: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(dampingRatio = .78f, stiffness = 420f), label = "optionScale")
-    Row(
-        modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(16.dp))
-            .background(if (focused) Color(0xF2F2F2F7) else Color.Transparent)
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OptionIcon(icon, if (focused) Color(0xB31C1C1E) else Color(0xB3FFFFFF), Modifier.size(20.dp))
-        Spacer(Modifier.width(14.dp))
-        Text(t(label), color = if (focused) Color(0xFF1C1C1E) else PlayerWhite, fontSize = 17.sp,
-            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-/** Simple one-colour line icons for the options panel: "star", "hide", "lock" or "edit". */
-@Composable
-private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val line = Stroke(width = w * .09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        when (kind) {
-            "star" -> {
-                val path = Path()
-                val outer = w * .46f
-                val inner = outer * .46f
-                for (i in 0 until 10) {
-                    val r = if (i % 2 == 0) outer else inner
-                    val angle = Math.toRadians(-90.0 + i * 36.0)
-                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
-                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                path.close()
-                drawPath(path, tint, style = line)
-            }
-            "hide" -> {
-                // An eye with a line through it.
-                val eye = Path().apply {
-                    moveTo(w * .06f, h * .5f)
-                    quadraticBezierTo(w * .5f, h * .08f, w * .94f, h * .5f)
-                    quadraticBezierTo(w * .5f, h * .92f, w * .06f, h * .5f)
-                    close()
-                }
-                drawPath(eye, tint, style = line)
-                drawCircle(tint, radius = w * .12f, center = androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), style = line)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .16f, h * .86f), androidx.compose.ui.geometry.Offset(w * .84f, h * .14f),
-                    strokeWidth = w * .09f, cap = StrokeCap.Round)
-            }
-            "history" -> {
-                // A clock face.
-                drawCircle(tint, radius = w * .42f, center = androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), style = line)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), androidx.compose.ui.geometry.Offset(w * .5f, h * .26f),
-                    strokeWidth = w * .09f, cap = StrokeCap.Round)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, h * .5f), androidx.compose.ui.geometry.Offset(w * .68f, h * .6f),
-                    strokeWidth = w * .09f, cap = StrokeCap.Round)
-            }
-            "lock" -> {
-                drawRoundRect(tint, topLeft = androidx.compose.ui.geometry.Offset(w * .18f, h * .44f),
-                    size = androidx.compose.ui.geometry.Size(w * .64f, h * .48f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * .1f), style = line)
-                drawArc(tint, startAngle = 180f, sweepAngle = 180f, useCenter = false,
-                    topLeft = androidx.compose.ui.geometry.Offset(w * .3f, h * .1f),
-                    size = androidx.compose.ui.geometry.Size(w * .4f, h * .68f), style = line)
-            }
-            else -> {
-                // A pencil over a baseline.
-                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .26f, h * .68f), androidx.compose.ui.geometry.Offset(w * .76f, h * .18f),
-                    strokeWidth = w * .17f, cap = StrokeCap.Round)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(w * .14f, h * .9f), androidx.compose.ui.geometry.Offset(w * .86f, h * .9f),
-                    strokeWidth = w * .09f, cap = StrokeCap.Round)
-            }
-        }
+    // A thin, faint bar on the edge shows where in the list you are.
+    ScrollIndicator(listState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 6.dp, bottom = 22.dp, end = 5.dp))
     }
 }
 
@@ -884,7 +703,7 @@ private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProg
     }
 }
 
-private fun channelDisplayName(name: String): String =
+internal fun channelDisplayName(name: String): String =
     name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
 
 private fun channelQuality(name: String): String =
