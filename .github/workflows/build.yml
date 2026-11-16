@@ -60,7 +60,8 @@ jobs:
           publish() {
             TAG=$1; ASSET=$2; TITLE=$3; FLAGS=$4
             cp release/app.apk "release/$ASSET"
-            NOTES="Branch: $GITHUB_REF_NAME
+            NOTES="Version code: $GITHUB_RUN_NUMBER
+          Branch: $GITHUB_REF_NAME
           Commit: $GITHUB_SHA
           Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           SHA-256: $(sha256sum "release/$ASSET" | cut -d' ' -f1)"
