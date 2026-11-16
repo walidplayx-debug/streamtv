@@ -95,7 +95,7 @@ private fun ScrollBar(spot: ScrollSpot?, modifier: Modifier) {
         val thumb = maxHeight * shown.coerceIn(.08f, 1f)
         Box(
             Modifier.fillMaxWidth().height(thumb).offset(y = (maxHeight - thumb) * progress)
-                .clip(CircleShape).background(Color.White.copy(alpha = .30f * alpha))
+                .clip(CircleShape).background(Color(0xFFF2683F).copy(alpha = .7f * alpha))
         )
     }
 }

@@ -51,7 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val EntryInk = Color(0xFF000000)
+private val EntryInk = Color(0xFF2A2B2E)
 private val EntryWhite = Color(0xFFFFFFFF)
 private val EntryMuted = Color(0xFF99999E)
 private val EntryGlass = Color(0xFF29292C)
