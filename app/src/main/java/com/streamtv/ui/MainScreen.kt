@@ -108,8 +108,6 @@ private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(
 private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)))
 /** Dark glass: see-through black with a lit edge, brighter where the light falls (top left). */
 private val GlassFill = Brush.verticalGradient(listOf(Color(0xB3262931), Color(0xB3131519)))
-/** A darker glass, for the wider Movies menu. */
-private val GlassFillDeep = Brush.verticalGradient(listOf(Color(0xD91C1E24), Color(0xE00C0D10)))
 private val GlassEdge = Brush.linearGradient(listOf(Color(0x5CFFFFFF), Color(0x0FFFFFFF), Color(0x14FFFFFF), Color(0x38FFFFFF)))
 
 /** A short "pressed" pulse so an OK press is felt even when nothing else changes on screen. */
@@ -325,8 +323,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
         val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
         when (state.tab) {
-            // The wider, darker menu is tried on Movies first.
-            "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, wideMenu = true)
+            // Movies uses the Live TV style of list for its menu.
+            "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
             "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
@@ -524,8 +522,8 @@ private class LibraryUi {
 private fun LibraryContent(
     kind: ChannelKind, state: TvState, model: MainViewModel, ui: LibraryUi,
     restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long) -> Unit,
-    /** The menu reaches out further toward the screen edge and is darker. */
-    wideMenu: Boolean = false
+    /** The menu looks like the Live TV list (plain rows, no glass card). */
+    liveMenu: Boolean = false
 ) {
     val titles = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
     val name = if (kind == ChannelKind.Movie) "movies" else "series"
@@ -567,18 +565,34 @@ private fun LibraryContent(
     }
     Row(Modifier.fillMaxSize()) {
         val menuState = rememberLazyListState()
+        val searchHint = if (kind == ChannelKind.Movie) "Search movies" else "Search series"
+        if (liveMenu) {
+            // The same list as Live TV: plain rows, section headings, the scroll bar on its edge.
+            Box(Modifier.width(250.dp).fillMaxHeight()) {
+                LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    item { LibrarySearch(ui.search, searchHint, large = true) { ui.search = it } }
+                    item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+                    if (history.isNotEmpty()) {
+                        item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
+                    }
+                    if (favorites.isNotEmpty()) {
+                        item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
+                    }
+                    item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    items(genres.toList()) { (genre, list) ->
+                        FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
+                    }
+                }
+                ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+            }
+            Spacer(Modifier.width(30.dp))
+        } else {
         // A floating card of dark glass that never goes away.
         Box(
             Modifier.width(210.dp).fillMaxHeight()
-                // The wide menu grows toward the screen edge only; the posters keep their place.
-                .layout { measurable, constraints ->
-                    val extra = if (wideMenu) 40.dp.roundToPx() else 0
-                    val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
-                    layout(placeable.width - extra, placeable.height) { placeable.placeRelative(-extra, 0) }
-                }
                 .padding(top = 4.dp, bottom = 6.dp)
                 .shadow(22.dp, RoundedCornerShape(24.dp))
-                .clip(RoundedCornerShape(24.dp)).background(if (wideMenu) GlassFillDeep else GlassFill)
+                .clip(RoundedCornerShape(24.dp)).background(GlassFill)
                 .border(1.dp, GlassEdge, RoundedCornerShape(24.dp))
         ) {
             LazyColumn(
@@ -586,7 +600,7 @@ private fun LibraryContent(
                 contentPadding = PaddingValues(start = 10.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(1.dp)
             ) {
-                item { LibrarySearch(ui.search, if (kind == ChannelKind.Movie) "Search movies" else "Search series") { ui.search = it } }
+                item { LibrarySearch(ui.search, searchHint) { ui.search = it } }
                 item { Spacer(Modifier.height(4.dp)) }
                 item { MenuRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
                 if (history.isNotEmpty()) {
@@ -603,6 +617,7 @@ private fun LibraryContent(
             ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 18.dp, bottom = 18.dp, end = 4.dp))
         }
         Spacer(Modifier.width(22.dp))
+        }
         Box(Modifier.weight(1f).fillMaxHeight()) {
             if (shown.isEmpty()) {
                 Text(t(if (query.isNotEmpty()) "No results" else "Nothing here yet"), color = Muted, fontSize = 18.sp, modifier = Modifier.align(Alignment.Center))
@@ -647,7 +662,7 @@ private fun PosterGrid(
 
 /** The search pill at the top of the Movies / Series menu. OK opens the TV keyboard (voice search works too). */
 @Composable
-private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit) {
+private fun LibrarySearch(text: String, hint: String, large: Boolean = false, onChange: (String) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
     val field = remember { FocusRequester() }
@@ -668,7 +683,7 @@ private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit
         }
     }
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp).height(40.dp).clip(CircleShape)
+        Modifier.fillMaxWidth().padding(vertical = if (large) 4.dp else 2.dp).height(if (large) 50.dp else 40.dp).clip(CircleShape)
             .background(if (focused || editing) FocusBrush else SolidColor(White.copy(alpha = .07f)))
             .border(1.dp, White.copy(alpha = if (focused || editing) .5f else .10f), CircleShape)
             .focusRequester(bar).onFocusChanged { focused = it.isFocused }
@@ -679,7 +694,7 @@ private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit
         if (editing) {
             BasicTextField(
                 value = text, onValueChange = onChange, singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 15.sp),
+                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = if (large) 18.sp else 15.sp),
                 cursorBrush = SolidColor(White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { finish() }),
@@ -692,7 +707,7 @@ private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit
         } else {
             Text(
                 if (text.isEmpty()) t(hint) else text, Modifier.weight(1f),
-                color = if (text.isEmpty()) White.copy(alpha = .55f) else White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                color = if (text.isEmpty()) White.copy(alpha = .55f) else White, fontSize = if (large) 18.sp else 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
     }
