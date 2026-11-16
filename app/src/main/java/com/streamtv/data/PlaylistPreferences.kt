@@ -21,6 +21,8 @@ class PlaylistPreferences(private val context: Context) {
     private val lockedKey = stringSetPreferencesKey("locked_channel_keys")
     private val pinKey = stringPreferencesKey("parental_pin")
     private val namesKey = stringPreferencesKey("channel_names")
+    private val recentVodKey = stringPreferencesKey("recent_vod_keys")
+    private val positionsKey = stringPreferencesKey("vod_positions")
     val playlistUrl: Flow<String> = context.dataStore.data.map { it[playlistKey].orEmpty() }
     val epgUrl: Flow<String> = context.dataStore.data.map { it[epgKey].orEmpty() }
     val favoriteIds: Flow<Set<String>> = context.dataStore.data.map { it[favoritesKey] ?: emptySet() }
@@ -51,4 +53,22 @@ class PlaylistPreferences(private val context: Context) {
         context.dataStore.edit { it[namesKey] = names.entries.joinToString("\n") { (key, name) -> key + "\t" + name } }
     }
     suspend fun saveLastChannel(id: String) { context.dataStore.edit { it[lastChannelKey] = id } }
+    /** Movies and episodes watched, newest first; kept apart from the channels' history. */
+    val recentVodKeys: Flow<List<String>> = context.dataStore.data.map { it[recentVodKey].orEmpty().split("\n").filter { key -> key.isNotBlank() } }
+    suspend fun saveRecentVod(keys: List<String>) { context.dataStore.edit { it[recentVodKey] = keys.joinToString("\n") } }
+    /** Where each movie was left: one "key<TAB>position<TAB>duration" (milliseconds) per line. */
+    val positions: Flow<Map<String, Pair<Long, Long>>> = context.dataStore.data.map { prefs ->
+        prefs[positionsKey].orEmpty().split("\n").mapNotNull { line ->
+            val parts = line.split('\t')
+            if (parts.size < 3) return@mapNotNull null
+            val duration = parts[parts.size - 1].toLongOrNull() ?: return@mapNotNull null
+            val position = parts[parts.size - 2].toLongOrNull() ?: return@mapNotNull null
+            parts.dropLast(2).joinToString("\t") to (position to duration)
+        }.toMap()
+    }
+    suspend fun savePositions(positions: Map<String, Pair<Long, Long>>) {
+        context.dataStore.edit { prefs ->
+            prefs[positionsKey] = positions.entries.joinToString("\n") { (key, value) -> key + "\t" + value.first + "\t" + value.second }
+        }
+    }
 }

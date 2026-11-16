@@ -11,6 +11,8 @@ import com.streamtv.data.PlaylistPreferences
 import com.streamtv.data.M3uParser
 import com.streamtv.data.EpgProgram
 import com.streamtv.data.EpgRepository
+import com.streamtv.data.ChannelKind
+import com.streamtv.data.kind
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,7 +63,11 @@ data class TvState(
     val pin: PinPrompt? = null,
     val pinError: Boolean = false,
     /** What is typed in the Search tab; separate from the Live TV list choice (searchQuery). */
-    val searchText: String = ""
+    val searchText: String = "",
+    /** Movies and episodes watched, newest first (apart from the channels' [recent]). */
+    val recentVod: List<String> = emptyList(),
+    /** Where each movie or episode was left (key -> position to duration, in milliseconds). */
+    val positions: Map<String, Pair<Long, Long>> = emptyMap()
 )
 
 /** Applies the viewer's hidden channels and custom names to a list, remembering the last result. */
@@ -169,6 +175,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.recentKeys.collect { keys -> _state.value = _state.value.copy(recent = keys) }
         }
+        viewModelScope.launch {
+            preferences.recentVodKeys.collect { keys -> _state.value = _state.value.copy(recentVod = keys) }
+        }
+        viewModelScope.launch {
+            preferences.positions.collect { saved -> _state.value = _state.value.copy(positions = saved) }
+        }
     }
     init {
         viewModelScope.launch {
@@ -180,6 +192,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.saveLanguage(code) }
     }
     private fun rememberWatched(channel: Channel) {
+        if (channel.kind() != ChannelKind.Live) {
+            // Movies and episodes have a history of their own.
+            val vod = (listOf(channel.key) + _state.value.recentVod.filterNot { it == channel.key }).take(40)
+            _state.value = _state.value.copy(recentVod = vod)
+            viewModelScope.launch { preferences.saveRecentVod(vod) }
+            return
+        }
         val updated = (listOf(channel.key) + _state.value.recent.filterNot { it == channel.key }).take(20)
         _state.value = _state.value.copy(recent = updated)
         viewModelScope.launch { preferences.saveRecent(updated) }
@@ -300,6 +319,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         play(channel, from, title)
     }
     private fun play(channel: Channel, from: List<Channel>?, title: String?) {
+        if (channel.kind() != ChannelKind.Live) {
+            // A movie plays on its own: no channel list, no zapping, and the last channel stays the last channel.
+            _state.value = _state.value.copy(selected = channel, playing = true)
+            rememberWatched(channel)
+            return
+        }
         lastChannelId = channel.id
         val current = _state.value.queue
         val queue = from ?: if (current.any { it.key == channel.key }) current else _state.value.channels
@@ -329,11 +354,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         rememberWatched(selected)
         viewModelScope.launch { preferences.saveLastChannel(selected.id) }
     }
+    /** Remembers where a movie was left, so it can be resumed. Very start or very end: nothing to resume. */
+    fun savePosition(channel: Channel, position: Long, duration: Long) {
+        val keep = duration > 0 && position > 30_000L && position < duration - 60_000L
+        val current = _state.value.positions
+        val updated = if (keep) (current - channel.key) + (channel.key to (position to duration)) else current - channel.key
+        if (updated == current) return
+        val trimmed = if (updated.size > 200) updated.entries.drop(updated.size - 200).associate { it.key to it.value } else updated
+        _state.value = _state.value.copy(positions = trimmed)
+        viewModelScope.launch { preferences.savePositions(trimmed) }
+    }
     /** Privacy: forget that this channel was watched. */
     fun removeFromHistory(channel: Channel) {
         val updated = _state.value.recent.filterNot { it == channel.key }
-        _state.value = _state.value.copy(recent = updated)
+        val vod = _state.value.recentVod.filterNot { it == channel.key }
+        _state.value = _state.value.copy(recent = updated, recentVod = vod, positions = _state.value.positions - channel.key)
         viewModelScope.launch {
+            preferences.saveRecentVod(vod)
+            preferences.savePositions(_state.value.positions)
             preferences.saveRecent(updated)
             // It is also remembered as "the last channel"; forget that too.
             if (lastChannelId == channel.id) { lastChannelId = ""; preferences.saveLastChannel("") }

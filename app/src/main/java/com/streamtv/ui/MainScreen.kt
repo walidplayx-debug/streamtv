@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -120,6 +121,11 @@ private fun rememberPress(onClick: () -> Unit): Pair<Boolean, () -> Unit> {
 fun MainScreen(state: TvState, model: MainViewModel) {
     // The channel to put focus back on when the player closes.
     var returnKey by remember { mutableStateOf<String?>(null) }
+    // The Movies and Series pages keep their place (menu choice, open title) while a title plays.
+    val movieUi = remember { LibraryUi() }
+    val seriesUi = remember { LibraryUi() }
+    // Where the next movie starts: 0, or the place it was left when "Resume" was chosen.
+    var vodStart by remember { mutableLongStateOf(0L) }
 
     // With no PIN set, hiding a channel or removing a playlist asks a plain yes/no question on the
     // back of the card instead; with a PIN, the card asks for the PIN and nothing else.
@@ -191,6 +197,19 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
     val openOptions: (Channel) -> Unit = { target -> optionsFor = target }
 
+    if (state.playing && state.selected != null && state.selected.kind() != ChannelKind.Live) {
+        // Movies and episodes get a real player: progress bar, seeking, pause, favourite; no zapping.
+        val title = state.selected
+        VodPlayerScreen(
+            channel = title, favorite = title.id in state.favorites, startAt = vodStart,
+            onFavorite = { model.toggleFavorite(title) },
+            onPosition = { position, duration -> model.savePosition(title, position, duration) },
+            onExit = model::stopPlaying
+        )
+        // The start point is used once; anything opened later (from Search, say) starts from the top.
+        LaunchedEffect(title.key) { vodStart = 0L }
+        return
+    }
     if (state.playing && state.selected != null) {
         SideEffect { returnKey = state.selected.key }
         // The player keeps one layout in every language: channel names are mostly Latin, and the
@@ -281,11 +300,18 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         BackHandler(enabled = !topBarFocused) {
             if (runCatching { tabFocus.requestFocus() }.isFailure) topBarFocused = true
         }
-        TopNavigation(state.tab, model::selectTab, tabFocus) { topBarFocused = it }
-        Spacer(Modifier.height(if (state.tab == "Live TV") 18.dp else 30.dp))
+        TopNavigation(state.tab, { tab ->
+            // Changing tabs closes an open title page.
+            movieUi.details = null
+            seriesUi.details = null
+            model.selectTab(tab)
+        }, tabFocus) { topBarFocused = it }
+        // The pages start right under the tab bar; the tab already says where you are.
+        Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
+        val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
         when (state.tab) {
-            "Movies" -> LibraryContent("Movies", ChannelKind.Movie, state, model, returnKey) { returnKey = null }
-            "Series" -> LibraryContent("Series", ChannelKind.Series, state, model, returnKey) { returnKey = null }
+            "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
+            "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
                 Spacer(Modifier.height(20.dp))
@@ -467,37 +493,260 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     }
 }
 
+/** What the Movies (or Series) page remembers while a title plays: the menu choice, the search and the open title. */
+private class LibraryUi {
+    var section by mutableStateOf("__all")
+    var search by mutableStateOf("")
+    var details by mutableStateOf<Channel?>(null)
+}
+
+/**
+ * Movies or Series: a menu that always stays on the side (search, watch history, favourites and the
+ * genres) and the posters beside it. OK on a poster opens the title's page, not the player.
+ */
 @Composable
-private fun LibraryContent(title: String, kind: ChannelKind, state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit) {
-    val items = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
-    ScreenHeading(title, "${items.size} ${t("titles")}")
-    Spacer(Modifier.height(20.dp))
-    if (items.isEmpty()) {
-        EmptyState("No ${title.lowercase()} yet", "Your playlist has no ${title.lowercase()}. Add one that includes them in Settings.", "Settings") {
+private fun LibraryContent(
+    kind: ChannelKind, state: TvState, model: MainViewModel, ui: LibraryUi,
+    restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long) -> Unit
+) {
+    val titles = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
+    val name = if (kind == ChannelKind.Movie) "movies" else "series"
+    if (titles.isEmpty()) {
+        EmptyState("No $name yet", "Your playlist has no $name. Add one that includes them in Settings.", "Settings") {
             model.selectTab("Settings")
         }
-    } else {
-        val restoreIndex = remember(items, restoreKey) { if (restoreKey == null) -1 else items.indexOfFirst { it.key == restoreKey } }
-        val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex / 6 * 6 - 6).coerceAtLeast(0) else 0)
+        return
+    }
+    ui.details?.let { item ->
+        TitleDetails(
+            item, kind, titles, state,
+            onPlay = { start -> onPlay(item, start) },
+            onFavorite = { model.toggleFavorite(item) },
+            onOpen = { other -> ui.details = other },
+            onClose = { ui.details = null; onReturn(item.key) }
+        )
+        return
+    }
+    val byKey = remember(titles) { titles.associateBy { it.key } }
+    // History and favourites of this page only: channels keep theirs apart.
+    val history = remember(byKey, state.recentVod) { state.recentVod.mapNotNull { byKey[it] } }
+    val favorites = remember(titles, state.favorites) { titles.filter { it.id in state.favorites } }
+    val genres = remember(titles) { titles.groupBy { it.group.ifBlank { "Other" } }.toSortedMap() }
+    val query = ui.search.trim()
+    val chosen = ui.section
+    val section = when {
+        chosen == "__history" -> if (history.isEmpty()) "__all" else chosen
+        chosen == "__favorites" -> if (favorites.isEmpty()) "__all" else chosen
+        chosen == "__all" || genres.containsKey(chosen) -> chosen
+        else -> "__all"
+    }
+    val shown = when {
+        query.isNotEmpty() -> titles.filter { it.name.contains(query, true) || it.group.contains(query, true) }
+        section == "__history" -> history
+        section == "__favorites" -> favorites
+        section == "__all" -> titles
+        else -> genres[section].orEmpty()
+    }
+    Row(Modifier.fillMaxSize()) {
+        val menuState = rememberLazyListState()
+        Box(Modifier.width(230.dp).fillMaxHeight()) {
+            LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item { LibrarySearch(ui.search, if (kind == ChannelKind.Movie) "Search movies" else "Search series") { ui.search = it } }
+                item { Spacer(Modifier.height(4.dp)) }
+                item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+                if (history.isNotEmpty()) {
+                    item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
+                }
+                if (favorites.isNotEmpty()) {
+                    item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
+                }
+                item { Text(t("GENRES"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                items(genres.toList()) { (genre, list) ->
+                    FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
+                }
+            }
+            ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+        }
+        Spacer(Modifier.width(24.dp))
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            if (shown.isEmpty()) {
+                Text(t(if (query.isNotEmpty()) "No results" else "Nothing here yet"), color = Muted, fontSize = 18.sp, modifier = Modifier.align(Alignment.Center))
+            } else {
+                PosterGrid(shown, if (query.isNotEmpty()) "?$query" else section, state.favorites, restoreKey, onRestored) { ui.details = it }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosterGrid(
+    titles: List<Channel>, listKey: String, favorites: Set<String>, restoreKey: String?, onRestored: () -> Unit, onOpen: (Channel) -> Unit
+) {
+    // Each list starts at its own top.
+    key(listKey) {
+        val restoreIndex = remember(titles, restoreKey) { if (restoreKey == null) -1 else titles.indexOfFirst { it.key == restoreKey } }
+        val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex - 4).coerceAtLeast(0) else 0)
         val restoreFocus = remember { FocusRequester() }
         RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
         var focusedKey by remember { mutableStateOf<String?>(null) }
         GlideToFocus(gridState, focusedKey)
         BoxWithConstraints(Modifier.fillMaxSize()) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
+                // About 10% smaller posters than before.
+                columns = GridCells.FixedSize(106.dp),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 // Free room under the last row, so every row can glide up to the focus height.
-                contentPadding = PaddingValues(start = 12.dp, top = 14.dp, end = 12.dp, bottom = maxHeight),
+                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 16.dp, bottom = maxHeight),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                gridItems(items, key = { it.key }) { item ->
-                    PosterCard(item, item.id in state.favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { model.select(item, items, title) }
+                gridItems(titles, key = { it.key }) { item ->
+                    PosterCard(item, item.id in favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { onOpen(item) }
                 }
             }
-            ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 14.dp))
+            ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
+        }
+    }
+}
+
+/** The search pill at the top of the Movies / Series menu. OK opens the TV keyboard (voice search works too). */
+@Composable
+private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit) {
+    var editing by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    val field = remember { FocusRequester() }
+    val bar = remember { FocusRequester() }
+    val seen = remember { booleanArrayOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    fun finish() { editing = false; runCatching { bar.requestFocus() } }
+    BackHandler(enabled = editing) { finish() }
+    LaunchedEffect(editing) {
+        if (editing) {
+            repeat(20) {
+                if (runCatching { field.requestFocus() }.isSuccess) return@LaunchedEffect
+                withFrameNanos { }
+            }
+        } else {
+            seen[0] = false
+            keyboard?.hide()
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).height(50.dp).clip(CircleShape)
+            .background(if (focused || editing) FocusBrush else SolidColor(Glass.copy(alpha = .72f)))
+            .border(1.dp, White.copy(alpha = if (focused || editing) .5f else .12f), CircleShape)
+            .focusRequester(bar).onFocusChanged { focused = it.isFocused }
+            .clickable { editing = true }
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (editing) {
+            BasicTextField(
+                value = text, onValueChange = onChange, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 17.sp),
+                cursorBrush = SolidColor(White),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { finish() }),
+                modifier = Modifier.weight(1f).focusRequester(field)
+                    .onFocusChanged { state ->
+                        if (state.isFocused) seen[0] = true
+                        else if (seen[0] && editing) { seen[0] = false; editing = false }
+                    }
+            )
+        } else {
+            Text(
+                if (text.isEmpty()) t(hint) else text, Modifier.weight(1f),
+                color = if (text.isEmpty()) White.copy(alpha = .6f) else White, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** A title's own page: poster, name, genre, where it was left, and Play / Resume / favourite. */
+@Composable
+private fun TitleDetails(
+    item: Channel, kind: ChannelKind, titles: List<Channel>, state: TvState,
+    onPlay: (Long) -> Unit, onFavorite: () -> Unit, onOpen: (Channel) -> Unit, onClose: () -> Unit
+) {
+    BackHandler { onClose() }
+    val saved = state.positions[item.key]
+    val starred = item.id in state.favorites
+    val primary = remember(item.key) { FocusRequester() }
+    LaunchedEffect(item.key) {
+        repeat(30) {
+            if (runCatching { primary.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    val more = remember(item.key, titles) { titles.filter { it.group == item.group && it.key != item.key }.take(24) }
+    Box(Modifier.fillMaxSize()) {
+        // The poster, faint and wide, behind the page.
+        AsyncImage(
+            model = item.logo, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).graphicsLayer { alpha = .14f }
+        )
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink))))
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
+            Row {
+                Box(
+                    Modifier.width(160.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
+                ) {
+                    ChannelLogo(
+                        item.name, item.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 14.dp,
+                        placeholder = Brush.linearGradient(channelGradient(item.name)), contentScale = ContentScale.Crop
+                    )
+                }
+                Spacer(Modifier.width(34.dp))
+                Column(Modifier.weight(1f).padding(top = 6.dp)) {
+                    Text(item.name, color = White, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 38.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.clip(RoundedCornerShape(8.dp)).border(1.dp, White.copy(alpha = .35f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(t(if (kind == ChannelKind.Movie) "Movie" else "Series"), color = White.copy(alpha = .85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(t(item.group.ifBlank { "Other" }), color = Muted, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (saved != null) {
+                        Spacer(Modifier.height(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val done = (saved.first.toFloat() / saved.second.coerceAtLeast(1L)).coerceIn(0f, 1f)
+                            Box(Modifier.width(200.dp).height(4.dp).clip(CircleShape).background(White.copy(alpha = .2f))) {
+                                Box(Modifier.fillMaxWidth(done).fillMaxHeight().clip(CircleShape).background(White))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text("${formatTime((saved.second - saved.first).coerceAtLeast(0L))} ${t("left")}", color = Muted, fontSize = 15.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (saved != null) {
+                            WhiteButton("Resume", Modifier.focusRequester(primary)) { onPlay(saved.first) }
+                            WhiteButton("Start over") { onPlay(0L) }
+                        } else {
+                            WhiteButton("Play", Modifier.focusRequester(primary)) { onPlay(0L) }
+                        }
+                        WhiteButton(if (starred) "Remove from favorites" else "Add to favorites") { onFavorite() }
+                    }
+                }
+            }
+            if (more.isNotEmpty()) {
+                Spacer(Modifier.height(26.dp))
+                Text("${t("More in")} ${t(item.group.ifBlank { "Other" })}", color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(more, key = { it.key }) { other ->
+                        PosterCard(other, other.id in state.favorites, Modifier.width(86.dp)) { onOpen(other) }
+                    }
+                }
+            }
         }
     }
 }
