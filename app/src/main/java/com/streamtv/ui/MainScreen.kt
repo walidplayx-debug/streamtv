@@ -1301,10 +1301,12 @@ private fun SettingsContent(
         val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
+        // The list scrolls instead of squeezing: on a short screen the last row ("About") was
+        // pressed into a sliver and its name was cut down to a few marks.
         Column(
-            Modifier.width(250.dp).padding(end = 8.dp)
-                .focusProperties { enter = { rows[section] ?: FocusRequester.Default } }.focusGroup(),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            Modifier.width(250.dp).fillMaxHeight().padding(end = 8.dp)
+                .focusProperties { enter = { rows[section] ?: FocusRequester.Default } }.focusGroup()
+                .verticalScroll(rememberScrollState())
         ) {
             sections.forEach { item ->
                 FocusRow(
