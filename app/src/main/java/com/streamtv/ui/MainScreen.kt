@@ -55,7 +55,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.painterResource
@@ -359,7 +362,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
                     .onFocusChanged { onFocus(it.hasFocus) },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Live TV", "Movies", "Series", "Search", "Settings").forEach { item ->
+                listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
                     val selected = tab == item
                     FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
                 }
@@ -1264,6 +1267,7 @@ private fun SearchKey(label: String, modifier: Modifier = Modifier, outlined: Bo
 }
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 private fun SettingsContent(
     state: TvState, model: MainViewModel, section: String, onSection: (String) -> Unit,
     onConfirm: (ConfirmRequest) -> Unit, onEntry: (String) -> Unit
@@ -1278,17 +1282,24 @@ private fun SettingsContent(
         }
     }
     Row(Modifier.fillMaxSize()) {
-        // The sections as neat boxes of one size on a glass card, in a sensible order.
+        // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
+        // coming back into the list (from the page or the tabs) lands on the open section, so
+        // passing over the list never opens another one by accident.
+        val openRow = remember { FocusRequester() }
         Column(
-            Modifier.width(260.dp).padding(top = 4.dp).clip(RoundedCornerShape(24.dp)).background(GlassFill)
-                .border(1.dp, GlassEdge, RoundedCornerShape(24.dp)).padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            Modifier.width(250.dp).padding(end = 8.dp)
+                .focusProperties { enter = { openRow } }.focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             listOf("Playlist", "Playback", "TV guide", "Language", "Parental control", "About").forEach { item ->
-                SectionRow(item, item == section) { onSection(item) }
+                FocusRow(
+                    item, "", item == section,
+                    modifier = if (item == section) Modifier.focusRequester(openRow) else Modifier,
+                    onFocus = { if (item != section) onSection(item) }
+                ) { onSection(item) }
             }
         }
-        Spacer(Modifier.width(36.dp))
+        Spacer(Modifier.width(30.dp))
         val pageScroll = rememberScrollState()
         Box(Modifier.weight(1f).fillMaxHeight()) {
         ScrollIndicator(pageScroll, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
@@ -1426,26 +1437,6 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
     }
 }
 
-/** One section of Settings: a box of fixed height; the open one is lit and carries a mark on its edge. */
-@Composable
-private fun SectionRow(title: String, selected: Boolean, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val (pressed, press) = rememberPress(onClick)
-    Row(
-        Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp))
-            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = if (selected) .12f else .04f)))
-            .border(1.dp, White.copy(alpha = if (focused) .4f else if (selected) .14f else .05f), RoundedCornerShape(14.dp))
-            .onFocusChanged { focused = it.isFocused }.clickable(onClick = press)
-            .padding(start = 8.dp, end = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.width(3.dp).height(18.dp).clip(CircleShape).background(if (selected) White else Color.Transparent))
-        Spacer(Modifier.width(11.dp))
-        Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .62f), fontSize = 17.sp,
-            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
 /** A box to pick one of several (a language): a check mark on the chosen one. */
 @Composable
 private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -1499,13 +1490,17 @@ private fun SettingItem(title: String, value: String, action: String? = null, on
 private fun SettingsRow(title: String, subtitle: String) = SettingItem(title, subtitle)
 
 @Composable
-private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick: () -> Unit) {
+private fun FocusRow(
+    title: String, trailing: String, selected: Boolean, modifier: Modifier = Modifier,
+    /** Called when the row takes focus (Settings opens a section without a press). */
+    onFocus: (() -> Unit)? = null, onClick: () -> Unit
+) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     val scale by animateFloatAsState(if (pressed) .97f else if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
+    Row(modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
         .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
-        .onFocusChanged { focused = it.isFocused }.clickable(onClick = press)
+        .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal)
         Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
