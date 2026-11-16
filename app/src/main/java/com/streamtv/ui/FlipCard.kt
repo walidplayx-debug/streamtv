@@ -85,10 +85,15 @@ data class PinFace(val heading: String, val message: String, val error: Boolean)
 fun pinFace(prompt: PinPrompt, wrong: Boolean): PinFace {
     val message = when (prompt.purpose) {
         "lock" -> "Please enter the PIN to lock this channel"
+        "hide" -> "Please enter the PIN to hide this channel"
         "unlock" -> "Please enter the PIN to unlock this channel"
         "open" -> "Please enter the PIN to open this channel"
         "verify" -> "Enter your current PIN"
-        "set" -> if (prompt.channel != null) "Choose a 4-digit PIN to lock this channel" else "Choose a new 4-digit PIN"
+        "set" -> when {
+            prompt.channel == null -> "Choose a new 4-digit PIN"
+            prompt.then == "hide" -> "Choose a 4-digit PIN to hide this channel"
+            else -> "Choose a 4-digit PIN to lock this channel"
+        }
         else -> "Please enter the PIN to continue"
     }
     return PinFace(heading = prompt.channel?.name ?: "Parental control", message = message, error = wrong)
@@ -118,6 +123,8 @@ fun FlipCardDialog(
     onPinSubmit: (String) -> Unit,
     onPinCancel: () -> Unit,
     onDismiss: () -> Unit,
+    /** Nothing pressed for a while (8 s on the options, 20 s on the PIN pad): put the card away. */
+    onIdle: () -> Unit,
     /** The front; null when the card only asks for the PIN. */
     options: CardOptions?
 ) {
@@ -162,6 +169,12 @@ fun FlipCardDialog(
             if (flipped) backFirst.focusWhenReady()
             else if (options != null) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
         }
+        // Every key press restarts the idle clock.
+        var keyTick by remember { mutableStateOf(0) }
+        LaunchedEffect(keyTick, flipped) {
+            kotlinx.coroutines.delay(if (flipped) 20_000L else 8_000L)
+            onIdle()
+        }
         // The OK press that opened this card may still be held down; ignore it until it is released.
         val armed = remember { booleanArrayOf(false) }
 
@@ -179,6 +192,7 @@ fun FlipCardDialog(
                     .width(CardWidth).clip(RoundedCornerShape(28.dp)).background(CardGlass)
                     .border(1.dp, CardBorder, RoundedCornerShape(28.dp))
                     .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown) keyTick++
                         val code = event.nativeKeyEvent.keyCode
                         val digit = when (code) {
                             in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_0)
@@ -303,7 +317,8 @@ private fun ChannelOptionsFront(
     Text(channelDisplayName(channel.name), color = CardWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
     Spacer(Modifier.height(10.dp))
-    row(if (starred) "Remove from favorites" else "Add to favorites", "star", "favorite")
+    // A favourite's star is filled in white; taking it out leaves the outline again.
+    row(if (starred) "Remove from favorites" else "Add to favorites", if (starred) "starFilled" else "star", "favorite")
     // Only for channels that are in "Last watched".
     if (inHistory) row("Remove from history", "history", "history")
     row("Hide channel", "hide", "hide")
@@ -338,7 +353,7 @@ private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Bo
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OptionIcon(icon, if (focused) Color(0xB31C1C1E) else Color(0xB3FFFFFF), Modifier.size(20.dp))
+        OptionIcon(icon, if (focused) Color(0xB31C1C1E) else if (icon == "starFilled") CardWhite else Color(0xB3FFFFFF), Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Text(t(label), color = if (focused) Color(0xFF1C1C1E) else CardWhite, fontSize = 17.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -353,7 +368,7 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
         val h = size.height
         val line = Stroke(width = w * .09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         when (kind) {
-            "star" -> {
+            "star", "starFilled" -> {
                 val path = Path()
                 val outer = w * .46f
                 val inner = outer * .46f
@@ -365,6 +380,7 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 path.close()
+                if (kind == "starFilled") drawPath(path, tint)
                 drawPath(path, tint, style = line)
             }
             "hide" -> {

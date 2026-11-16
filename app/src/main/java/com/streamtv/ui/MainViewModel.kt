@@ -24,8 +24,14 @@ import java.io.File
 
 data class PlaylistEntry(val name: String, val url: String)
 
-/** A PIN question on screen. purpose: "set", "open", "lock", "unlock", "verify" or "confirm". */
-data class PinPrompt(val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null)
+/**
+ * A PIN question on screen. purpose: "set", "open", "lock", "unlock", "hide", "verify" or "confirm".
+ * [then]: for "set" with a channel, what happens to it once the new PIN is chosen ("lock" or "hide").
+ */
+data class PinPrompt(
+    val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null,
+    val then: String = "lock"
+)
 
 data class TvState(
     val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
@@ -355,6 +361,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             else -> _state.value = _state.value.copy(pin = PinPrompt("lock", channel), pinError = false)
         }
     }
+    /** Hiding asks for the PIN on the card, the same way locking does (a new PIN first if none is set). */
+    fun requestHide(channel: Channel) {
+        _state.value = _state.value.copy(
+            pin = if (pinCode.isBlank()) PinPrompt("set", channel, then = "hide") else PinPrompt("hide", channel),
+            pinError = false
+        )
+    }
     private fun setLocked(keys: Set<String>) {
         _state.value = _state.value.copy(locked = keys)
         viewModelScope.launch { preferences.saveLocked(keys) }
@@ -380,7 +393,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pinCode = value
             _state.value = _state.value.copy(pin = null, pinError = false, pinSet = true)
             viewModelScope.launch { preferences.savePin(value) }
-            prompt.channel?.let { setLocked(_state.value.locked + it.key) }
+            prompt.channel?.let { if (prompt.then == "hide") hideChannel(it) else setLocked(_state.value.locked + it.key) }
             return true
         }
         if (value != pinCode) { _state.value = _state.value.copy(pinError = true); return false }
@@ -389,6 +402,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
             "unlock" -> prompt.channel?.let { setLocked(_state.value.locked - it.key) }
             "lock" -> prompt.channel?.let { setLocked(_state.value.locked + it.key) }
+            "hide" -> prompt.channel?.let { hideChannel(it) }
             // The old PIN was right: the same card now asks for the new one.
             "verify" -> { _state.value = _state.value.copy(pin = PinPrompt("set")); return false }
             "confirm" -> { val action = pendingAction; pendingAction = null; action?.invoke() }

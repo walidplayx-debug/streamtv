@@ -143,12 +143,13 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // Holding OK on a channel (a tile, or the video while it plays) opens the channel card.
     var optionsFor by remember { mutableStateOf<Channel?>(null) }
     val handleOption: (Channel, String) -> Unit = { target, option ->
-        // Locking keeps the card open: it turns over to ask for the PIN. Everything else closes it.
-        if (option != "lock") optionsFor = null
+        // Locking and hiding keep the card open: it turns over to ask for the PIN. A favourite keeps
+        // it open too, so the star can be seen filling in. Everything else closes it.
+        if (option != "lock" && option != "hide" && option != "favorite") optionsFor = null
         when (option) {
             "favorite" -> model.toggleFavorite(target)
             "history" -> model.removeFromHistory(target)
-            "hide" -> confirm = ConfirmRequest("Hide this channel?", target.name, "Hide channel") { model.hideChannel(target) }
+            "hide" -> model.requestHide(target)
             "lock" -> model.toggleLock(target)
             "rename" -> renaming = target
         }
@@ -171,6 +172,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             onPinSubmit = { code -> if (model.submitPin(code) && cardChannel != null) { closeCard = true } },
             onPinCancel = model::cancelPin,
             onDismiss = { if (prompt != null) model.cancelPin() else { optionsFor = null } },
+            // Left alone for a while, the card puts itself away, PIN question and all.
+            onIdle = { if (prompt != null) model.cancelPin(); optionsFor = null },
             options = cardChannel?.let { target ->
                 CardOptions(
                     channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
