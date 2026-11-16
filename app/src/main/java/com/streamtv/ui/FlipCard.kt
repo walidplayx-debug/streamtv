@@ -78,8 +78,11 @@ private val CardWidth = 288.dp
 /** What the front of the card offers for a channel. [onPick] gets "favorite", "history", "hide", "lock" or "rename". */
 class CardOptions(val channel: Channel, val starred: Boolean, val locked: Boolean, val inHistory: Boolean, val onPick: (String) -> Unit)
 
-/** What the back of the card shows: who it is about, what it asks, and whether the last try was wrong. */
-data class PinFace(val heading: String, val message: String, val error: Boolean)
+/** What the back of the card shows: who it is about, what it asks, and what went wrong last time. */
+data class PinFace(val heading: String, val message: String, val error: String?)
+
+/** A yes/no question on the back of the card, used when no PIN is set (hiding a channel, removing a playlist). */
+class CardQuestion(val heading: String, val question: String, val confirmLabel: String, val action: () -> Unit)
 
 /** The words on the back of the card for a PIN question. */
 fun pinFace(prompt: PinPrompt, wrong: Boolean): PinFace {
@@ -94,9 +97,15 @@ fun pinFace(prompt: PinPrompt, wrong: Boolean): PinFace {
             prompt.then == "hide" -> "Choose a 4-digit PIN to hide this channel"
             else -> "Choose a 4-digit PIN to lock this channel"
         }
-        else -> "Please enter the PIN to continue"
+        "repeat" -> "Enter the same PIN again to confirm"
+        else -> prompt.reason ?: "Please enter the PIN to continue"
     }
-    return PinFace(heading = prompt.channel?.name ?: "Parental control", message = message, error = wrong)
+    val error = when {
+        prompt.mismatch -> "The PINs did not match"
+        wrong -> "Wrong PIN"
+        else -> null
+    }
+    return PinFace(heading = prompt.channel?.name ?: prompt.label ?: "Parental control", message = message, error = error)
 }
 
 /** requestFocus() throws while the target is not on screen yet; wait a few frames for it. */
@@ -117,11 +126,12 @@ private suspend fun FocusRequester.focusWhenReady() {
 fun FlipCardDialog(
     /** Over the playing video: on the side of the screen, with nothing dimmed. */
     atEnd: Boolean,
-    /** True while the back (the PIN pad) is showing. */
-    flipped: Boolean,
+    /** The PIN pad on the back; or [question], a yes/no question there instead. */
     pin: PinFace?,
+    question: CardQuestion?,
     onPinSubmit: (String) -> Unit,
     onPinCancel: () -> Unit,
+    onQuestionCancel: () -> Unit,
     onDismiss: () -> Unit,
     /** Nothing pressed for a while (8 s on the options, 20 s on the PIN pad): put the card away. */
     onIdle: () -> Unit,
@@ -135,9 +145,17 @@ fun FlipCardDialog(
         // The back keeps its last words while the card turns back to the front. Before the first
         // question it is laid out empty: both faces are measured from the very first frame, so the
         // card never changes height when it turns over.
-        val keptFace = remember { arrayOf(PinFace(heading = "", message = "", error = false)) }
+        val keptFace = remember { arrayOf(PinFace(heading = "", message = "", error = null)) }
         if (pin != null) keptFace[0] = pin
         val face = pin ?: keptFace[0]
+        val keptQuestion = remember { arrayOf(CardQuestion("", "", "Cancel") {}) }
+        if (question != null) keptQuestion[0] = question
+        val ask = question ?: keptQuestion[0]
+        // Which of the two backs is in use; kept while the card turns back to the front.
+        val keptMode = remember { booleanArrayOf(false) }
+        if (pin != null) keptMode[0] = false else if (question != null) keptMode[0] = true
+        val questionMode = keptMode[0]
+        val flipped = pin != null || question != null
 
         val rotation = remember { Animatable(if (flipped) 180f else 0f) }
         LaunchedEffect(flipped) { rotation.animateTo(if (flipped) 180f else 0f, tween(560, easing = FastOutSlowInEasing)) }
@@ -152,7 +170,7 @@ fun FlipCardDialog(
 
         var digits by remember { mutableStateOf("") }
         fun type(digit: Char) {
-            if (!flipped || digits.length >= 4) return
+            if (!flipped || questionMode || digits.length >= 4) return
             val next = digits + digit
             if (next.length == 4) { digits = ""; onPinSubmit(next) } else digits = next
         }
@@ -163,10 +181,11 @@ fun FlipCardDialog(
         val rowFocus = remember { mutableMapOf<String, FocusRequester>() }
         val lastRow = remember { arrayOf("favorite") }
         val backFirst = remember { FocusRequester() }
+        val questionFirst = remember { FocusRequester() }
         // Focus follows the face: wait one frame so the face just turned to can take focus.
-        LaunchedEffect(flipped) {
+        LaunchedEffect(flipped, questionMode) {
             withFrameNanos { }
-            if (flipped) backFirst.focusWhenReady()
+            if (flipped) (if (questionMode) questionFirst else backFirst).focusWhenReady()
             else if (options != null) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
         }
         // Every key press restarts the idle clock.
@@ -223,14 +242,27 @@ fun FlipCardDialog(
                         ChannelOptionsFront(options, enabled = !flipped, settled = settled, focus = rowFocus) { lastRow[0] = it }
                     }
                 }
-                run {
+                Box(
+                    Modifier.fillMaxWidth().graphicsLayer { rotationY = 180f; alpha = if (backVisible) 1f else 0f },
+                    contentAlignment = Alignment.Center
+                ) {
+                    // The PIN pad sets the size of the back; the question sits in the same space.
                     Column(
-                        Modifier.fillMaxWidth().graphicsLayer { rotationY = 180f; alpha = if (backVisible) 1f else 0f }
+                        Modifier.fillMaxWidth().graphicsLayer { alpha = if (questionMode) 0f else 1f }
                             .padding(horizontal = 20.dp, vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        PinBack(face, digits, enabled = flipped, first = backFirst,
+                        PinBack(face, digits, enabled = flipped && !questionMode, first = backFirst,
                             onDigit = { type(it) }, onDelete = { digits = digits.dropLast(1) }, onCancel = onPinCancel)
+                    }
+                    Column(
+                        Modifier.matchParentSize().graphicsLayer { alpha = if (questionMode) 1f else 0f }
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        QuestionBack(ask, enabled = flipped && questionMode, first = questionFirst,
+                            onCancel = onQuestionCancel, onConfirm = { ask.action() })
                     }
                 }
             }
@@ -261,7 +293,7 @@ private fun PinBack(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Text(if (face.error && digits.isEmpty()) t("Wrong PIN") else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
+            Text(if (face.error != null && digits.isEmpty()) t(face.error) else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
             Spacer(Modifier.height(6.dp))
             for (row in listOf("123", "456", "789", "<0x")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -282,6 +314,48 @@ private fun PinBack(
                 Spacer(Modifier.height(8.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun QuestionBack(ask: CardQuestion, enabled: Boolean, first: FocusRequester, onCancel: () -> Unit, onConfirm: () -> Unit) {
+    Text(t(ask.heading), color = CardMuted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Spacer(Modifier.height(6.dp))
+    Text(t(ask.question), color = CardWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center, maxLines = 2)
+    Spacer(Modifier.height(24.dp))
+    // Focus starts on Cancel, so a stray OK press removes nothing.
+    CardChoice(t("Cancel"), danger = false, enabled = enabled, modifier = Modifier.focusRequester(first), onClick = onCancel)
+    Spacer(Modifier.height(10.dp))
+    CardChoice(t(ask.confirmLabel), danger = true, enabled = enabled, onClick = onConfirm)
+}
+
+/** A wide button on the back of the card; [danger] is a soft, muted red rather than a loud one. */
+@Composable
+private fun CardChoice(label: String, danger: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.03f else 1f, spring(stiffness = 430f), label = "choiceScale")
+    val background = when {
+        danger && focused -> Color(0xFFB5544D)
+        danger -> Color(0x33C0544D)
+        focused -> CardWhite
+        else -> Color(0x1FFFFFFF)
+    }
+    val text = when {
+        danger && focused -> CardWhite
+        danger -> Color(0xFFEFA39B)
+        focused -> Color(0xFF1C1C1E)
+        else -> CardWhite
+    }
+    Box(
+        modifier.fillMaxWidth().height(48.dp).scale(scale).clip(CircleShape).background(background)
+            .focusProperties { canFocus = enabled }
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

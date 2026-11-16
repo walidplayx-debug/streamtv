@@ -25,12 +25,15 @@ import java.io.File
 data class PlaylistEntry(val name: String, val url: String)
 
 /**
- * A PIN question on screen. purpose: "set", "open", "lock", "unlock", "hide", "verify" or "confirm".
+ * A PIN question on screen. purpose: "set", "repeat" (the new PIN typed a second time), "open",
+ * "lock", "unlock", "hide", "verify" or "confirm".
  * [then]: for "set" with a channel, what happens to it once the new PIN is chosen ("lock" or "hide").
+ * [mismatch]: the second entry of a new PIN did not match the first; it is chosen again.
+ * [label] and [reason]: heading and message of a "confirm" question.
  */
 data class PinPrompt(
     val purpose: String, val channel: Channel? = null, val from: List<Channel>? = null, val title: String? = null,
-    val then: String = "lock"
+    val then: String = "lock", val mismatch: Boolean = false, val label: String? = null, val reason: String? = null
 )
 
 data class TvState(
@@ -89,6 +92,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val queueView = ChannelView()
     private var pinCode: String = ""
     private var pendingAction: (() -> Unit)? = null
+    /** A new PIN typed once, waiting to be typed again. */
+    private var pendingPin: String = ""
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
@@ -376,13 +381,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(pin = PinPrompt(if (pinCode.isBlank()) "set" else "verify"), pinError = false)
     }
     /** Runs [action] straight away when no PIN is set, otherwise only after the PIN is entered. */
-    fun protect(action: () -> Unit) {
+    fun protect(label: String? = null, reason: String? = null, action: () -> Unit) {
         if (pinCode.isBlank()) { action(); return }
         pendingAction = action
-        _state.value = _state.value.copy(pin = PinPrompt("confirm"), pinError = false)
+        _state.value = _state.value.copy(pin = PinPrompt("confirm", label = label, reason = reason), pinError = false)
     }
     fun cancelPin() {
         pendingAction = null
+        pendingPin = ""
         _state.value = _state.value.copy(pin = null, pinError = false)
     }
     /** Returns true when the PIN was accepted and the question is finished (nothing more to ask). */
@@ -390,6 +396,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prompt = _state.value.pin ?: return false
         if (prompt.purpose == "set") {
             if (!Regex("\\d{4}").matches(value)) { _state.value = _state.value.copy(pinError = true); return false }
+            // A new PIN is typed twice, so a slip of the finger cannot lock the viewer out.
+            pendingPin = value
+            _state.value = _state.value.copy(pin = prompt.copy(purpose = "repeat", mismatch = false), pinError = false)
+            return false
+        }
+        if (prompt.purpose == "repeat") {
+            val first = pendingPin
+            pendingPin = ""
+            if (value != first) {
+                _state.value = _state.value.copy(pin = prompt.copy(purpose = "set", mismatch = true), pinError = false)
+                return false
+            }
             pinCode = value
             _state.value = _state.value.copy(pin = null, pinError = false, pinSet = true)
             viewModelScope.launch { preferences.savePin(value) }

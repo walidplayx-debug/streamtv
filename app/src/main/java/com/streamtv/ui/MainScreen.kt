@@ -121,16 +121,9 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // The channel to put focus back on when the player closes.
     var returnKey by remember { mutableStateOf<String?>(null) }
 
-    // "Are you sure?" before anything is removed; the PIN (when one is set) is asked right after.
-    var confirm by remember { mutableStateOf<ConfirmRequest?>(null) }
-    confirm?.let { request ->
-        ConfirmScreen(
-            question = request.question, subject = request.subject, confirmLabel = request.confirmLabel,
-            onConfirm = { confirm = null; model.protect(request.action) },
-            onCancel = { confirm = null }
-        )
-        return
-    }
+    // With no PIN set, hiding a channel or removing a playlist asks a plain yes/no question on the
+    // back of the card instead; with a PIN, the card asks for the PIN and nothing else.
+    var question by remember { mutableStateOf<CardQuestion?>(null) }
     var renaming by remember { mutableStateOf<Channel?>(null) }
     renaming?.let { target ->
         SingleFieldScreen(
@@ -149,7 +142,14 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         when (option) {
             "favorite" -> model.toggleFavorite(target)
             "history" -> model.removeFromHistory(target)
-            "hide" -> model.requestHide(target)
+            "hide" -> {
+                if (state.pinSet) model.requestHide(target)
+                else {
+                    question = CardQuestion(target.name, "Hide this channel?", "Hide channel") {
+                        model.hideChannel(target); question = null; optionsFor = null
+                    }
+                }
+            }
             "lock" -> model.toggleLock(target)
             "rename" -> renaming = target
         }
@@ -164,16 +164,23 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     var closeCard by remember { mutableStateOf(false) }
     if (closeCard && prompt == null) SideEffect { closeCard = false; optionsFor = null }
     val cardChannel = if (closeCard && prompt == null) null else optionsFor
-    if (cardChannel != null || prompt != null) {
+    if (cardChannel != null || prompt != null || question != null) {
         FlipCardDialog(
             atEnd = state.playing,
-            flipped = prompt != null,
             pin = prompt?.let { pinFace(it, state.pinError) },
+            question = question,
             onPinSubmit = { code -> if (model.submitPin(code) && cardChannel != null) { closeCard = true } },
             onPinCancel = model::cancelPin,
-            onDismiss = { if (prompt != null) model.cancelPin() else { optionsFor = null } },
+            onQuestionCancel = { question = null },
+            onDismiss = {
+                when {
+                    prompt != null -> { model.cancelPin() }
+                    question != null -> { question = null }
+                    else -> { optionsFor = null }
+                }
+            },
             // Left alone for a while, the card puts itself away, PIN question and all.
-            onIdle = { if (prompt != null) model.cancelPin(); optionsFor = null },
+            onIdle = { if (prompt != null) model.cancelPin(); question = null; optionsFor = null },
             options = cardChannel?.let { target ->
                 CardOptions(
                     channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
@@ -285,7 +292,13 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                 ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions)
             }
             "Search" -> SearchContent(state, model, returnKey, { returnKey = null }, openOptions)
-            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { confirm = it }) { entry = it }
+            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { request ->
+                if (state.pinSet) {
+                    model.protect(request.subject, "Please enter the PIN to remove this playlist", request.action)
+                } else {
+                    question = CardQuestion(request.subject, request.question, request.confirmLabel) { request.action(); question = null }
+                }
+            }) { entry = it }
             else -> LiveContent(state, model, returnKey, { returnKey = null }, openOptions)
         }
     }
