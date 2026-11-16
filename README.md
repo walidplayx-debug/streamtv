@@ -11,7 +11,12 @@ A personal Android TV IPTV player. No channels, playlists, logos, or third-party
 - Channel browsing, categories, and favorites persisted across restarts
 - Room-backed channel cache and DataStore-backed playlist/favorites preferences
 - Optional XMLTV/XMLTV.GZ loading with a rolling now/next programme window
-- Room channel cache and DataStore preferences
+- Movies and Series pages: side menu (search, watch history, favourites, genres), title page, resume
+- Movie player with progress bar, seeking, pause, favourite and in-file subtitles
+- Channel card (hold OK): favourite, hide, lock, rename; PIN questions on the card's back
+- Parental PIN for locked channels, hiding channels and removing playlists
+- Interface in 10 languages, right-to-left layout for Arabic
+- In-app updates from the `latest` release
 
 ## Build
 
