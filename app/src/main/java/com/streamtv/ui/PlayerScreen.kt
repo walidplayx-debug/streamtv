@@ -358,6 +358,8 @@ fun PlayerScreen(
                         okShort[0] -> {
                             okShort[0] = false
                             // The card opens in its own window, which also takes the release of this press.
+                            // The info bar steps away so the two never sit on top of each other.
+                            overlayState = OverlayState.None
                             onOptions()
                             true
                         }

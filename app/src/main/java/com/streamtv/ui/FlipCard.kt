@@ -125,8 +125,10 @@ fun FlipCardDialog(
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect { if (atEnd) window?.setDimAmount(0f) }
 
-        // The back keeps its last words while the card turns back to the front.
-        val keptFace = remember { arrayOfNulls<PinFace>(1) }
+        // The back keeps its last words while the card turns back to the front. Before the first
+        // question it is laid out empty: both faces are measured from the very first frame, so the
+        // card never changes height when it turns over.
+        val keptFace = remember { arrayOf(PinFace(heading = "", message = "", error = false)) }
         if (pin != null) keptFace[0] = pin
         val face = pin ?: keptFace[0]
 
@@ -149,12 +151,16 @@ fun FlipCardDialog(
         }
         LaunchedEffect(flipped) { digits = "" }
 
-        val frontFirst = remember { FocusRequester() }
+        // One focus target per option; the card remembers the last one focused, so turning back
+        // from the PIN pad puts the white highlight where it was (on "Lock channel", say).
+        val rowFocus = remember { mutableMapOf<String, FocusRequester>() }
+        val lastRow = remember { arrayOf("favorite") }
         val backFirst = remember { FocusRequester() }
         // Focus follows the face: wait one frame so the face just turned to can take focus.
         LaunchedEffect(flipped) {
             withFrameNanos { }
-            if (flipped) backFirst.focusWhenReady() else if (options != null) frontFirst.focusWhenReady()
+            if (flipped) backFirst.focusWhenReady()
+            else if (options != null) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
         }
         // The OK press that opened this card may still be held down; ignore it until it is released.
         val armed = remember { booleanArrayOf(false) }
@@ -200,10 +206,10 @@ fun FlipCardDialog(
                         Modifier.fillMaxWidth().graphicsLayer { alpha = if (backVisible) 0f else 1f }
                             .padding(horizontal = 14.dp, vertical = 16.dp)
                     ) {
-                        ChannelOptionsFront(options, enabled = !flipped, settled = settled, first = frontFirst)
+                        ChannelOptionsFront(options, enabled = !flipped, settled = settled, focus = rowFocus) { lastRow[0] = it }
                     }
                 }
-                if (face != null) {
+                run {
                     Column(
                         Modifier.fillMaxWidth().graphicsLayer { rotationY = 180f; alpha = if (backVisible) 1f else 0f }
                             .padding(horizontal = 20.dp, vertical = 16.dp),
@@ -283,26 +289,40 @@ private fun PinKey(label: String, enabled: Boolean, modifier: Modifier = Modifie
 
 /** The front of the card: the channel's options. */
 @Composable
-private fun ChannelOptionsFront(options: CardOptions, enabled: Boolean, settled: Boolean, first: FocusRequester) {
+private fun ChannelOptionsFront(
+    options: CardOptions, enabled: Boolean, settled: Boolean,
+    focus: MutableMap<String, FocusRequester>, onFocused: (String) -> Unit
+) {
+    val row: @Composable (String, String, String) -> Unit = { label, icon, option ->
+        OptionItem(label, icon, option, options, enabled, settled, focus, onFocused)
+    }
     val channel = options.channel
-    val onPick = options.onPick
     val starred = options.starred
     val locked = options.locked
     val inHistory = options.inHistory
     Text(channelDisplayName(channel.name), color = CardWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
     Spacer(Modifier.height(10.dp))
-    OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", enabled, settled, Modifier.focusRequester(first)) { onPick("favorite") }
+    row(if (starred) "Remove from favorites" else "Add to favorites", "star", "favorite")
     // Only for channels that are in "Last watched".
-    if (inHistory) OptionRow("Remove from history", "history", enabled, settled) { onPick("history") }
-    OptionRow("Hide channel", "hide", enabled, settled) { onPick("hide") }
-    OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock", enabled, settled) { onPick("lock") }
-    OptionRow("Rename", "edit", enabled, settled) { onPick("rename") }
+    if (inHistory) row("Remove from history", "history", "history")
+    row("Hide channel", "hide", "hide")
+    row(if (locked) "Unlock channel" else "Lock channel", "lock", "lock")
+    row("Rename", "edit", "rename")
+}
+
+@Composable
+private fun OptionItem(
+    label: String, icon: String, option: String, options: CardOptions, enabled: Boolean, settled: Boolean,
+    focus: MutableMap<String, FocusRequester>, onFocused: (String) -> Unit
+) {
+    val requester = remember(option) { focus.getOrPut(option) { FocusRequester() } }
+    OptionRow(label, icon, enabled, settled, Modifier.focusRequester(requester), { onFocused(option) }) { options.onPick(option) }
 }
 
 /** One action on the front of the card. */
 @Composable
-private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Boolean, modifier: Modifier, onFocused: () -> Unit, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         if (focused) 1.03f else 1f,
@@ -313,7 +333,7 @@ private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Bo
         modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(16.dp))
             .background(if (focused) Color(0xF2F2F2F7) else Color.Transparent)
             .focusProperties { canFocus = enabled }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
             .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
