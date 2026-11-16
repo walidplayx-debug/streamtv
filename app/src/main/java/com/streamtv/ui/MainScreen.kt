@@ -17,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,9 +61,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -996,8 +1000,9 @@ private fun ChannelGrid(
     GlideToFocus(gridState, focusedKey)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            // Tiles keep one size: four across beside the Live TV lists, more when the grid is wider (Search).
-            columns = GridCells.Adaptive(110.dp),
+            // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
+            // lists; a wider grid fits more tiles of the same size instead of stretching them.
+            columns = GridCells.FixedSize(112.dp),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             // Room around the grid so the enlarged, focused tile is never cut off.
@@ -1052,7 +1057,46 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
             channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp
         )
-        if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Accent, fontSize = 15.sp)
+        if (favorite) FavoriteCorner(Modifier.align(Alignment.TopEnd).size(34.dp))
+    }
+}
+
+/**
+ * A favourite's mark: a quarter disc of soft gold set into the tile's top corner (the tile's own
+ * outline cuts it, so the tile keeps its shape), with a star engraved in its middle.
+ */
+@Composable
+private fun FavoriteCorner(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val r = size.width
+        val corner = Offset(size.width, 0f)
+        // A soft shadow on the tile, under the curve.
+        drawCircle(Color.Black.copy(alpha = .30f), radius = r + 3.dp.toPx(), center = Offset(corner.x - 1.dp.toPx(), corner.y + 2.dp.toPx()))
+        // Brushed gold: light at the corner, deeper toward the curve.
+        drawCircle(
+            Brush.linearGradient(listOf(Color(0xFFF0D38E), Color(0xFFB88E45)), start = corner, end = Offset(0f, r)),
+            radius = r, center = corner
+        )
+        drawCircle(Color(0x8CFFECBE), radius = r - .5.dp.toPx(), center = corner, style = Stroke(width = 1.dp.toPx()))
+        // The star, cut in: centred on the corner's diagonal, halfway out.
+        val d = r * .5f * .7071f
+        val cx = corner.x - d
+        val cy = d
+        val outer = r * .22f
+        fun star(dx: Float, dy: Float) = Path().apply {
+            for (i in 0 until 10) {
+                val rr = if (i % 2 == 0) outer else outer * .45f
+                val a = Math.toRadians(-90.0 + i * 36.0)
+                val x = cx + dx + (rr * kotlin.math.cos(a)).toFloat()
+                val y = cy + dy + (rr * kotlin.math.sin(a)).toFloat()
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+            close()
+        }
+        val lip = 1.dp.toPx()
+        drawPath(star(lip, lip), Color(0xD9FFF0C8))      // the lower lip catches the light
+        drawPath(star(-lip, -lip), Color(0xCC6E501E))    // the upper lip is in shade
+        drawPath(star(0f, 0f), Brush.verticalGradient(listOf(Color(0xFF8C662A), Color(0xFFB58E4C)), startY = cy - outer, endY = cy + outer))
     }
 }
 
