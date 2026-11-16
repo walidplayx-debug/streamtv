@@ -3,6 +3,7 @@ package com.streamtv.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -72,7 +73,7 @@ private val CardWhite = Color.White
 private val CardMuted = Color(0xFFB5B5BA)
 private val CardGlass = Color(0xF01C1C1E)
 private val CardBorder = Color(0x33FFFFFF)
-private val CardWidth = 340.dp
+private val CardWidth = 288.dp
 
 /** What the front of the card offers for a channel. [onPick] gets "favorite", "history", "hide", "lock" or "rename". */
 class CardOptions(val channel: Channel, val starred: Boolean, val locked: Boolean, val inHistory: Boolean, val onPick: (String) -> Unit)
@@ -131,8 +132,13 @@ fun FlipCardDialog(
 
         val rotation = remember { Animatable(if (flipped) 180f else 0f) }
         LaunchedEffect(flipped) { rotation.animateTo(if (flipped) 180f else 0f, tween(560, easing = FastOutSlowInEasing)) }
+        // The card fades in at its final size: growing in while the first row also grew into its
+        // focus look read as a little stretch, as if something were wrong.
         val appear = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = .82f, stiffness = 360f)) }
+        LaunchedEffect(Unit) { appear.animateTo(1f, tween(180)) }
+        // Rows animate their focus only once the card has settled; the first highlight is instant.
+        var settled by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { kotlinx.coroutines.delay(250); settled = true }
         val backVisible = rotation.value > 90f
 
         var digits by remember { mutableStateOf("") }
@@ -163,8 +169,6 @@ fun FlipCardDialog(
                         rotationY = rotation.value
                         cameraDistance = 16f * density
                         alpha = appear.value.coerceIn(0f, 1f)
-                        scaleX = .9f + .1f * appear.value
-                        scaleY = .9f + .1f * appear.value
                     }
                     .width(CardWidth).clip(RoundedCornerShape(28.dp)).background(CardGlass)
                     .border(1.dp, CardBorder, RoundedCornerShape(28.dp))
@@ -196,7 +200,7 @@ fun FlipCardDialog(
                         Modifier.fillMaxWidth().graphicsLayer { alpha = if (backVisible) 0f else 1f }
                             .padding(horizontal = 14.dp, vertical = 16.dp)
                     ) {
-                        ChannelOptionsFront(options, enabled = !flipped, first = frontFirst)
+                        ChannelOptionsFront(options, enabled = !flipped, settled = settled, first = frontFirst)
                     }
                 }
                 if (face != null) {
@@ -279,7 +283,7 @@ private fun PinKey(label: String, enabled: Boolean, modifier: Modifier = Modifie
 
 /** The front of the card: the channel's options. */
 @Composable
-private fun ChannelOptionsFront(options: CardOptions, enabled: Boolean, first: FocusRequester) {
+private fun ChannelOptionsFront(options: CardOptions, enabled: Boolean, settled: Boolean, first: FocusRequester) {
     val channel = options.channel
     val onPick = options.onPick
     val starred = options.starred
@@ -288,19 +292,23 @@ private fun ChannelOptionsFront(options: CardOptions, enabled: Boolean, first: F
     Text(channelDisplayName(channel.name), color = CardWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
     Spacer(Modifier.height(10.dp))
-    OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", enabled, Modifier.focusRequester(first)) { onPick("favorite") }
+    OptionRow(if (starred) "Remove from favorites" else "Add to favorites", "star", enabled, settled, Modifier.focusRequester(first)) { onPick("favorite") }
     // Only for channels that are in "Last watched".
-    if (inHistory) OptionRow("Remove from history", "history", enabled) { onPick("history") }
-    OptionRow("Hide channel", "hide", enabled) { onPick("hide") }
-    OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock", enabled) { onPick("lock") }
-    OptionRow("Rename", "edit", enabled) { onPick("rename") }
+    if (inHistory) OptionRow("Remove from history", "history", enabled, settled) { onPick("history") }
+    OptionRow("Hide channel", "hide", enabled, settled) { onPick("hide") }
+    OptionRow(if (locked) "Unlock channel" else "Lock channel", "lock", enabled, settled) { onPick("lock") }
+    OptionRow("Rename", "edit", enabled, settled) { onPick("rename") }
 }
 
 /** One action on the front of the card. */
 @Composable
-private fun OptionRow(label: String, icon: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(dampingRatio = .78f, stiffness = 420f), label = "optionScale")
+    val scale by animateFloatAsState(
+        if (focused) 1.03f else 1f,
+        if (settled) spring<Float>(dampingRatio = .78f, stiffness = 420f) else snap<Float>(),
+        label = "optionScale"
+    )
     Row(
         modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(16.dp))
             .background(if (focused) Color(0xF2F2F2F7) else Color.Transparent)
