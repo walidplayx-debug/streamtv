@@ -63,6 +63,7 @@ import androidx.media3.ui.PlayerView
 import com.streamtv.data.Channel
 import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
+import com.streamtv.data.hasFavorite
 import com.streamtv.data.EpgProgram
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -107,7 +108,7 @@ fun PlayerScreen(
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val side = if (rtl) 1 else -1
     val player = remember(channel.url) {
-        ExoPlayer.Builder(context).build().apply {
+        Players.create(context).apply {
             setMediaItem(MediaItem.fromUri(channel.url))
             prepare()
             playWhenReady = true
@@ -135,7 +136,7 @@ fun PlayerScreen(
             val watched = recent.mapNotNull { byKey[it] }
             if (watched.isNotEmpty()) add("Last watched" to watched)
             add("All channels" to live)
-            val starred = live.filter { it.id in favorites }
+            val starred = live.filter { favorites.hasFavorite(it) }
             if (starred.isNotEmpty()) add("Favorites" to starred)
             live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap().forEach { (name, items) -> add(name to items) }
             if (none { it.first == queueTitle }) add(0, queueTitle to channels)
@@ -206,6 +207,16 @@ fun PlayerScreen(
     fun showInfoBar() {
         overlayState = OverlayState.InfoBar
         infoBarTick++
+    }
+    // A held up/down still zaps, but at a calm pace: each zap starts a new stream, and dozens a
+    // second only pile up half-started downloads (which also drag the picture quality down).
+    val lastZap = remember { longArrayOf(0L) }
+    fun zap(delta: Int, held: Boolean) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (held && now - lastZap[0] < 350L) return
+        lastZap[0] = now
+        onZap(delta)
+        showInfoBar()
     }
 
     DisposableEffect(player) {
@@ -328,19 +339,24 @@ fun PlayerScreen(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (listOpen) listTick++
                 when (event.key) {
-                    Key.ChannelUp -> { onZap(1); showInfoBar(); true }
-                    Key.ChannelDown -> { onZap(-1); showInfoBar(); true }
+                    Key.ChannelUp -> { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
+                    Key.ChannelDown -> { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
                     // Handled here, before the system moves focus on its own for the Back key.
                     Key.Back -> { if (listOpen) backInList() else onBack(); true }
-                    Key.DirectionUp -> if (listOpen) false else { onZap(1); showInfoBar(); true }
-                    Key.DirectionDown -> if (listOpen) false else { onZap(-1); showInfoBar(); true }
+                    Key.DirectionUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
+                    Key.DirectionDown -> if (listOpen) false else { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
                     // On the list name, left/right page between lists; on the channels they close the panel.
                     // "Open" is the arrow pointing at the panel's side of the screen.
                     Key.DirectionLeft, Key.DirectionRight -> {
                         val step = if ((event.key == Key.DirectionRight) != rtl) 1 else -1
+                        // A held arrow repeats many times a second. Only paging the lists uses the
+                        // repeats; opening and closing the panel take the first press only, so a held
+                        // arrow opens the panel once and leaves it open instead of flashing it on and off.
+                        val held = event.nativeKeyEvent.repeatCount > 0
                         when {
                             listOpen && pickerOpen -> true
                             listOpen && nameFocused -> { stepList(step); true }
+                            held -> true
                             listOpen -> { overlayState = OverlayState.None; true }
                             showErrorCard -> false
                             // Either arrow brings the list up; the same arrow puts it away again.

@@ -89,6 +89,7 @@ import com.streamtv.R
 import com.streamtv.data.Channel
 import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
+import com.streamtv.data.hasFavorite
 import com.streamtv.data.detectedLanguage
 import com.streamtv.data.EpgProgram
 import java.text.SimpleDateFormat
@@ -201,7 +202,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             onIdle = { if (prompt != null) model.cancelPin(); question = null; optionsFor = null },
             options = cardChannel?.let { target ->
                 CardOptions(
-                    channel = target, starred = target.id in state.favorites, locked = target.key in state.locked,
+                    channel = target, starred = state.favorites.hasFavorite(target), locked = target.key in state.locked,
                     inHistory = target.key in state.recent
                 ) { option -> handleOption(target, option) }
             }
@@ -213,7 +214,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         // Movies and episodes get a real player: progress bar, seeking, pause, favourite; no zapping.
         val title = state.selected
         VodPlayerScreen(
-            channel = title, favorite = title.id in state.favorites, startAt = vodStart,
+            channel = title, favorite = state.favorites.hasFavorite(title), startAt = vodStart,
             onFavorite = { model.toggleFavorite(title) },
             onPosition = { position, duration -> model.savePosition(title, position, duration) },
             onExit = model::stopPlaying
@@ -331,9 +332,9 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
             "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
             "Favorites" -> {
-                ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
+                ScreenHeading("Favorites", "${state.channels.count { state.favorites.hasFavorite(it) }} ${t("saved channels")}")
                 Spacer(Modifier.height(20.dp))
-                ChannelGrid(state.channels.filter { it.id in state.favorites }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions)
+                ChannelGrid(state.channels.filter { state.favorites.hasFavorite(it) }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions)
             }
             "Search" -> SearchContent(state, model, returnKey, { returnKey = null }, openOptions)
             "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { request ->
@@ -443,7 +444,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     val stillValid = when {
         chosen.isBlank() -> false
         chosen == "__recent" -> recent.isNotEmpty()
-        chosen == "__favorites" -> live.any { it.id in state.favorites }
+        chosen == "__favorites" -> live.any { state.favorites.hasFavorite(it) }
         chosen.startsWith("__") -> true
         else -> categoryGroups.keys.any { it.equals(chosen, true) }
     }
@@ -454,7 +455,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     ).filter { it.third > 0 }
     val filtered = when {
         query == "__recent" -> recent
-        query == "__favorites" -> live.filter { it.id in state.favorites }
+        query == "__favorites" -> live.filter { state.favorites.hasFavorite(it) }
         query == "__all" -> live
         query == "__language_ar" -> live.filter { it.detectedLanguage() == "ar" }
         query == "__language_fr" -> live.filter { it.detectedLanguage() == "fr" }
@@ -477,8 +478,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), query == "__recent") { model.setSearchQuery("__recent") } }
                 }
-                if (state.favorites.any { favoriteId -> live.any { it.id == favoriteId } }) {
-                    item { FocusRow("Favorites", live.count { it.id in state.favorites }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
+                if (live.any { state.favorites.hasFavorite(it) }) {
+                    item { FocusRow("Favorites", live.count { state.favorites.hasFavorite(it) }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
                 }
                 item { FocusRow("All channels", live.size.toString(), query == "__all") { model.setSearchQuery("__all") } }
                 if (languageGroups.isNotEmpty()) {
@@ -551,7 +552,7 @@ private fun LibraryContent(
     val byKey = remember(titles) { titles.associateBy { it.key } }
     // History and favourites of this page only: channels keep theirs apart.
     val history = remember(byKey, state.recentVod) { state.recentVod.mapNotNull { byKey[it] } }
-    val favorites = remember(titles, state.favorites) { titles.filter { it.id in state.favorites } }
+    val favorites = remember(titles, state.favorites) { titles.filter { state.favorites.hasFavorite(it) } }
     val genres = remember(titles) { titles.groupBy { it.group.ifBlank { "Other" } }.toSortedMap() }
     val query = ui.search.trim()
     val chosen = ui.section
@@ -657,7 +658,7 @@ private fun PosterGrid(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 gridItems(titles, key = { it.key }) { item ->
-                    PosterCard(item, item.id in favorites, if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { onOpen(item) }
+                    PosterCard(item, favorites.hasFavorite(item), if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { onOpen(item) }
                 }
             }
             ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
@@ -726,7 +727,7 @@ private fun TitleDetails(
 ) {
     BackHandler { onClose() }
     val saved = state.positions[item.key]
-    val starred = item.id in state.favorites
+    val starred = state.favorites.hasFavorite(item)
     val primary = remember(item.key) { FocusRequester() }
     LaunchedEffect(item.key) {
         repeat(30) {
@@ -823,7 +824,7 @@ private fun TitleDetails(
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     items(more, key = { it.key }) { other ->
-                        PosterCard(other, other.id in state.favorites, Modifier.width(70.dp)) { onOpen(other) }
+                        PosterCard(other, state.favorites.hasFavorite(other), Modifier.width(70.dp)) { onOpen(other) }
                     }
                 }
                 }
@@ -1012,7 +1013,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, channel.id in favorites, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1232,7 +1233,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     gridItems(matches, key = { it.key }) { item ->
-                        PosterCard(item, item.id in state.favorites, onFocus = { posterFocus = item.key }) { model.select(item, matches, "Search results") }
+                        PosterCard(item, state.favorites.hasFavorite(item), onFocus = { posterFocus = item.key }) { model.select(item, matches, "Search results") }
                     }
                 }
                     ScrollIndicator(posterState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 14.dp))

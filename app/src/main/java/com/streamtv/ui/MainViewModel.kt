@@ -13,6 +13,7 @@ import com.streamtv.data.EpgProgram
 import com.streamtv.data.EpgRepository
 import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
+import com.streamtv.data.hasFavorite
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -465,11 +466,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         return true
     }
+    /** Favourites are kept per playlist entry, so two streams that share an id stay independent. */
     fun toggleFavorite(channel: Channel) {
         val f = _state.value.favorites.toMutableSet()
-        if (!f.add(channel.id)) f.remove(channel.id)
+        if (f.hasFavorite(channel)) {
+            if (f.remove(channel.id)) {
+                // An entry saved the old way, by the shared id: the other streams with that id stay.
+                _state.value.channels.filter { it.id == channel.id && it.key != channel.key }.forEach { f.add(it.key) }
+            }
+            f.remove(channel.key)
+        } else {
+            f.add(channel.key)
+        }
         _state.value = _state.value.copy(favorites = f)
         viewModelScope.launch { preferences.saveFavorites(f) }
+    }
+    /** Moves favourites saved by the old shared id over to the playlist entries that have that id. */
+    private fun moveOldFavorites(channels: List<Channel>) {
+        val saved = _state.value.favorites
+        if (saved.isEmpty() || channels.isEmpty()) return
+        val keys = channels.mapTo(HashSet()) { it.key }
+        val byId = channels.groupBy { it.id }
+        // Only entries that match this playlist are moved; others may belong to another playlist.
+        val old = saved.filter { it !in keys && byId.containsKey(it) }
+        if (old.isEmpty()) return
+        val updated = (saved - old.toSet()) + old.flatMap { id -> byId[id].orEmpty().map { it.key } }
+        _state.value = _state.value.copy(favorites = updated)
+        viewModelScope.launch { preferences.saveFavorites(updated) }
     }
     /** [openLive]: a playlist that was just added opens on Live TV once its channels are in. */
     fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false) {
@@ -478,6 +501,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching { repository.load(url) }.onSuccess { channels ->
                 _state.value = _state.value.copy(channels = channels, loading = false, selected = channels.firstOrNull())
+                moveOldFavorites(channels)
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
                 dao.clear()

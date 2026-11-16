@@ -8,6 +8,13 @@ data class Channel(
     val key: String get() = "$id|$url"
 }
 
+/**
+ * Favourites are kept per playlist entry (its [Channel.key]). Older versions kept the shared id
+ * instead, so taking one stream out of the favourites took out every stream with the same id;
+ * an entry saved that way still counts until it is moved over.
+ */
+fun Set<String>.hasFavorite(channel: Channel): Boolean = channel.key in this || channel.id in this
+
 
 fun Channel.detectedLanguage(): String {
     val explicit = language.lowercase()

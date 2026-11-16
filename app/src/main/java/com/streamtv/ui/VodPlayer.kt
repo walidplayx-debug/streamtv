@@ -111,7 +111,7 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val savePosition by rememberUpdatedState(onPosition)
     val player = remember(channel.url) {
-        ExoPlayer.Builder(context).build().apply {
+        Players.create(context).apply {
             setMediaItem(MediaItem.fromUri(channel.url), startAt.coerceAtLeast(0L))
             prepare()
             playWhenReady = true
