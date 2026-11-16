@@ -328,38 +328,22 @@ fun VodPlayerScreen(
                 enter = fadeIn(tween(220)) + slideInVertically(spring(dampingRatio = .82f, stiffness = 360f)) { it / 3 },
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 4 }
             ) {
+                // Slim: the title and the buttons on one line, the bar under them.
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(PanelFill)
-                        .border(1.dp, PanelEdge, RoundedCornerShape(28.dp))
-                        .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp)
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelFill)
+                        .border(1.dp, PanelEdge, RoundedCornerShape(24.dp))
+                        .padding(start = 22.dp, end = 18.dp, top = 10.dp, bottom = 10.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        ChannelLogo(channel.name, channel.logo, Modifier.size(width = 34.dp, height = 50.dp), fontSize = 12.sp, corner = 7.dp,
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(channel.name, color = VodWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                listOfNotNull(channel.group.takeIf { it.isNotBlank() }, if (!playing && !buffering) t("Paused") else null).joinToString("  ·  "),
-                                color = VodMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        if (subtitles.isNotEmpty()) {
-                            Text(
-                                t("Subtitles") + ": " + (if (chosenSubtitle < 0) t("Off") else subtitles[chosenSubtitle].label),
-                                color = VodMuted, fontSize = 13.sp, maxLines = 1
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    ProgressBar(position, duration, selected = row == 0)
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Text(channel.name, Modifier.weight(1f), color = VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         buttons.forEachIndexed { index, name ->
-                            if (index > 0) Spacer(Modifier.width(16.dp))
+                            if (index > 0) Spacer(Modifier.width(10.dp))
                             VodIconButton(name, playing = playing, favorite = favorite, subtitlesOn = chosenSubtitle >= 0, selected = row == 1 && button == index)
                         }
                     }
+                    Spacer(Modifier.height(6.dp))
+                    ProgressBar(position, duration, selected = row == 0)
                 }
             }
         }
@@ -377,21 +361,21 @@ private fun ProgressBar(position: Long, duration: Long, selected: Boolean) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val thumb by animateFloatAsState(if (selected) 1f else 0f, spring(stiffness = 500f), label = "thumb")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(formatTime(position), color = VodWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(72.dp))
-        Box(Modifier.weight(1f).height(18.dp), contentAlignment = Alignment.CenterStart) {
-            Canvas(Modifier.fillMaxWidth().height(18.dp)) {
+        Text(formatTime(position), color = VodWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(62.dp))
+        Box(Modifier.weight(1f).height(16.dp), contentAlignment = Alignment.CenterStart) {
+            Canvas(Modifier.fillMaxWidth().height(16.dp)) {
                 val y = size.height / 2f
-                val track = if (selected) 6.dp.toPx() else 4.dp.toPx()
+                val track = if (selected) 5.dp.toPx() else 3.dp.toPx()
                 drawLine(Color(0x40FFFFFF), Offset(0f, y), Offset(size.width, y), strokeWidth = track, cap = StrokeCap.Round)
                 drawLine(VodWhite, Offset(0f, y), Offset(size.width * fraction, y), strokeWidth = track, cap = StrokeCap.Round)
                 // The playhead grows in when the bar is selected (left/right seek).
-                drawCircle(VodWhite, radius = 3.dp.toPx() + 5.dp.toPx() * thumb, center = Offset(size.width * fraction, y))
+                drawCircle(VodWhite, radius = 2.dp.toPx() + 4.dp.toPx() * thumb, center = Offset(size.width * fraction, y))
             }
         }
         Text(
             if (duration > 0) "-" + formatTime((duration - position).coerceAtLeast(0L)) else "--:--",
-            color = VodMuted, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-            modifier = Modifier.width(80.dp).padding(start = 12.dp)
+            color = VodMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(72.dp).padding(start = 12.dp)
         )
     }
 }
@@ -401,21 +385,21 @@ private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, sub
     val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
     val big = name == "play"
     Box(
-        Modifier.size(if (big) 50.dp else 42.dp).scale(scale).clip(CircleShape)
+        Modifier.size(if (big) 40.dp else 34.dp).scale(scale).clip(CircleShape)
             .background(if (selected) VodWhite else Color(0x24FFFFFF))
             .border(1.dp, if (selected) Color.Transparent else Color(0x1FFFFFFF), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         val tint = if (selected) Color(0xFF1C1C1E) else VodWhite
         when (name) {
-            "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             // "CC" in a box; dimmed while subtitles are off.
             "subtitles" -> Box(
                 Modifier.border(1.5.dp, tint.copy(alpha = if (subtitlesOn) 1f else .5f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp)
             ) {
-                Text("CC", color = tint.copy(alpha = if (subtitlesOn) 1f else .5f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("CC", color = tint.copy(alpha = if (subtitlesOn) 1f else .5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
-            else -> Canvas(Modifier.size(if (big) 20.dp else 18.dp)) {
+            else -> Canvas(Modifier.size(if (big) 16.dp else 15.dp)) {
                 val w = size.width
                 val h = size.height
                 when {

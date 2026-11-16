@@ -47,6 +47,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.scale
@@ -104,6 +108,8 @@ private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(
 private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)))
 /** Dark glass: see-through black with a lit edge, brighter where the light falls (top left). */
 private val GlassFill = Brush.verticalGradient(listOf(Color(0xB3262931), Color(0xB3131519)))
+/** A darker glass, for the wider Movies menu. */
+private val GlassFillDeep = Brush.verticalGradient(listOf(Color(0xD91C1E24), Color(0xE00C0D10)))
 private val GlassEdge = Brush.linearGradient(listOf(Color(0x5CFFFFFF), Color(0x0FFFFFFF), Color(0x14FFFFFF), Color(0x38FFFFFF)))
 
 /** A short "pressed" pulse so an OK press is felt even when nothing else changes on screen. */
@@ -297,11 +303,10 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
 
     // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
-    // Every page but Settings sits on the softer, less black backdrop.
-    val softBackdrop = state.tab != "Settings"
+    // Every page sits on the softer, less black backdrop.
     Column(
         Modifier.fillMaxSize()
-            .background(if (softBackdrop) LibraryBackdrop else SolidColor(Ink))
+            .background(LibraryBackdrop)
             .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
     ) {
         // Back first returns to the tab bar; from the tab bar it leaves the app.
@@ -320,7 +325,8 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
         val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
         when (state.tab) {
-            "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
+            // The wider, darker menu is tried on Movies first.
+            "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, wideMenu = true)
             "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { it.id in state.favorites }} ${t("saved channels")}")
@@ -517,7 +523,9 @@ private class LibraryUi {
 @Composable
 private fun LibraryContent(
     kind: ChannelKind, state: TvState, model: MainViewModel, ui: LibraryUi,
-    restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long) -> Unit
+    restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long) -> Unit,
+    /** The menu reaches out further toward the screen edge and is darker. */
+    wideMenu: Boolean = false
 ) {
     val titles = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
     val name = if (kind == ChannelKind.Movie) "movies" else "series"
@@ -561,9 +569,16 @@ private fun LibraryContent(
         val menuState = rememberLazyListState()
         // A floating card of dark glass that never goes away.
         Box(
-            Modifier.width(210.dp).fillMaxHeight().padding(top = 4.dp, bottom = 6.dp)
+            Modifier.width(210.dp).fillMaxHeight()
+                // The wide menu grows toward the screen edge only; the posters keep their place.
+                .layout { measurable, constraints ->
+                    val extra = if (wideMenu) 40.dp.roundToPx() else 0
+                    val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
+                    layout(placeable.width - extra, placeable.height) { placeable.placeRelative(-extra, 0) }
+                }
+                .padding(top = 4.dp, bottom = 6.dp)
                 .shadow(22.dp, RoundedCornerShape(24.dp))
-                .clip(RoundedCornerShape(24.dp)).background(GlassFill)
+                .clip(RoundedCornerShape(24.dp)).background(if (wideMenu) GlassFillDeep else GlassFill)
                 .border(1.dp, GlassEdge, RoundedCornerShape(24.dp))
         ) {
             LazyColumn(
@@ -700,7 +715,16 @@ private fun TitleDetails(
         }
     }
     val more = remember(item.key, titles) { titles.filter { it.group == item.group && it.key != item.key }.take(24) }
-    Box(Modifier.fillMaxSize()) {
+    // The page eases in when a title opens.
+    val enter = remember(item.key) { Animatable(0f) }
+    LaunchedEffect(item.key) { enter.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+    // On the "More in" row, the poster and its details are pushed up under the tab bar, and the
+    // row takes their place; back up, they glide down again. Nothing shrinks.
+    var lower by remember(item.key) { mutableStateOf(false) }
+    val lift by animateFloatAsState(if (lower) 1f else 0f, tween(480, easing = FastOutSlowInEasing), label = "detailsLift")
+    var topHeight by remember { mutableStateOf(0) }
+    val gap = with(LocalDensity.current) { 16.dp.toPx() }
+    Box(Modifier.fillMaxSize().clipToBounds()) {
         // The poster, faint and wide, behind the page.
         AsyncImage(
             model = item.logo, contentDescription = null, contentScale = ContentScale.Crop,
@@ -708,8 +732,15 @@ private fun TitleDetails(
         )
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink))))
         // Everything fits on one screen: nothing scrolls away, so the buttons are always one press up.
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp)) {
-            Row {
+        Column(
+            Modifier.fillMaxSize()
+                .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+        ) {
+            Row(
+                Modifier.onSizeChanged { topHeight = it.height }
+                    .graphicsLayer { translationY = -(topHeight + gap) * lift; alpha = 1f - lift }
+            ) {
                 Box(
                     Modifier.width(124.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
                         .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
@@ -758,10 +789,11 @@ private fun TitleDetails(
             }
             if (more.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
+                Column(Modifier.graphicsLayer { translationY = -(topHeight + gap) * lift }) {
                 Text("${t("More in")} ${t(item.group.ifBlank { "Other" })}", color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 LazyRow(
                     // Up from this row always goes back to Play / Resume.
-                    modifier = Modifier.onPreviewKeyEvent { event ->
+                    modifier = Modifier.onFocusChanged { lower = it.hasFocus }.onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
                             runCatching { primary.requestFocus() }
                             true
@@ -773,6 +805,7 @@ private fun TitleDetails(
                     items(more, key = { it.key }) { other ->
                         PosterCard(other, other.id in state.favorites, Modifier.width(70.dp)) { onOpen(other) }
                     }
+                }
                 }
             }
         }
