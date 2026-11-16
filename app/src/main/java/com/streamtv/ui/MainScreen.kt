@@ -297,11 +297,11 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
 
     // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
-    val library = state.tab == "Movies" || state.tab == "Series"
+    // Every page but Settings sits on the softer, less black backdrop.
+    val softBackdrop = state.tab != "Settings"
     Column(
         Modifier.fillMaxSize()
-            // Movies and Series sit on a softer, less black backdrop, under their floating glass menu.
-            .background(if (library) LibraryBackdrop else SolidColor(Ink))
+            .background(if (softBackdrop) LibraryBackdrop else SolidColor(Ink))
             .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
     ) {
         // Back first returns to the tab bar; from the tab bar it leaves the app.
