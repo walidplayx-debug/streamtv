@@ -96,26 +96,18 @@ private val Surface = Color(0xFF0C0C0E)
 private val Raised = Color(0xFF1C1C1E)
 private val White = Color(0xFFFFFFFF)
 private val Muted = Color(0xFF99999E)
-// Warm orange, from the S of the logo: picked values, check marks, the focus.
-private val Accent = Color(0xFFF2683F)
-private val Glass = Color(0xFF3A3B3F)
+private val Accent = Color(0xFFD5DADF)
+private val Glass = Color(0xFF29292C)
 
 /** Something destructive waiting for the viewer to say yes. */
 private class ConfirmRequest(val question: String, val subject: String, val confirmLabel: String, val action: () -> Unit)
 
 /** One focus colour for every control: the soft sky blue of the tab pills. */
-private val FocusBrush = Brush.verticalGradient(listOf(Color(0xFFF27A50), Color(0xFFDC5530)))
-private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFFFA483), Color(0xFFF27A50)))
-/** Warm graphite, a little lighter at the top. */
-private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF3A3B3F), Color(0xFF2A2B2E), Color(0xFF1D1E20)))
-/** A soft orange glow rising from the bottom-left corner, over the graphite. */
-private val WarmGlow = Brush.linearGradient(
-    0f to Color(0x47C2652E), .55f to Color.Transparent,
-    start = androidx.compose.ui.geometry.Offset(0f, Float.POSITIVE_INFINITY),
-    end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, 0f)
-)
+private val FocusBrush = Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
+private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)))
+private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)))
 /** Dark glass: see-through black with a lit edge, brighter where the light falls (top left). */
-private val GlassFill = Brush.verticalGradient(listOf(Color(0x59202124), Color(0x73151618)))
+private val GlassFill = Brush.verticalGradient(listOf(Color(0xB3262931), Color(0xB3131519)))
 private val GlassEdge = Brush.linearGradient(listOf(Color(0x5CFFFFFF), Color(0x0FFFFFFF), Color(0x14FFFFFF), Color(0x38FFFFFF)))
 
 /** A short "pressed" pulse so an OK press is felt even when nothing else changes on screen. */
@@ -312,7 +304,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // Every page sits on the softer, less black backdrop.
     Column(
         Modifier.fillMaxSize()
-            .background(LibraryBackdrop).background(WarmGlow)
+            .background(LibraryBackdrop)
             .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
     ) {
         // Back first returns to the tab bar; from the tab bar it leaves the app.
@@ -421,7 +413,7 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
         var fontSize by remember(label) { mutableStateOf(16f) }
         Text(
             label,
-            color = if (selected && !focused && !pressed) Accent else White.copy(alpha = if (focused) .98f else .72f),
+            color = White.copy(alpha = if (focused || selected) .98f else .72f),
             fontSize = fontSize.sp,
             maxLines = 1,
             softWrap = false,
@@ -754,7 +746,7 @@ private fun TitleDetails(
             model = item.logo, contentDescription = null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).graphicsLayer { alpha = .14f }
         )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF232427)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink))))
         // Everything fits on one screen: nothing scrolls away, so the buttons are always one press up.
         Column(
             Modifier.fillMaxSize()
@@ -887,7 +879,7 @@ private fun WelcomeScreen(
         }
     }
     Box(
-        Modifier.fillMaxSize().background(LibraryBackdrop).background(WarmGlow),
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1035,7 +1027,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)
             .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF5C5D62), Color(0xFF3E3F43)) else listOf(Color(0xFF45464A), Color(0xFF303134))))
+            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF465064), Color(0xFF2B3240)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (focused) .16f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
