@@ -1262,13 +1262,9 @@ private fun SettingsContent(
         Box(Modifier.weight(1f).fillMaxHeight()) {
         ScrollIndicator(pageScroll, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
         Column(Modifier.fillMaxSize().padding(end = 14.dp).verticalScroll(pageScroll)) {
-            // The tab already says "Settings" and the Playlist page opens with its own heading.
-            if (section != "Playlist") {
-                Text(t(section), color = White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(18.dp))
-            } else {
-                Spacer(Modifier.height(6.dp))
-            }
+            // No page heading: the lit section box already says where you are. The first row lines up
+            // with the first section box.
+            Spacer(Modifier.height(10.dp))
             when (section) {
                 "Playlist" -> {
                     val counts = remember(state.channels) { state.channels.groupingBy { it.kind() }.eachCount() }
@@ -1339,8 +1335,6 @@ private fun SettingsContent(
                 }
                 "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
                 "Language" -> {
-                    Text(t("Interface language"), color = Muted, fontSize = 16.sp)
-                    Spacer(Modifier.height(10.dp))
                     // Two even columns of boxes: all ten languages fit without scrolling.
                     for (pair in AppLanguages.chunked(2)) {
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
