@@ -8,6 +8,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -80,8 +82,12 @@ private val VodMuted = Color(0xFFB5B5BA)
 private const val SeekStepMillis = 10_000L
 private const val ControlsMillis = 4_500L
 
-/** The buttons under the progress bar, in order. */
-private val VodButtons = listOf("back10", "play", "fwd10", "favorite")
+/** Glass like the live info bar: a dark see-through panel with a lit edge. */
+private val PanelFill = Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429)))
+private val PanelEdge = Brush.linearGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF), Color(0x1FFFFFFF), Color(0x47FFFFFF)))
+
+/** One subtitle track found in the file. */
+private class TextTrack(val label: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 
 /**
  * The movie and episode player: a progress bar with times, rewind / play-pause / forward, and the
@@ -122,6 +128,31 @@ fun VodPlayerScreen(
     var button by remember { mutableIntStateOf(1) }
     var touch by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
+    // Subtitles carried inside the file. The one in the app's language is picked by itself.
+    var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
+    var subtitlesOff by remember { mutableStateOf(false) }
+    val appLanguage = LocalAppLanguage.current
+    LaunchedEffect(player, appLanguage) {
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setPreferredTextLanguage(appLanguage).build()
+    }
+    val buttons = if (subtitles.isEmpty()) listOf("back10", "play", "fwd10", "favorite")
+        else listOf("back10", "play", "fwd10", "favorite", "subtitles")
+    val chosenSubtitle = if (subtitlesOff) -1 else subtitles.indexOfFirst { it.selected }
+    fun nextSubtitle() {
+        // Off -> first track -> second -> ... -> off.
+        val next = chosenSubtitle + 1
+        val params = player.trackSelectionParameters.buildUpon()
+        if (next >= subtitles.size) {
+            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            subtitlesOff = true
+        } else {
+            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(androidx.media3.common.TrackSelectionOverride(subtitles[next].group, 0))
+            subtitlesOff = false
+        }
+        player.trackSelectionParameters = params.build()
+    }
 
     fun save() {
         val length = player.duration
@@ -145,6 +176,7 @@ fun VodPlayerScreen(
             "fwd10" -> seek(SeekStepMillis)
             "play" -> togglePlay()
             "favorite" -> { onFavorite(); show() }
+            "subtitles" -> { nextSubtitle(); show() }
         }
     }
     fun leave() { save(); onExit() }
@@ -158,6 +190,16 @@ fun VodPlayerScreen(
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
             override fun onPlayerError(error: PlaybackException) { failed = true; buffering = false; controls = true }
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                subtitles = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isSupported }.mapIndexed { index, group ->
+                    val format = group.getTrackFormat(0)
+                    val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
+                    val label = format.label?.takeIf { it.isNotBlank() }
+                        ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
+                        ?: "${index + 1}"
+                    TextTrack(label, group.mediaTrackGroup, group.isSelected)
+                }
+            }
         }
         player.addListener(listener)
         onDispose { save(); player.removeListener(listener); player.release() }
@@ -221,7 +263,7 @@ fun VodPlayerScreen(
                             when {
                                 failed -> { if (controls) { row = 1; button = if (forward) 1 else 0 }; show() }
                                 !controls || row == 0 -> seek(if (forward) SeekStepMillis else -SeekStepMillis)
-                                else -> { button = (button + if (forward) 1 else -1).coerceIn(0, VodButtons.lastIndex); show() }
+                                else -> { button = (button + if (forward) 1 else -1).coerceIn(0, buttons.lastIndex); show() }
                             }
                             true
                         }
@@ -232,7 +274,7 @@ fun VodPlayerScreen(
                             when {
                                 failed -> if (button == 0) leave() else { failed = false; player.prepare(); player.play(); show() }
                                 !controls || row == 0 -> togglePlay()
-                                else -> press(VodButtons[button])
+                                else -> press(buttons[button.coerceIn(0, buttons.lastIndex)])
                             }
                             true
                         }
@@ -279,33 +321,43 @@ fun VodPlayerScreen(
                 }
             }
 
-            // Top: the title. Bottom: the bar and the buttons. Both fade together.
+            // One glass panel, like the live info bar: the title, the bar and the buttons together.
             AnimatedVisibility(
-                visible = controls && !failed, modifier = Modifier.fillMaxSize(),
-                enter = fadeIn(tween(200)), exit = fadeOut(tween(260))
+                visible = controls && !failed,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp).fillMaxWidth(.74f),
+                enter = fadeIn(tween(220)) + slideInVertically(spring(dampingRatio = .82f, stiffness = 360f)) { it / 3 },
+                exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 4 }
             ) {
-                Box(Modifier.fillMaxSize()) {
-                    Box(
-                        Modifier.fillMaxWidth().height(140.dp).align(Alignment.TopCenter)
-                            .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-                    ) {
-                        Text(
-                            channel.name, Modifier.padding(start = 56.dp, end = 56.dp, top = 34.dp),
-                            color = VodWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis
-                        )
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(PanelFill)
+                        .border(1.dp, PanelEdge, RoundedCornerShape(28.dp))
+                        .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ChannelLogo(channel.name, channel.logo, Modifier.size(width = 34.dp, height = 50.dp), fontSize = 12.sp, corner = 7.dp,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(channel.name, color = VodWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(channel.group.takeIf { it.isNotBlank() }, if (!playing && !buffering) t("Paused") else null).joinToString("  ·  "),
+                                color = VodMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (subtitles.isNotEmpty()) {
+                            Text(
+                                t("Subtitles") + ": " + (if (chosenSubtitle < 0) t("Off") else subtitles[chosenSubtitle].label),
+                                color = VodMuted, fontSize = 13.sp, maxLines = 1
+                            )
+                        }
                     }
-                    Column(
-                        Modifier.fillMaxWidth().align(Alignment.BottomCenter)
-                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-                            .padding(start = 56.dp, end = 56.dp, top = 60.dp, bottom = 34.dp)
-                    ) {
-                        ProgressBar(position, duration, selected = row == 0)
-                        Spacer(Modifier.height(18.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            VodButtons.forEachIndexed { index, name ->
-                                if (index > 0) Spacer(Modifier.width(18.dp))
-                                VodIconButton(name, playing = playing, favorite = favorite, selected = row == 1 && button == index)
-                            }
+                    Spacer(Modifier.height(12.dp))
+                    ProgressBar(position, duration, selected = row == 0)
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        buttons.forEachIndexed { index, name ->
+                            if (index > 0) Spacer(Modifier.width(16.dp))
+                            VodIconButton(name, playing = playing, favorite = favorite, subtitlesOn = chosenSubtitle >= 0, selected = row == 1 && button == index)
                         }
                     }
                 }
@@ -345,18 +397,25 @@ private fun ProgressBar(position: Long, duration: Long, selected: Boolean) {
 }
 
 @Composable
-private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, selected: Boolean) {
+private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean) {
     val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
     val big = name == "play"
     Box(
-        Modifier.size(if (big) 64.dp else 52.dp).scale(scale).clip(CircleShape)
-            .background(if (selected) VodWhite else Color(0x33FFFFFF)),
+        Modifier.size(if (big) 50.dp else 42.dp).scale(scale).clip(CircleShape)
+            .background(if (selected) VodWhite else Color(0x24FFFFFF))
+            .border(1.dp, if (selected) Color.Transparent else Color(0x1FFFFFFF), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         val tint = if (selected) Color(0xFF1C1C1E) else VodWhite
         when (name) {
-            "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            else -> Canvas(Modifier.size(if (big) 24.dp else 22.dp)) {
+            "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            // "CC" in a box; dimmed while subtitles are off.
+            "subtitles" -> Box(
+                Modifier.border(1.5.dp, tint.copy(alpha = if (subtitlesOn) 1f else .5f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp)
+            ) {
+                Text("CC", color = tint.copy(alpha = if (subtitlesOn) 1f else .5f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            else -> Canvas(Modifier.size(if (big) 20.dp else 18.dp)) {
                 val w = size.width
                 val h = size.height
                 when {

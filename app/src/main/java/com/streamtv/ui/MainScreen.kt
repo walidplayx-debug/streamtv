@@ -101,6 +101,10 @@ private class ConfirmRequest(val question: String, val subject: String, val conf
 /** One focus colour for every control: the soft sky blue of the tab pills. */
 private val FocusBrush = Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
 private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)))
+private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)))
+/** Dark glass: see-through black with a lit edge, brighter where the light falls (top left). */
+private val GlassFill = Brush.verticalGradient(listOf(Color(0xB3262931), Color(0xB3131519)))
+private val GlassEdge = Brush.linearGradient(listOf(Color(0x5CFFFFFF), Color(0x0FFFFFFF), Color(0x14FFFFFF), Color(0x38FFFFFF)))
 
 /** A short "pressed" pulse so an OK press is felt even when nothing else changes on screen. */
 @Composable
@@ -293,7 +297,13 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
 
     // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
-    Column(Modifier.fillMaxSize().background(Ink).padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)) {
+    val library = state.tab == "Movies" || state.tab == "Series"
+    Column(
+        Modifier.fillMaxSize()
+            // Movies and Series sit on a softer, less black backdrop, under their floating glass menu.
+            .background(if (library) LibraryBackdrop else SolidColor(Ink))
+            .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
+    ) {
         // Back first returns to the tab bar; from the tab bar it leaves the app.
         val tabFocus = remember { FocusRequester() }
         var topBarFocused by remember { mutableStateOf(false) }
@@ -549,25 +559,35 @@ private fun LibraryContent(
     }
     Row(Modifier.fillMaxSize()) {
         val menuState = rememberLazyListState()
-        Box(Modifier.width(230.dp).fillMaxHeight()) {
-            LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // A floating card of dark glass that never goes away.
+        Box(
+            Modifier.width(210.dp).fillMaxHeight().padding(top = 4.dp, bottom = 6.dp)
+                .shadow(22.dp, RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(24.dp)).background(GlassFill)
+                .border(1.dp, GlassEdge, RoundedCornerShape(24.dp))
+        ) {
+            LazyColumn(
+                state = menuState, modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 10.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
                 item { LibrarySearch(ui.search, if (kind == ChannelKind.Movie) "Search movies" else "Search series") { ui.search = it } }
                 item { Spacer(Modifier.height(4.dp)) }
-                item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+                item { MenuRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
                 if (history.isNotEmpty()) {
-                    item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
+                    item { MenuRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
                 }
                 if (favorites.isNotEmpty()) {
-                    item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
+                    item { MenuRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
                 }
-                item { Text(t("GENRES"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                item { Text(t("GENRES"), color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)) }
                 items(genres.toList()) { (genre, list) ->
-                    FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
+                    MenuRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
                 }
             }
-            ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+            ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 18.dp, bottom = 18.dp, end = 4.dp))
         }
-        Spacer(Modifier.width(24.dp))
+        Spacer(Modifier.width(22.dp))
         Box(Modifier.weight(1f).fillMaxHeight()) {
             if (shown.isEmpty()) {
                 Text(t(if (query.isNotEmpty()) "No results" else "Nothing here yet"), color = Muted, fontSize = 18.sp, modifier = Modifier.align(Alignment.Center))
@@ -633,18 +653,18 @@ private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit
         }
     }
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp).height(50.dp).clip(CircleShape)
-            .background(if (focused || editing) FocusBrush else SolidColor(Glass.copy(alpha = .72f)))
-            .border(1.dp, White.copy(alpha = if (focused || editing) .5f else .12f), CircleShape)
+        Modifier.fillMaxWidth().padding(vertical = 2.dp).height(40.dp).clip(CircleShape)
+            .background(if (focused || editing) FocusBrush else SolidColor(White.copy(alpha = .07f)))
+            .border(1.dp, White.copy(alpha = if (focused || editing) .5f else .10f), CircleShape)
             .focusRequester(bar).onFocusChanged { focused = it.isFocused }
             .clickable { editing = true }
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (editing) {
             BasicTextField(
                 value = text, onValueChange = onChange, singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 17.sp),
+                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 15.sp),
                 cursorBrush = SolidColor(White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { finish() }),
@@ -657,7 +677,7 @@ private fun LibrarySearch(text: String, hint: String, onChange: (String) -> Unit
         } else {
             Text(
                 if (text.isEmpty()) t(hint) else text, Modifier.weight(1f),
-                color = if (text.isEmpty()) White.copy(alpha = .6f) else White, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                color = if (text.isEmpty()) White.copy(alpha = .55f) else White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -687,10 +707,11 @@ private fun TitleDetails(
             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).graphicsLayer { alpha = .14f }
         )
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink))))
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
+        // Everything fits on one screen: nothing scrolls away, so the buttons are always one press up.
+        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp)) {
             Row {
                 Box(
-                    Modifier.width(160.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                    Modifier.width(124.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
                         .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
                 ) {
                     ChannelLogo(
@@ -700,7 +721,7 @@ private fun TitleDetails(
                 }
                 Spacer(Modifier.width(34.dp))
                 Column(Modifier.weight(1f).padding(top = 6.dp)) {
-                    Text(item.name, color = White, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 38.sp)
+                    Text(item.name, color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 36.sp)
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -723,7 +744,7 @@ private fun TitleDetails(
                             Text("${formatTime((saved.second - saved.first).coerceAtLeast(0L))} ${t("left")}", color = Muted, fontSize = 15.sp)
                         }
                     }
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         if (saved != null) {
                             WhiteButton("Resume", Modifier.focusRequester(primary)) { onPlay(saved.first) }
@@ -736,14 +757,21 @@ private fun TitleDetails(
                 }
             }
             if (more.isNotEmpty()) {
-                Spacer(Modifier.height(26.dp))
-                Text("${t("More in")} ${t(item.group.ifBlank { "Other" })}", color = White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(16.dp))
+                Text("${t("More in")} ${t(item.group.ifBlank { "Other" })}", color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                    // Up from this row always goes back to Play / Resume.
+                    modifier = Modifier.onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                            runCatching { primary.requestFocus() }
+                            true
+                        } else false
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     items(more, key = { it.key }) { other ->
-                        PosterCard(other, other.id in state.favorites, Modifier.width(86.dp)) { onOpen(other) }
+                        PosterCard(other, other.id in state.favorites, Modifier.width(70.dp)) { onOpen(other) }
                     }
                 }
             }
@@ -1338,6 +1366,26 @@ private fun FocusRow(title: String, trailing: String, selected: Boolean, onClick
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal)
         Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
+    }
+}
+
+/** A compact row of the Movies / Series glass menu. */
+@Composable
+private fun MenuRow(title: String, trailing: String, selected: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(if (pressed) .97f else if (focused) 1.03f else 1f, spring(stiffness = 430f), label = "menuRowScale")
+    Row(
+        Modifier.fillMaxWidth().scale(scale).clip(RoundedCornerShape(12.dp))
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
+            .onFocusChanged { focused = it.isFocused }.clickable(onClick = press)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .62f), fontSize = 15.sp,
+            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(6.dp))
+        Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 12.sp)
     }
 }
 
