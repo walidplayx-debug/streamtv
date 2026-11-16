@@ -14,6 +14,7 @@ import com.streamtv.data.EpgRepository
 import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
 import com.streamtv.data.hasFavorite
+import com.streamtv.data.LogoIndex
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,18 +69,25 @@ data class TvState(
     /** Movies and episodes watched, newest first (apart from the channels' [recent]). */
     val recentVod: List<String> = emptyList(),
     /** Where each movie or episode was left (key -> position to duration, in milliseconds). */
-    val positions: Map<String, Pair<Long, Long>> = emptyMap()
+    val positions: Map<String, Pair<Long, Long>> = emptyMap(),
+    /** Goes up when the public logo index is ready, so the lists pick up the logos it fills in. */
+    val logoVersion: Int = 0
 )
 
-/** Applies the viewer's hidden channels and custom names to a list, remembering the last result. */
+/**
+ * Applies the viewer's hidden channels and custom names to a list, and fills in logos from the
+ * public index for channels the playlist gives none, remembering the last result.
+ */
 private class ChannelView {
     private var list: List<Channel>? = null
     private var hidden: Set<String>? = null
     private var names: Map<String, String>? = null
+    private var logos: Int = -1
     private var result: List<Channel> = emptyList()
-    fun of(list: List<Channel>, hidden: Set<String>, names: Map<String, String>): List<Channel> {
-        if (list === this.list && hidden === this.hidden && names === this.names) return result
-        this.list = list; this.hidden = hidden; this.names = names
+    fun of(source: List<Channel>, hidden: Set<String>, names: Map<String, String>, logos: Int): List<Channel> {
+        if (source === this.list && hidden === this.hidden && names === this.names && logos == this.logos) return result
+        this.list = source; this.hidden = hidden; this.names = names; this.logos = logos
+        val list = LogoIndex.fill(source)
         result = if (hidden.isEmpty() && names.isEmpty()) list else list.mapNotNull { channel ->
             val key = channel.key
             if (key in hidden) null else names[key]?.let { channel.copy(name = it) } ?: channel
@@ -104,12 +112,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
-            channels = channelsView.of(raw.channels, raw.hidden, raw.names),
-            queue = queueView.of(raw.queue, raw.hidden, raw.names),
-            selected = raw.selected?.let { channel -> raw.names[channel.key]?.let { channel.copy(name = it) } ?: channel }
+            channels = channelsView.of(raw.channels, raw.hidden, raw.names, raw.logoVersion),
+            queue = queueView.of(raw.queue, raw.hidden, raw.names, raw.logoVersion),
+            selected = raw.selected?.let { LogoIndex.fill(listOf(it)).first() }
+                ?.let { channel -> raw.names[channel.key]?.let { channel.copy(name = it) } ?: channel }
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TvState())
     init {
+        // Logos for channels without one: read once at start (downloaded at most once a week).
+        viewModelScope.launch {
+            if (LogoIndex.load(getApplication())) _state.value = _state.value.copy(logoVersion = _state.value.logoVersion + 1)
+        }
         viewModelScope.launch { preferences.hiddenKeys.collect { keys -> _state.value = _state.value.copy(hidden = keys) } }
         viewModelScope.launch { preferences.lockedKeys.collect { keys -> _state.value = _state.value.copy(locked = keys) } }
         viewModelScope.launch { preferences.channelNames.collect { names -> _state.value = _state.value.copy(names = names) } }

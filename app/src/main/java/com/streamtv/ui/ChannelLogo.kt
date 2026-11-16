@@ -1,7 +1,14 @@
 package com.streamtv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +25,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -43,15 +52,21 @@ fun ChannelLogo(
     corner: Dp = 10.dp,
     placeholder: Brush = Brush.linearGradient(listOf(Color(0xFF3A3A3D), Color(0xFF242426))),
     logoPadding: Dp = 0.dp,
-    contentScale: ContentScale = ContentScale.Fit
+    contentScale: ContentScale = ContentScale.Fit,
+    /** When given, a channel without a logo shows its name under its category's colour instead of initials. */
+    group: String? = null
 ) {
     var loaded by remember(logo) { mutableStateOf(false) }
     var failed by remember(logo) { mutableStateOf(false) }
     val hasLogo = !logo.isNullOrBlank() && !failed
     Box(modifier.clip(RoundedCornerShape(corner)), contentAlignment = Alignment.Center) {
         if (!hasLogo || !loaded) {
-            Box(Modifier.fillMaxSize().background(placeholder), contentAlignment = Alignment.Center) {
-                Text(channelInitials(name), color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold, maxLines = 1)
+            if (group != null) {
+                CategoryFace(name, group)
+            } else {
+                Box(Modifier.fillMaxSize().background(placeholder), contentAlignment = Alignment.Center) {
+                    Text(channelInitials(name), color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
             }
         }
         if (hasLogo) {
@@ -63,6 +78,49 @@ fun ChannelLogo(
                 onSuccess = { loaded = true },
                 onError = { failed = true }
             )
+        }
+    }
+}
+
+/** A colour for a playlist category, found from words in its name (in English, French or Arabic). */
+private fun categoryColor(group: String): Color {
+    val g = group.lowercase()
+    fun has(vararg words: String) = words.any { it in g }
+    return when {
+        has("news", "info", "أخبار", "اخبار", "actualit") -> Color(0xFF3B82F6)
+        has("sport", "رياض", "bein", "foot", "soccer") -> Color(0xFF22C55E)
+        has("movie", "film", "cinema", "ciné", "أفلام", "افلام", "سينما") -> Color(0xFFF59E0B)
+        has("kid", "child", "cartoon", "anim", "enfant", "أطفال", "اطفال", "كرتون") -> Color(0xFFEC4899)
+        has("music", "musique", "أغاني", "اغاني", "موسيق") -> Color(0xFF06B6D4)
+        has("docu", "nature", "science", "وثائق", "علوم") -> Color(0xFF14B8A6)
+        has("relig", "islam", "quran", "coran", "دين", "قرآن", "قران") -> Color(0xFF84CC16)
+        has("series", "série", "drama", "مسلسل", "دراما") -> Color(0xFFA855F7)
+        else -> Color(0xFF94A3B8)
+    }
+}
+
+/**
+ * The face of a channel without a logo: a coloured stripe and the category on the start side,
+ * the channel's full name under it, large enough to read from the sofa.
+ */
+@Composable
+private fun CategoryFace(name: String, group: String) {
+    val color = categoryColor(group)
+    val label = group.split(';', '|', '/').firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    Row(
+        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF30353F), Color(0xFF22262E))))
+            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+    ) {
+        Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(color))
+        Spacer(Modifier.width(7.dp))
+        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
+            if (label.isNotEmpty()) {
+                Text(label.uppercase(), color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, letterSpacing = .4.sp)
+                Spacer(Modifier.height(2.dp))
+            }
+            Text(name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+                overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
         }
     }
 }

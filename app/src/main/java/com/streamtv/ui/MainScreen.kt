@@ -1085,7 +1085,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
     ) {
         ChannelLogo(
             channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
-            placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp
+            placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
+            group = channel.group
         )
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
