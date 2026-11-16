@@ -1057,33 +1057,17 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
             channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp
         )
-        if (favorite) FavoriteCorner(Modifier.align(Alignment.TopEnd).size(34.dp))
+        if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
 }
 
-/**
- * A favourite's mark: a quarter disc of milky glass set into the tile's top corner (the tile's own
- * outline cuts it, so the tile keeps its shape), with a star engraved in its middle.
- */
+/** A favourite's mark: a star engraved into the tile itself, nothing laid over it. */
 @Composable
-private fun FavoriteCorner(modifier: Modifier = Modifier) {
+private fun FavoriteStar(modifier: Modifier = Modifier) {
     Canvas(modifier) {
-        val r = size.width
-        val corner = Offset(size.width, 0f)
-        // A soft shadow on the tile, under the curve.
-        drawCircle(Color.Black.copy(alpha = .22f), radius = r + 3.dp.toPx(), center = Offset(corner.x - 1.dp.toPx(), corner.y + 2.dp.toPx()))
-        // Glass: a light veil, a little whiter at the corner; what lies under it still shows through.
-        drawCircle(
-            Brush.linearGradient(listOf(Color.White.copy(alpha = .58f), Color(0xFFDDE1E8).copy(alpha = .40f)), start = corner, end = Offset(0f, r)),
-            radius = r, center = corner
-        )
-        // The lit edge of the glass along the curve.
-        drawCircle(Color.White.copy(alpha = .75f), radius = r - .5.dp.toPx(), center = corner, style = Stroke(width = 1.dp.toPx()))
-        // The star, cut in: centred on the corner's diagonal, halfway out.
-        val d = r * .5f * .7071f
-        val cx = corner.x - d
-        val cy = d
-        val outer = r * .22f
+        val cx = size.width / 2f
+        val cy = size.height / 2f + size.height * .04f
+        val outer = size.width / 2f
         fun star(dx: Float, dy: Float) = Path().apply {
             for (i in 0 until 10) {
                 val rr = if (i % 2 == 0) outer else outer * .45f
@@ -1095,9 +1079,9 @@ private fun FavoriteCorner(modifier: Modifier = Modifier) {
             close()
         }
         val lip = 1.dp.toPx()
-        drawPath(star(lip, lip), Color.White.copy(alpha = .85f))     // the lower lip catches the light
-        drawPath(star(-lip, -lip), Color(0xB33A3E48))                  // the upper lip is in shade
-        drawPath(star(0f, 0f), Brush.verticalGradient(listOf(Color(0xE6767B86), Color(0xE6A3A8B2)), startY = cy - outer, endY = cy + outer))
+        drawPath(star(lip, lip), Color.White.copy(alpha = .22f))   // the lower lip catches the light
+        drawPath(star(-lip, -lip), Color.Black.copy(alpha = .35f)) // the upper lip is in shade
+        drawPath(star(0f, 0f), Color.White.copy(alpha = .28f))     // the cut itself, a shade of the tile
     }
 }
 
