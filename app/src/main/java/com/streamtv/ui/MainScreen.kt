@@ -101,8 +101,6 @@ import java.util.Date
 import java.util.Locale
 
 private val Ink = Color(0xFF000000)
-private val Surface = Color(0xFF0C0C0E)
-private val Raised = Color(0xFF1C1C1E)
 private val White = Color(0xFFFFFFFF)
 private val Muted = Color(0xFF99999E)
 private val Accent = Color(0xFFD5DADF)
@@ -1598,19 +1596,4 @@ private fun WhiteButton(text: String, modifier: Modifier = Modifier, onClick: ()
         .clickable(onClick = press).padding(horizontal = 26.dp, vertical = 14.dp)) {
         Text(t(text), color = if (focused && !pressed) White else Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
     }
-}
-
-@Composable
-private fun GlassInput(value: String, hint: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.clip(RoundedCornerShape(16.dp)).background(Glass).border(1.dp, White.copy(alpha = .10f), RoundedCornerShape(16.dp)).padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        BasicTextField(value = value, onValueChange = onValueChange, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp), modifier = Modifier.fillMaxWidth(), decorationBox = { inner ->
-            if (value.isEmpty()) Text(t(hint), color = Muted, fontSize = 18.sp)
-            inner()
-        })
-    }
-}
-
-private fun currentProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
-    val now = System.currentTimeMillis()
-    return programs.firstOrNull { (it.channelId == channel.id || it.channelId.equals(channel.name, true)) && it.startEpochMillis <= now && it.endEpochMillis > now }
 }
