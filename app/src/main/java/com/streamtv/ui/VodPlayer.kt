@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -204,23 +205,41 @@ fun VodPlayerScreen(
         player.addListener(listener)
         onDispose { save(); player.removeListener(listener); player.release() }
     }
-    // Home (or anything that takes the app off screen) pauses; the place is kept.
+    // Home (or anything that takes the app off screen) stops the title completely: no download,
+    // no decoder held. The place is kept; coming back, the title is ready again, paused there.
     val lifecycleOwner = LocalLifecycleOwner.current
+    val stoppedInBackground = remember(player) { booleanArrayOf(false) }
     DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) { save(); player.pause() }
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    save()
+                    stoppedInBackground[0] = true
+                    player.playWhenReady = false
+                    player.stop()
+                }
+                Lifecycle.Event.ON_START -> if (stoppedInBackground[0]) {
+                    stoppedInBackground[0] = false
+                    player.prepare()
+                    controls = true
+                }
+                else -> Unit
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     // The clock under the bar, and a saved place every half minute in case the TV is switched off.
-    LaunchedEffect(player) {
-        var ticks = 0
-        while (true) {
-            position = player.currentPosition
-            duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
-            if (++ticks % 60 == 0) save()
-            delay(500)
+    // Only while on screen.
+    LaunchedEffect(player, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var ticks = 0
+            while (true) {
+                position = player.currentPosition
+                duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+                if (++ticks % 60 == 0) save()
+                delay(500)
+            }
         }
     }
     // The controls step away on their own while the title plays.
@@ -287,6 +306,8 @@ fun VodPlayerScreen(
                 factory = {
                     PlayerView(it).apply {
                         this.player = player
+                        // The screen stays on while a title is on screen, not while browsing menus.
+                        keepScreenOn = true
                         useController = false
                         isFocusable = false
                         setShutterBackgroundColor(android.graphics.Color.BLACK)

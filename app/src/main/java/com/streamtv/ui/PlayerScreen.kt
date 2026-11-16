@@ -390,6 +390,8 @@ fun PlayerScreen(
             factory = {
                 PlayerView(it).apply {
                     this.player = player
+                    // The screen stays on while a channel is on screen, not while browsing menus.
+                    keepScreenOn = true
                     useController = false
                     isFocusable = false
                     setShutterBackgroundColor(android.graphics.Color.BLACK)

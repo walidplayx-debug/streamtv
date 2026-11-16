@@ -1,6 +1,5 @@
 package com.streamtv
 import android.os.Bundle
-import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,7 +17,8 @@ class MainActivity : ComponentActivity() {
     private val model: MainViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // No screen-on flag for the whole app: the players keep the screen on while something plays,
+        // and the TV may dim or sleep as usual while the menus sit idle.
         // TV keyboards float over the window; text entry has its own top-aligned screen instead.
         window.setSoftInputMode(SOFT_INPUT_ADJUST_NOTHING)
         setContent {

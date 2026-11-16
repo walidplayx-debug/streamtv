@@ -56,6 +56,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -138,10 +139,14 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // The channel to put focus back on when the player closes.
     var returnKey by remember { mutableStateOf<String?>(null) }
     // Looks for a newer version now and then, for the red mark on Settings.
-    LaunchedEffect(Unit) {
-        while (true) {
-            UpdateNotice.refresh()
-            kotlinx.coroutines.delay(6 * 60 * 60 * 1000L)
+    // Only while the app is on screen: nothing runs after Home.
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                UpdateNotice.refresh()
+                kotlinx.coroutines.delay(6 * 60 * 60 * 1000L)
+            }
         }
     }
     // The Movies and Series pages keep their place (menu choice, open title) while a title plays.
@@ -392,10 +397,14 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
 @Composable
 private fun Clock() {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(60_000L - System.currentTimeMillis() % 60_000L + 100L)
-            now = System.currentTimeMillis()
+    // Ticks only while the app is on screen.
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(60_000L - System.currentTimeMillis() % 60_000L + 100L)
+            }
         }
     }
     val text = remember(now) { SimpleDateFormat("HH:mm", Locale.US).format(Date(now)) }
@@ -1009,6 +1018,9 @@ private fun ChannelGrid(
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
         return
     }
+    // Every list opens at its top: the grid used to keep the place of the list shown before it,
+    // so Favourites could open half-way down with its first rows out of sight.
+    key(title) {
     val restoreIndex = remember(channels, restoreKey) { if (restoreKey == null) -1 else channels.indexOfFirst { it.key == restoreKey } }
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = if (restoreIndex >= 0) (restoreIndex - 8).coerceAtLeast(0) else 0)
     val restoreFocus = remember { FocusRequester() }
@@ -1034,6 +1046,7 @@ private fun ChannelGrid(
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
         ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
+    }
     }
 }
 
