@@ -1062,7 +1062,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
 }
 
 /**
- * A favourite's mark: a quarter disc of soft gold set into the tile's top corner (the tile's own
+ * A favourite's mark: a quarter disc of milky glass set into the tile's top corner (the tile's own
  * outline cuts it, so the tile keeps its shape), with a star engraved in its middle.
  */
 @Composable
@@ -1071,13 +1071,14 @@ private fun FavoriteCorner(modifier: Modifier = Modifier) {
         val r = size.width
         val corner = Offset(size.width, 0f)
         // A soft shadow on the tile, under the curve.
-        drawCircle(Color.Black.copy(alpha = .30f), radius = r + 3.dp.toPx(), center = Offset(corner.x - 1.dp.toPx(), corner.y + 2.dp.toPx()))
-        // Brushed gold: light at the corner, deeper toward the curve.
+        drawCircle(Color.Black.copy(alpha = .22f), radius = r + 3.dp.toPx(), center = Offset(corner.x - 1.dp.toPx(), corner.y + 2.dp.toPx()))
+        // Glass: a light veil, a little whiter at the corner; what lies under it still shows through.
         drawCircle(
-            Brush.linearGradient(listOf(Color(0xFFF0D38E), Color(0xFFB88E45)), start = corner, end = Offset(0f, r)),
+            Brush.linearGradient(listOf(Color.White.copy(alpha = .58f), Color(0xFFDDE1E8).copy(alpha = .40f)), start = corner, end = Offset(0f, r)),
             radius = r, center = corner
         )
-        drawCircle(Color(0x8CFFECBE), radius = r - .5.dp.toPx(), center = corner, style = Stroke(width = 1.dp.toPx()))
+        // The lit edge of the glass along the curve.
+        drawCircle(Color.White.copy(alpha = .75f), radius = r - .5.dp.toPx(), center = corner, style = Stroke(width = 1.dp.toPx()))
         // The star, cut in: centred on the corner's diagonal, halfway out.
         val d = r * .5f * .7071f
         val cx = corner.x - d
@@ -1094,9 +1095,9 @@ private fun FavoriteCorner(modifier: Modifier = Modifier) {
             close()
         }
         val lip = 1.dp.toPx()
-        drawPath(star(lip, lip), Color(0xD9FFF0C8))      // the lower lip catches the light
-        drawPath(star(-lip, -lip), Color(0xCC6E501E))    // the upper lip is in shade
-        drawPath(star(0f, 0f), Brush.verticalGradient(listOf(Color(0xFF8C662A), Color(0xFFB58E4C)), startY = cy - outer, endY = cy + outer))
+        drawPath(star(lip, lip), Color.White.copy(alpha = .85f))     // the lower lip catches the light
+        drawPath(star(-lip, -lip), Color(0xB33A3E48))                  // the upper lip is in shade
+        drawPath(star(0f, 0f), Brush.verticalGradient(listOf(Color(0xE6767B86), Color(0xE6A3A8B2)), startY = cy - outer, endY = cy + outer))
     }
 }
 
