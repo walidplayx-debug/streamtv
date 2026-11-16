@@ -264,14 +264,21 @@ fun SingleFieldScreen(
             withFrameNanos { }
         }
     }
-    Box(Modifier.fillMaxSize().background(EntryInk)) {
-        Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
+    // A soft card centred in the top half of the screen: the TV keyboard rises from the bottom
+    // and sits right under it, so the field, the buttons and the keyboard read as one block.
+    Box(Modifier.fillMaxSize().background(EntryInk), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier.padding(top = 64.dp).width(460.dp).clip(RoundedCornerShape(28.dp))
+                .background(EntryWhite.copy(alpha = .05f))
+                .border(1.dp, EntryWhite.copy(alpha = .06f), RoundedCornerShape(28.dp))
+                .padding(horizontal = 24.dp, vertical = 22.dp)
+        ) {
             Text(t(title), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             EntryField(
                 value = value, hint = hint,
                 onValueChange = { typed -> value = if (pin) typed.filter { it.isDigit() }.take(4) else typed },
-                modifier = Modifier.fillMaxWidth(if (pin) .3f else .6f).focusRequester(field),
+                modifier = Modifier.fillMaxWidth().focusRequester(field),
                 keyboardOptions = KeyboardOptions(keyboardType = if (pin) KeyboardType.NumberPassword else KeyboardType.Text, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
                     keyboard?.hide()
