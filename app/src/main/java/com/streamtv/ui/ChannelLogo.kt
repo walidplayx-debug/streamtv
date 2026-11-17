@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -199,7 +201,12 @@ fun distinguishingLabels(channels: List<com.streamtv.data.Channel>): Map<String,
 /** The label on a tile: a see-through dark band along its foot, with the distinguishing words. */
 @Composable
 fun TileLabel(text: String, modifier: Modifier = Modifier) {
-    Box(modifier.background(Color.Black.copy(alpha = .55f)).padding(horizontal = 6.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    // No vertical padding and no extra font padding: the line is centred in the band and its
+    // descenders (y, g, p) are never cut.
+    Box(modifier.background(Color.Black.copy(alpha = .6f)).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+        Text(
+            text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false), lineHeight = 13.sp)
+        )
     }
 }
