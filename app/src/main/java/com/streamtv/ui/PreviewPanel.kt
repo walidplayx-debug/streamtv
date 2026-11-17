@@ -44,7 +44,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import android.view.TextureView
+import android.view.ViewGroup
+import androidx.media3.ui.PlayerView
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -99,28 +100,26 @@ fun PreviewPanel(
     val program = playerProgram(channel, programs)
     var pictureFocused by remember { mutableStateOf(false) }
     Column(modifier) {
-        // The picture has no frame: its edges melt into the page, so it reads as part of the screen.
-        // A TextureView (not the usual surface) so the soft edge mask applies to the video itself.
+        // A clean picture with rounded corners and no frame or shading; a white outline only when focused.
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(
-                        Brush.radialGradient(
-                            0f to Color.Black, .62f to Color.Black, 1f to Color.Transparent,
-                            center = center, radius = size.maxDimension * .56f
-                        ),
-                        blendMode = BlendMode.DstIn
-                    )
-                }
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Color.Black)
+                .border(if (pictureFocused) 2.dp else 0.dp, if (pictureFocused) Color.White else Color.Transparent, RoundedCornerShape(12.dp))
                 .onFocusChanged { pictureFocused = it.isFocused }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onFullScreen)
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { TextureView(it).apply { keepScreenOn = true }.also { view -> player.setVideoTextureView(view) } },
-                update = { player.setVideoTextureView(it) }
+                factory = {
+                    PlayerView(it).apply {
+                        this.player = player
+                        keepScreenOn = true
+                        useController = false
+                        isFocusable = false
+                        setShutterBackgroundColor(android.graphics.Color.BLACK)
+                        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                    }
+                },
+                update = { it.player = player }
             )
             if (buffering) {
                 CircularProgressIndicator(
@@ -129,8 +128,7 @@ fun PreviewPanel(
                 )
             }
         }
-        if (pictureFocused) Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp).height(2.dp).clip(CircleShape).background(Color.White))
-        Spacer(Modifier.height(if (pictureFocused) 6.dp else 8.dp))
+        Spacer(Modifier.height(16.dp))
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text(
                 t("LIVE"), Modifier.clip(RoundedCornerShape(5.dp)).background(Color(0xFFE5484D)).padding(horizontal = 6.dp, vertical = 1.dp),

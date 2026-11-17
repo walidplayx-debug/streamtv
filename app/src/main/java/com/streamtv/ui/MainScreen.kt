@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -525,17 +526,22 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 targetState = preview != null,
                 transitionSpec = {
                     (fadeIn(tween(240, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 7 }) togetherWith
-                        (fadeOut(tween(220)) + slideOutVertically(tween(220)) { if (targetState) 0 else it / 10 })
+                        (fadeOut(tween(220)) + slideOutVertically(tween(220)) { if (targetState) 0 else it / 10 }) using
+                        // The picture reaches past the column, so nothing is clipped to it.
+                        SizeTransform(clip = false)
                 },
                 label = "previewSwap"
             ) { showing ->
             val shown = preview
             val melt by transition.animateFloat({ tween(240) }, label = "melt") { if (it == EnterExitState.Visible) 0f else 1f }
             if (showing && shown != null) {
+                // Larger than the list's column: it reaches out toward the screen edge and up to the
+                // grid, and its top lines up with the first row of tiles.
                 PreviewPanel(
                     shown, state.programs, state.favorites.hasFavorite(shown),
                     onFullScreen = { preview = null; model.select(shown, filtered, heading) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset(x = (-34).dp)
+                        .width(306.dp).padding(top = 49.dp)
                 )
             } else Box(Modifier.fillMaxSize().blur((14 * melt).dp)) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
