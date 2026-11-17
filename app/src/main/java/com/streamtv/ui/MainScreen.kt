@@ -1348,9 +1348,9 @@ private fun SettingsContent(
                             .background(Glass.copy(alpha = .72f)).padding(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FocusPill("M3U link", false, Modifier.weight(1f)) { if (!state.loading) onEntry("playlist") }
-                        FocusPill("Xtream login", false, Modifier.weight(1f)) { if (!state.loading) onEntry("xtream") }
-                        FocusPill("Import file", false, Modifier.weight(1f)) {
+                        FocusPill("M3U", false, Modifier.weight(1f)) { if (!state.loading) onEntry("playlist") }
+                        FocusPill("Xtream", false, Modifier.weight(1f)) { if (!state.loading) onEntry("xtream") }
+                        FocusPill("File", false, Modifier.weight(1f)) {
                             try {
                                 filePicker.launch(arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "application/octet-stream", "*/*"))
                             } catch (_: ActivityNotFoundException) {
