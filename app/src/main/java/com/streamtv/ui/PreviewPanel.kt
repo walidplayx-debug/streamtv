@@ -75,7 +75,13 @@ fun PreviewPanel(
             override fun onPlaybackStateChanged(state: Int) { buffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE }
         }
         player.addListener(listener)
-        onDispose { player.removeListener(listener); player.release() }
+        onDispose {
+            // Silence it at once, but release it only after the closing move: releasing waits for the
+            // playback thread and would stall the animation.
+            player.removeListener(listener)
+            player.stop()
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ player.release() }, 400)
+        }
     }
     LaunchedEffect(channel.key) {
         buffering = true

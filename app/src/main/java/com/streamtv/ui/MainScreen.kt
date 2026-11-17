@@ -524,11 +524,17 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
             // focus as it fades; back again, the list comes into focus as the picture sinks away.
             AnimatedContent(
                 targetState = preview != null,
+                // Leaving is the same move played backwards: the picture sinks and fades while the list
+                // comes back into focus where it stands. Only the picture ever moves; the list never
+                // slides, so nothing behind it shakes.
                 transitionSpec = {
-                    (fadeIn(tween(240, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 7 }) togetherWith
-                        (fadeOut(tween(220)) + slideOutVertically(tween(220)) { if (targetState) 0 else it / 10 }) using
-                        // The picture reaches past the column, so nothing is clipped to it.
-                        SizeTransform(clip = false)
+                    if (targetState) {
+                        (fadeIn(tween(240, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 7 }) togetherWith
+                            fadeOut(tween(240))
+                    } else {
+                        fadeIn(tween(240, delayMillis = 60)) togetherWith
+                            (fadeOut(tween(240)) + slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it / 7 })
+                    } using SizeTransform(clip = false) // the picture reaches past the column: nothing is clipped
                 },
                 label = "previewSwap"
             ) { showing ->
