@@ -41,7 +41,7 @@ fun channelSections(live: List<Channel>, mode: GroupMode, appLanguage: String): 
     }
     GroupMode.Genre -> {
         val byGenre = LinkedHashMap<String, MutableList<Channel>>()
-        live.forEach { channel -> genresOf(channel).forEach { byGenre.getOrPut(it) { mutableListOf() } += channel } }
+        for (channel in live) for (genre in genresOf(channel)) byGenre.getOrPut(genre) { mutableListOf() } += channel
         (Genres.map { it.first } + "Other").mapNotNull { name -> byGenre[name]?.let { ChannelSection("__genre:$name", name, it) } }
     }
 }
@@ -50,7 +50,7 @@ private const val OTHER = "zz"
 
 private fun ranked(live: List<Channel>, prefix: String, keys: (Channel) -> Set<String>): List<Pair<String, List<Channel>>> {
     val groups = HashMap<String, MutableList<Channel>>()
-    live.forEach { channel -> keys(channel).ifEmpty { setOf(OTHER) }.forEach { groups.getOrPut(it) { mutableListOf() } += channel } }
+    for (channel in live) for (key in keys(channel).ifEmpty { setOf(OTHER) }) groups.getOrPut(key) { mutableListOf() } += channel
     return groups.entries.sortedWith(compareBy<Map.Entry<String, MutableList<Channel>>> { it.key == OTHER }.thenByDescending { it.value.size })
         .map { it.key to it.value }
 }
@@ -63,8 +63,8 @@ private fun prefixOf(channel: Channel): String? =
 /** English names, native names and ISO codes (2 and 3 letters) of every language Android knows. */
 private val languageCodes: Map<String, String> by lazy {
     val map = HashMap<String, String>()
-    Locale.getAvailableLocales().forEach { locale ->
-        val code = locale.language.takeIf { it.length == 2 } ?: return@forEach
+    for (locale in Locale.getAvailableLocales()) {
+        val code = locale.language.takeIf { it.length == 2 } ?: continue
         map[code] = code
         runCatching { map[locale.isO3Language] = code }
         map[locale.getDisplayLanguage(Locale.ENGLISH).lowercase()] = code
