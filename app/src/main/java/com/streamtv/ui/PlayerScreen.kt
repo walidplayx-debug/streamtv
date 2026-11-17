@@ -68,6 +68,7 @@ import com.streamtv.data.hasFavorite
 import com.streamtv.data.EpgProgram
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -356,8 +357,9 @@ fun PlayerScreen(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (listOpen) listTick++
                 when (event.key) {
-                    Key.ChannelUp -> { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
-                    Key.ChannelDown -> { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
+                    // With the channel list open, CH+ / CH− page through it instead (handled by the list).
+                    Key.ChannelUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
+                    Key.ChannelDown -> if (listOpen) false else { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
                     // Handled here, before the system moves focus on its own for the Back key.
                     Key.Back -> { if (listOpen) backInList() else onBack(); true }
                     Key.DirectionUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
@@ -634,7 +636,31 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
     // flags can briefly disagree while Compose dispatches focus loss/gain callbacks.
     var focusedKey by remember(items) { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
-    Box(Modifier.fillMaxSize()) {
+    // CH+ / CH− (Page up / down) jump eight rows at a time; held, at a calm fixed pace.
+    val rowFocus = remember(items) { HashMap<String, FocusRequester>() }
+    val pageScope = rememberCoroutineScope()
+    val lastPage = remember { longArrayOf(0L) }
+    fun page(direction: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastPage[0] < 140L) return
+        lastPage[0] = now
+        val from = items.indexOfFirst { it.key == focusedKey }.coerceAtLeast(0)
+        val to = (from + direction * 8).coerceIn(0, items.lastIndex)
+        if (to == from) return
+        pageScope.launch {
+            listState.scrollToItem((to - 2).coerceAtLeast(0))
+            withFrameNanos { }
+            runCatching { rowFocus[items[to].key]?.requestFocus() }
+        }
+    }
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        val direction = when (event.key) {
+            Key.ChannelUp, Key.PageDown -> 1
+            Key.ChannelDown, Key.PageUp -> -1
+            else -> 0
+        }
+        if (direction == 0) false else { if (event.type == KeyEventType.KeyDown) page(direction); true }
+    }) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -655,6 +681,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
             )
             Row(
                 (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
+                    .focusRequester(rowFocus.getOrPut(item.key) { FocusRequester() })
                     .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
                     // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
                     .background(

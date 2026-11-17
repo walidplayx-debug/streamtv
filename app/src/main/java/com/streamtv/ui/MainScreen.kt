@@ -47,6 +47,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
@@ -1118,7 +1121,34 @@ private fun ChannelGrid(
     // Channels that share one logo (one channel in several languages or regions) are labelled with
     // what tells them apart; every other tile stays clean.
     val marks = remember(channels) { Memo.of("marks", channels) { distinguishingLabels(channels) } }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // CH+ / CH− (or Page up / down) jump four rows at a time (16 channels with four across). A held
+    // key repeats at a calm, fixed pace, so it speeds through the list without piling up work.
+    val tileFocus = remember { HashMap<String, FocusRequester>() }
+    val pageScope = rememberCoroutineScope()
+    val lastPage = remember { longArrayOf(0L) }
+    fun page(direction: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastPage[0] < 140L) return
+        lastPage[0] = now
+        val visible = gridState.layoutInfo.visibleItemsInfo
+        val columns = visible.firstOrNull()?.let { first -> visible.count { it.row == first.row } }?.coerceAtLeast(1) ?: 4
+        val from = channels.indexOfFirst { it.key == focusedKey }.coerceAtLeast(0)
+        val to = (from + direction * columns * 4).coerceIn(0, channels.lastIndex)
+        if (to == from) return
+        pageScope.launch {
+            gridState.scrollToItem((to - to % columns - columns).coerceAtLeast(0))
+            withFrameNanos { }
+            runCatching { tileFocus[channels[to].key]?.requestFocus() }
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        val direction = when (event.key) {
+            Key.ChannelUp, Key.PageDown -> 1
+            Key.ChannelDown, Key.PageUp -> -1
+            else -> 0
+        }
+        if (direction == 0) false else { if (event.type == KeyEventType.KeyDown) page(direction); true }
+    }) {
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
             // lists; a wider grid fits more tiles of the same size instead of stretching them.
@@ -1132,7 +1162,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
