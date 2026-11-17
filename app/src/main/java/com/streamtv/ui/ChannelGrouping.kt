@@ -55,10 +55,15 @@ private fun ranked(live: List<Channel>, prefix: String, keys: (Channel) -> Set<S
         .map { it.key to it.value }
 }
 
-/** A short code in front of a category or name: "AR | MBC", "FR: TF1", "[UK] BBC". */
-private val prefixCode = Regex("""^\W*([A-Za-z]{2,3})\s*[|:\]\-–]""")
-private fun prefixOf(channel: Channel): String? =
-    (prefixCode.find(channel.group) ?: prefixCode.find(channel.name))?.groupValues?.get(1)?.lowercase()
+/**
+ * A short code in front of a provider's category: "AR | MBC", "FR: Sport", "[UK] News". Only the
+ * category is read: in channel names such prefixes are too often words ("TV: ...").
+ */
+private val prefixCode = Regex("""^\W*([A-Za-z]{2,3})\s*[|:\]]""")
+private fun prefixOf(channel: Channel): String? = prefixCode.find(channel.group)?.groupValues?.get(1)?.lowercase()
+
+/** Public playlists (iptv-org) end each channel id with its country: "BBCNews.uk@SD", "AlJazeera.qa". */
+private val idCountry = Regex("""\.([a-z]{2})(?:@|$)""", RegexOption.IGNORE_CASE)
 
 /** English names, native names and ISO codes (2 and 3 letters) of every language Android knows. */
 private val languageCodes: Map<String, String> by lazy {
@@ -77,16 +82,38 @@ private val languageCodes: Map<String, String> by lazy {
 private fun languagesOf(channel: Channel): Set<String> {
     val tagged = channel.language.split(';', ',', '/').mapNotNull { languageCodes[it.trim().lowercase()] }.toSet()
     if (tagged.isNotEmpty()) return tagged
+    // Arabic letters in the name settle it.
+    if (channel.name.any { it in '\u0600'..'\u06FF' }) return setOf("ar")
     when (val prefix = prefixOf(channel)) {
         null -> Unit
         "uk", "us", "gb" -> return setOf("en")
         else -> languageCodes[prefix]?.let { return setOf(it) }
     }
+    // Otherwise the main language of the channel's country, where that is clear.
+    countriesOf(channel).mapNotNull { CountryLanguage[it] }.toSet().takeIf { it.isNotEmpty() }?.let { return it }
     return when (channel.detectedLanguage()) {
         "ar" -> setOf("ar")
         "fr" -> setOf("fr")
         else -> emptySet()
     }
+}
+
+/** The main language of countries where one language clearly leads (bilingual ones are left out). */
+private val CountryLanguage: Map<String, String> = buildMap {
+    for (c in listOf("SA", "AE", "EG", "QA", "KW", "BH", "OM", "JO", "LB", "SY", "IQ", "PS", "YE", "LY", "TN", "DZ", "MA", "SD", "MR")) put(c, "ar")
+    for (c in listOf("FR", "MC", "SN", "CI")) put(c, "fr")
+    for (c in listOf("GB", "US", "AU", "NZ", "IE", "JM", "NG", "GH", "KE", "ZA", "PH")) put(c, "en")
+    for (c in listOf("DE", "AT", "LI")) put(c, "de")
+    for (c in listOf("ES", "MX", "AR", "CO", "CL", "PE", "VE", "EC", "BO", "PY", "UY", "CR", "PA", "DO", "GT", "HN", "NI", "SV", "CU", "PR")) put(c, "es")
+    for (c in listOf("PT", "BR", "AO", "MZ")) put(c, "pt")
+    for (c in listOf("IT", "SM")) put(c, "it")
+    put("NL", "nl"); put("TR", "tr"); put("RU", "ru"); put("CN", "zh"); put("TW", "zh"); put("HK", "zh")
+    put("IR", "fa"); put("PK", "ur"); put("IN", "hi"); put("GR", "el"); put("CY", "el"); put("HR", "hr"); put("RO", "ro")
+    put("PL", "pl"); put("UA", "uk"); put("CZ", "cs"); put("SK", "sk"); put("HU", "hu"); put("BG", "bg"); put("RS", "sr")
+    put("SE", "sv"); put("NO", "no"); put("DK", "da"); put("FI", "fi"); put("JP", "ja"); put("KR", "ko"); put("VN", "vi")
+    put("TH", "th"); put("ID", "id"); put("MY", "ms"); put("IL", "he"); put("AL", "sq"); put("XK", "sq"); put("AM", "hy")
+    put("GE", "ka"); put("AZ", "az"); put("BD", "bn"); put("LK", "si"); put("NP", "ne"); put("MN", "mn"); put("SI", "sl")
+    put("BA", "bs"); put("MK", "mk"); put("LT", "lt"); put("LV", "lv"); put("EE", "et"); put("IS", "is"); put("AF", "fa")
 }
 
 /** A language's own name, as its speakers write it: العربية, Français, English. */
@@ -101,6 +128,11 @@ private fun countriesOf(channel: Channel): Set<String> {
     val tagged = channel.country.split(';', ',', '/').map { it.trim().uppercase() }
         .map { if (it == "UK") "GB" else it }.filter { it in countryCodes }.toSet()
     if (tagged.isNotEmpty()) return tagged
+    // Only a real channel id ("Name.cc"), not the stand-in made from the name and address.
+    if ('/' !in channel.id && '|' !in channel.id) idCountry.find(channel.id)?.groupValues?.get(1)?.uppercase()?.let { code ->
+        val country = if (code == "UK") "GB" else code
+        if (country in countryCodes) return setOf(country)
+    }
     // "AR | " in IPTV lists means Arabic, not Argentina, so it says nothing about a country.
     val prefix = prefixOf(channel)?.uppercase()?.let { if (it == "UK") "GB" else it } ?: return emptySet()
     return if (prefix != "AR" && prefix in countryCodes) setOf(prefix) else emptySet()
