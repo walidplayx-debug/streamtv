@@ -212,7 +212,7 @@ fun FlipCardDialog(
         // A side-list entry's card opens right over the list, at the entry, as wide as the list;
         // its first option sits where the entry was.
         val anchor = menu?.anchor
-        val density = androidx.compose.ui.platform.LocalDensity.current
+        val screenDensity = androidx.compose.ui.platform.LocalDensity.current
         Box(
             if (anchor != null) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(24.dp),
             contentAlignment = if (anchor != null) Alignment.TopStart else if (atEnd) Alignment.CenterEnd else Alignment.Center
@@ -226,7 +226,7 @@ fun FlipCardDialog(
                     }
                     .then(
                         if (anchor == null) Modifier.width(CardWidth)
-                        else with(density) {
+                        else with(screenDensity) {
                             Modifier.absoluteOffset(anchor.left.toDp(), (anchor.top.toDp() - 54.dp).coerceAtLeast(16.dp)).width(anchor.width.toDp())
                         }
                     )
