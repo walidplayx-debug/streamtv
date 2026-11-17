@@ -175,50 +175,31 @@ object LogoTone {
 }
 
 /**
- * A short language mark (AR, EN, DE...) found in a channel's name, or in its language tag when
- * that names one language. Used only to tell apart channels that share one logo.
+ * For channels that share one logo (one channel in several languages or regions), the words that
+ * tell each apart: what is left of its name once the words all of them share, and quality tags
+ * like "(1080p)" or "HD", are taken out. "DW Arabic", "DW English" -> "Arabic", "English";
+ * "24 Horas", "24 Horas Catalunya" -> (nothing), "Catalunya". Returns channel key -> label.
  */
-fun languageMark(name: String, language: String): String? {
-    val n = " " + name.lowercase() + " "
-    val marks = listOf(
-        "AR" to listOf("arabic", "عربي", "العربية", "(ar)"),
-        "EN" to listOf("english", " eng ", "(en)"),
-        "DE" to listOf("deutsch", "german", "(de)"),
-        "FR" to listOf("français", "francais", "french", "(fr)"),
-        "ES" to listOf("español", "espanol", "spanish", "(es)"),
-        "TR" to listOf("türkçe", "turkce", "turkish", "(tr)"),
-        "RU" to listOf("русский", "russian", "(ru)"),
-        "FA" to listOf("persian", "farsi", "فارسی"),
-        "KU" to listOf("kurdish", "kurdî", "kurdi"),
-        "UR" to listOf("urdu", "اردو"),
-        "HI" to listOf("hindi"),
-        "PT" to listOf("português", "portugues", "portuguese"),
-        "IT" to listOf("italiano", "italian"),
-        "ZH" to listOf("chinese", "中文", "mandarin")
-    )
-    marks.firstOrNull { (_, words) -> words.any { it in n } }?.let { return it.first }
-    val tag = language.trim()
-    if (tag.isEmpty() || tag.contains(';') || tag.contains(',')) return null
-    // Language tags: a name ("Arabic") or an ISO code ("ar", "ara").
-    val word = " " + tag.lowercase() + " "
-    marks.firstOrNull { (_, words) -> words.any { it.trim().length > 4 && it.trim() in word } }?.let { return it.first }
-    val codes = mapOf(
-        "ar" to "AR", "ara" to "AR", "en" to "EN", "eng" to "EN", "de" to "DE", "deu" to "DE", "ger" to "DE",
-        "fr" to "FR", "fra" to "FR", "fre" to "FR", "es" to "ES", "spa" to "ES", "tr" to "TR", "tur" to "TR",
-        "ru" to "RU", "rus" to "RU", "fa" to "FA", "fas" to "FA", "per" to "FA", "ku" to "KU", "kur" to "KU",
-        "ur" to "UR", "urd" to "UR", "hi" to "HI", "hin" to "HI", "pt" to "PT", "por" to "PT",
-        "it" to "IT", "ita" to "IT", "zh" to "ZH", "zho" to "ZH", "chi" to "ZH"
-    )
-    return codes[tag.lowercase()]
+fun distinguishingLabels(channels: List<com.streamtv.data.Channel>): Map<String, String> {
+    val noise = Regex("""\s*[\(\[][^)\]]*[\)\]]""")
+    val quality = setOf("hd", "fhd", "uhd", "sd", "4k", "hevc", "h265", "720p", "1080p", "2160p", "480p", "360p", "tv")
+    fun words(name: String) = noise.replace(name, " ").split(Regex("\\s+")).filter { it.isNotBlank() && it.lowercase() !in quality }
+    val out = HashMap<String, String>()
+    channels.filter { !it.logo.isNullOrBlank() }.groupBy { it.logo!! }.values.filter { it.size > 1 }.forEach { group ->
+        val all = group.map { words(it.name) }
+        val shared = all.map { w -> w.map { it.lowercase() }.toSet() }.reduce { x, y -> x intersect y }
+        group.zip(all).forEach { (channel, w) ->
+            val label = w.filter { it.lowercase() !in shared }.joinToString(" ")
+            if (label.isNotBlank()) out[channel.key] = label
+        }
+    }
+    return out
 }
 
-/** The language mark on a tile: small, dark glass, white letters. */
+/** The label on a tile: a see-through dark band along its foot, with the distinguishing words. */
 @Composable
-fun LanguageMark(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier.clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .62f))
-            .padding(horizontal = 4.dp, vertical = 1.dp)
-    ) {
-        Text(text, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp, maxLines = 1)
+fun TileLabel(text: String, modifier: Modifier = Modifier) {
+    Box(modifier.background(Color.Black.copy(alpha = .55f)).padding(horizontal = 6.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+        Text(text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

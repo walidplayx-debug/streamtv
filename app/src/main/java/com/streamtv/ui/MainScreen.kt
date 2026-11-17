@@ -1026,12 +1026,9 @@ private fun ChannelGrid(
     RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
     var focusedKey by remember { mutableStateOf<String?>(null) }
     GlideToFocus(gridState, focusedKey)
-    // Channels that share one logo (the same channel in several languages) get a small language
-    // mark so they can be told apart; every other tile stays clean.
-    val marks = remember(channels) {
-        val shared = channels.mapNotNull { it.logo?.takeIf(String::isNotBlank) }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
-        channels.filter { it.logo in shared }.mapNotNull { c -> languageMark(c.name, c.language)?.let { c.key to it } }.toMap()
-    }
+    // Channels that share one logo (one channel in several languages or regions) are labelled with
+    // what tells them apart; every other tile stays clean.
+    val marks = remember(channels) { distinguishingLabels(channels) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
@@ -1096,11 +1093,13 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
         contentAlignment = Alignment.Center
     ) {
         ChannelLogo(
-            channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
+            channel.name, channel.logo,
+            Modifier.fillMaxSize().padding(start = 8.dp, end = 8.dp, top = if (mark != null) 5.dp else 8.dp, bottom = if (mark != null) 22.dp else 8.dp),
+            fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
             group = channel.group, onNeedsLight = { light = it }
         )
-        if (mark != null) LanguageMark(mark, Modifier.align(Alignment.TopStart).padding(top = 5.dp, start = 5.dp))
+        if (mark != null) TileLabel(mark, Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
 }
