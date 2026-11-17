@@ -5,8 +5,11 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.draw.blur
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -455,6 +458,7 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
     }
 }
 
+@OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
     val live = remember(state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } }
@@ -512,26 +516,28 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
             else -> preview = c
         }
     }
-    val sideWidth by animateDpAsState(if (preview != null) 300.dp else 250.dp, tween(320, easing = FastOutSlowInEasing), label = "sideWidth")
     Row(Modifier.fillMaxSize()) {
         val groupsState = rememberLazyListState()
-        Box(Modifier.width(sideWidth).fillMaxHeight()) {
+        Box(Modifier.width(250.dp).fillMaxHeight()) {
+            // The picture rises lightly into the list's place while the list melts away, going out of
+            // focus as it fades; back again, the list comes into focus as the picture sinks away.
             AnimatedContent(
                 targetState = preview != null,
                 transitionSpec = {
-                    (fadeIn(tween(280)) + scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = .92f)) togetherWith fadeOut(tween(160))
+                    (fadeIn(tween(240, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 7 }) togetherWith
+                        (fadeOut(tween(220)) + slideOutVertically(tween(220)) { if (targetState) 0 else it / 10 })
                 },
                 label = "previewSwap"
             ) { showing ->
             val shown = preview
+            val melt by transition.animateFloat({ tween(240) }, label = "melt") { if (it == EnterExitState.Visible) 0f else 1f }
             if (showing && shown != null) {
                 PreviewPanel(
                     shown, state.programs, state.favorites.hasFavorite(shown),
                     onFullScreen = { preview = null; model.select(shown, filtered, heading) },
-                    onClose = { preview = null },
-                    modifier = Modifier.fillMaxWidth().padding(end = 6.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-            } else Box(Modifier.fillMaxSize()) {
+            } else Box(Modifier.fillMaxSize().blur((14 * melt).dp)) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), query == "__recent") { model.setSearchQuery("__recent") } }
