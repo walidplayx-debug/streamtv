@@ -14,8 +14,6 @@ android {
         targetSdk = 34
         versionCode = ciVersionCode
         versionName = "1.0.1"
-        val updateChannel = if (System.getenv("GITHUB_REF_NAME") == "main") "latest" else "preview"
-        buildConfigField("String", "UPDATE_CHANNEL", "\"$updateChannel\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // Release builds are signed only by CI, with the private keystore kept in the repository

@@ -167,9 +167,9 @@ fun AppUpdateSection() {
 private class IncompatibleUpdateException : IOException()
 
 private fun checkAndDownloadUpdate(context: android.content.Context): DownloadedUpdate? {
-    val channel = BuildConfig.UPDATE_CHANNEL
-    val assetName = if (channel == "latest") "stv.apk" else "stv-preview.apk"
-    val apiUrl = "https://api.github.com/repos/walidplayx-debug/streamtv/releases/tags/$channel"
+    // Every build comes from main and updates from the one "latest" release.
+    val assetName = "stv.apk"
+    val apiUrl = "https://api.github.com/repos/walidplayx-debug/streamtv/releases/tags/latest"
 
     val releaseConnection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
         connectTimeout = 15_000

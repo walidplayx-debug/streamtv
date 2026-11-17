@@ -1,52 +1,54 @@
-# streamtv
+# STV
 
-A personal Android TV IPTV player. No channels, playlists, logos, or third-party content are bundled. Add your own M3U/M3U8 playlist; an XMLTV guide is optional.
+A personal IPTV player for Android TV. It comes with no channels, playlists or other content:
+you add your own M3U/M3U8 link or Xtream login, and an XMLTV guide if you have one.
 
-## Current implementation
+## Features
 
-- Kotlin, Jetpack Compose, Android TV launcher support, landscape UI
-- M3U parser with quoted/unquoted metadata attributes and duplicate filtering
-- Playlist loading over HTTP(S) off the main thread
-- Media3 playback for HLS, DASH, and progressive media
-- Channel browsing, categories, and favorites persisted across restarts
-- Room-backed channel cache and DataStore-backed playlist/favorites preferences
-- Optional XMLTV/XMLTV.GZ loading with a rolling now/next programme window
-- Movies and Series pages: side menu (search, watch history, favourites, genres), title page, resume
-- Movie player with progress bar, seeking, pause, favourite and in-file subtitles
-- Channel card (hold OK): favourite, hide, lock, rename; PIN questions on the card's back
-- Parental PIN for locked channels, hiding channels and removing playlists
-- Interface in 10 languages, right-to-left layout for Arabic
-- In-app updates from the `latest` release
+- **Live TV**: categories, favourites, search, channel logos (with a public logo index for
+  channels that have none), now/next from an XMLTV guide
+- **Movies and Series**: side menu with search, watch history, favourites and genres; a
+  title page; a player with seeking, resume and subtitles
+- **Channel card** (hold OK): favourite, rename, hide, lock
+- **Parental PIN** for locked channels, hidden channels and removing playlists
+- **10 languages**, with a right-to-left layout for Arabic
+- **Updates inside the app**, with a red mark on Settings when a new version is out
+
+## Install
+
+Download [stv.apk](https://github.com/walidplayx-debug/streamtv/releases/latest/download/stv.apk)
+and open it on the TV. If Android asks, allow installs from the app you opened it with.
+Runs on Android 6.0 and newer.
 
 ## Build
 
-Requires JDK 17, Android SDK platform 34, and Android build tools. From the repository root:
+Needs JDK 17 and Android SDK platform 34:
 
 ```bash
 ./gradlew lint testDebugUnitTest assembleRelease
 ```
 
-GitHub Actions runs the same checks and publishes a signed APK as the `latest` GitHub Release (`stv.apk`) when a build on `main` succeeds.
+## Releases and signing
 
-## Install
+Every push to `main` is built, linted and tested by GitHub Actions, then published as the
+`latest` release (`stv.apk`). The installed app updates from that release.
 
-Download [stv.apk](https://github.com/walidplayx-debug/streamtv/releases/latest/download/stv.apk) from the latest release and install it on an Android TV device. Enable installation from the browser/file manager if Android asks.
+APKs are signed only in CI, with a private keystore held in the repository secrets
+(`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`). No key is kept in the
+code, and the build stops if the secrets are missing, so every APK carries the same signature
+and installs over the previous one.
 
-## Playlist
+## Project layout
 
-Open streamtv, paste your own M3U or M3U8 URL, and choose **Load channels**. Playlist URLs must be HTTP or HTTPS.
-
-## Signing and updates
-
-Release APKs are signed only by GitHub Actions, with a private keystore stored in the repository Actions secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. No signing key is kept in the repository, and CI refuses to build if the secrets are missing. Every build therefore carries the same signature, so a new APK installs over the previous one.
-
-`main` publishes the `latest` release (`stv.apk`) and also refreshes the `preview` pre-release ([stv-preview.apk](https://github.com/walidplayx-debug/streamtv/releases/download/preview/stv-preview.apk)).
+```
+app/src/main/java/com/streamtv/
+  data/   playlists (M3U, Xtream), XMLTV guide, logo index, local cache and settings
+  ui/     screens, players, channel card, translations, updates
+```
 
 ## Troubleshooting
 
-- **No channels:** verify the playlist URL in a browser and ensure it returns valid M3U text.
-- **Playback fails:** some providers require headers, tokens, or network access not supported by the source URL.
-- **Install blocked:** allow installation from the app used to open the APK.
-- **Update rejected:** the installed app was signed with a different key; uninstall it once, then install again.
-
-This project is under active development; the repository README and release notes identify the features included in each build.
+- **No channels**: open the playlist link in a browser and check that it returns M3U text.
+- **A channel does not play**: some providers need tokens or headers the link does not carry.
+- **Update refused**: the installed copy was signed with another key; uninstall it once,
+  then install `stv.apk` again.

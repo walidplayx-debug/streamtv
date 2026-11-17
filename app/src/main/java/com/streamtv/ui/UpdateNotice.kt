@@ -35,7 +35,7 @@ object UpdateNotice {
     suspend fun refresh() {
         val remote = withContext(Dispatchers.IO) {
             runCatching {
-                val url = "https://api.github.com/repos/walidplayx-debug/streamtv/releases/tags/${BuildConfig.UPDATE_CHANNEL}"
+                val url = "https://api.github.com/repos/walidplayx-debug/streamtv/releases/tags/latest"
                 val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 10_000
                     readTimeout = 10_000
