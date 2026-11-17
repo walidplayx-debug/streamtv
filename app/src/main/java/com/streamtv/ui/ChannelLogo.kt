@@ -30,7 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import android.graphics.drawable.BitmapDrawable
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 
 fun channelInitials(name: String): String {
     val words = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -54,12 +57,23 @@ fun ChannelLogo(
     logoPadding: Dp = 0.dp,
     contentScale: ContentScale = ContentScale.Fit,
     /** When given, a channel without a logo shows its name under its category's colour instead of initials. */
-    group: String? = null
+    group: String? = null,
+    /** Give a dark or see-through logo a soft light plate, so it does not sink into a dark tile. */
+    smartPlate: Boolean = false
 ) {
     var loaded by remember(logo) { mutableStateOf(false) }
     var failed by remember(logo) { mutableStateOf(false) }
+    var plate by remember(logo) { mutableStateOf(logo?.let { LogoTone.known[it] } ?: false) }
     val hasLogo = !logo.isNullOrBlank() && !failed
+    val context = LocalContext.current
+    // Pixels are read only when the plate is wanted, so other logos keep the faster hardware bitmaps.
+    val model = remember(logo, smartPlate) {
+        if (smartPlate && logo != null && logo !in LogoTone.known) ImageRequest.Builder(context).data(logo).allowHardware(false).build() else logo
+    }
     Box(modifier.clip(RoundedCornerShape(corner)), contentAlignment = Alignment.Center) {
+        if (smartPlate && plate && hasLogo && loaded) {
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFF1F3F7), Color(0xFFD9DEE7)))))
+        }
         if (!hasLogo || !loaded) {
             if (group != null) {
                 CategoryFace(name, group)
@@ -71,11 +85,18 @@ fun ChannelLogo(
         }
         if (hasLogo) {
             AsyncImage(
-                model = logo,
+                model = model,
                 contentDescription = name,
-                modifier = Modifier.fillMaxSize().padding(logoPadding),
+                modifier = Modifier.fillMaxSize().padding(if (smartPlate && plate) logoPadding + 4.dp else logoPadding),
                 contentScale = contentScale,
-                onSuccess = { loaded = true },
+                onSuccess = { success ->
+                    if (smartPlate && logo != null) {
+                        val dark = LogoTone.known[logo] ?: ((success.result.drawable as? BitmapDrawable)?.bitmap
+                            ?.let { LogoTone.needsPlate(it) } ?: false).also { LogoTone.known[logo] = it }
+                        plate = dark
+                    }
+                    loaded = true
+                },
                 onError = { failed = true }
             )
         }
@@ -122,5 +143,82 @@ private fun CategoryFace(name: String, group: String) {
             Text(name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
         }
+    }
+}
+
+/**
+ * Decides which logos need a light plate: those that are mostly dark, or whose drawn parts are
+ * dark enough to vanish against the dark tile through their see-through gaps. Each logo is
+ * judged once and remembered.
+ */
+object LogoTone {
+    val known = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    fun needsPlate(bitmap: android.graphics.Bitmap): Boolean {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return false
+        val steps = 28
+        var drawn = 0
+        var dark = 0
+        var light = 0.0
+        for (y in 0 until steps) for (x in 0 until steps) {
+            val c = bitmap.getPixel(x * (bitmap.width - 1) / (steps - 1), y * (bitmap.height - 1) / (steps - 1))
+            val a = (c ushr 24) and 0xFF
+            if (a < 60) continue
+            val l = (.299 * ((c shr 16) and 0xFF) + .587 * ((c shr 8) and 0xFF) + .114 * (c and 0xFF)) / 255.0
+            drawn++
+            light += l
+            if (l < .22) dark++
+        }
+        if (drawn < steps) return false
+        return light / drawn < .36 || dark.toFloat() / drawn > .35
+    }
+}
+
+/**
+ * A short language mark (AR, EN, DE...) found in a channel's name, or in its language tag when
+ * that names one language. Used only to tell apart channels that share one logo.
+ */
+fun languageMark(name: String, language: String): String? {
+    val n = " " + name.lowercase() + " "
+    val marks = listOf(
+        "AR" to listOf("arabic", "عربي", "العربية", "(ar)"),
+        "EN" to listOf("english", " eng ", "(en)"),
+        "DE" to listOf("deutsch", "german", "(de)"),
+        "FR" to listOf("français", "francais", "french", "(fr)"),
+        "ES" to listOf("español", "espanol", "spanish", "(es)"),
+        "TR" to listOf("türkçe", "turkce", "turkish", "(tr)"),
+        "RU" to listOf("русский", "russian", "(ru)"),
+        "FA" to listOf("persian", "farsi", "فارسی"),
+        "KU" to listOf("kurdish", "kurdî", "kurdi"),
+        "UR" to listOf("urdu", "اردو"),
+        "HI" to listOf("hindi"),
+        "PT" to listOf("português", "portugues", "portuguese"),
+        "IT" to listOf("italiano", "italian"),
+        "ZH" to listOf("chinese", "中文", "mandarin")
+    )
+    marks.firstOrNull { (_, words) -> words.any { it in n } }?.let { return it.first }
+    val tag = language.trim()
+    if (tag.isEmpty() || tag.contains(';') || tag.contains(',')) return null
+    // Language tags: a name ("Arabic") or an ISO code ("ar", "ara").
+    val word = " " + tag.lowercase() + " "
+    marks.firstOrNull { (_, words) -> words.any { it.trim().length > 4 && it.trim() in word } }?.let { return it.first }
+    val codes = mapOf(
+        "ar" to "AR", "ara" to "AR", "en" to "EN", "eng" to "EN", "de" to "DE", "deu" to "DE", "ger" to "DE",
+        "fr" to "FR", "fra" to "FR", "fre" to "FR", "es" to "ES", "spa" to "ES", "tr" to "TR", "tur" to "TR",
+        "ru" to "RU", "rus" to "RU", "fa" to "FA", "fas" to "FA", "per" to "FA", "ku" to "KU", "kur" to "KU",
+        "ur" to "UR", "urd" to "UR", "hi" to "HI", "hin" to "HI", "pt" to "PT", "por" to "PT",
+        "it" to "IT", "ita" to "IT", "zh" to "ZH", "zho" to "ZH", "chi" to "ZH"
+    )
+    return codes[tag.lowercase()]
+}
+
+/** The language mark on a tile: small, dark glass, white letters. */
+@Composable
+fun LanguageMark(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier.clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .62f))
+            .padding(horizontal = 4.dp, vertical = 1.dp)
+    ) {
+        Text(text, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp, maxLines = 1)
     }
 }

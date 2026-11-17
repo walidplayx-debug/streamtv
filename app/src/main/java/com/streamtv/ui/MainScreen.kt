@@ -1025,6 +1025,12 @@ private fun ChannelGrid(
     RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
     var focusedKey by remember { mutableStateOf<String?>(null) }
     GlideToFocus(gridState, focusedKey)
+    // Channels that share one logo (the same channel in several languages) get a small language
+    // mark so they can be told apart; every other tile stays clean.
+    val marks = remember(channels) {
+        val shared = channels.mapNotNull { it.logo?.takeIf(String::isNotBlank) }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        channels.filter { it.logo in shared }.mapNotNull { c -> languageMark(c.name, c.language)?.let { c.key to it } }.toMap()
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
@@ -1039,7 +1045,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1049,7 +1055,7 @@ private fun ChannelGrid(
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
@@ -1084,8 +1090,9 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, onLongPress: () -> 
         ChannelLogo(
             channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
-            group = channel.group
+            group = channel.group, smartPlate = true
         )
+        if (mark != null) LanguageMark(mark, Modifier.align(Alignment.TopStart).padding(top = 5.dp, start = 5.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
 }
