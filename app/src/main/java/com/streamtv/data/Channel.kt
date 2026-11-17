@@ -36,7 +36,7 @@ private val episodeMarker = Regex("""\bS\d{1,2}\s?E\d{1,3}\b""", RegexOption.IGN
 
 /** Playlists mix live channels with on-demand files; tell them apart by the stream address. */
 fun Channel.kind(): ChannelKind {
-    val path = url.substringBefore('?').lowercase()
+    val path = url.substringBefore("|").substringBefore("?").lowercase()
     val file = videoFileExtensions.any { path.endsWith(it) }
     return when {
         path.contains("/series/") || (file && episodeMarker.containsMatchIn(name)) -> ChannelKind.Series

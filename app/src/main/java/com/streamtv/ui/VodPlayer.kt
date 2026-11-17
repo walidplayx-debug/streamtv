@@ -113,7 +113,7 @@ fun VodPlayerScreen(
     val savePosition by rememberUpdatedState(onPosition)
     val player = remember(channel.url) {
         Players.create(context).apply {
-            setMediaItem(MediaItem.fromUri(channel.url), startAt.coerceAtLeast(0L))
+            setMediaSource(Players.stream(context, channel.url), startAt.coerceAtLeast(0L))
             prepare()
             playWhenReady = true
         }

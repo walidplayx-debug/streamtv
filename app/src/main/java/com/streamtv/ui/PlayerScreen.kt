@@ -67,6 +67,8 @@ import com.streamtv.data.hasFavorite
 import com.streamtv.data.EpgProgram
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val PlayerWhite = Color.White
@@ -75,7 +77,9 @@ private val PlayerGlass = Color(0xF01C1C1E)
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
 private const val ListIdleMillis = 8000L
-private const val StallMillis = 20000L
+private const val StallMillis = 15000L
+/** Pauses before each automatic reconnect, then the error card. */
+private val RetryPauses = longArrayOf(300, 1_000, 2_000, 3_000, 5_000, 8_000)
 private val PlayerAccent = Color(0xFFD5DADF)
 
 private enum class OverlayState { None, InfoBar, ChannelList }
@@ -109,7 +113,7 @@ fun PlayerScreen(
     val side = if (rtl) 1 else -1
     val player = remember(channel.url) {
         Players.create(context).apply {
-            setMediaItem(MediaItem.fromUri(channel.url))
+            setMediaSource(Players.stream(context, channel.url))
             prepare()
             playWhenReady = true
         }
@@ -185,19 +189,28 @@ fun PlayerScreen(
         listTitle = lists[(listIndex + delta + lists.size) % lists.size].first
     }
 
+    // A fresh start always joins the stream at its live point, never where it dropped.
     fun restart() {
         failed = false
         buffering = true
         player.stop()
-        player.setMediaItem(MediaItem.fromUri(channel.url))
+        player.setMediaSource(Players.stream(context, channel.url))
         player.prepare()
         player.playWhenReady = true
     }
-    // One silent retry, then the error card.
+    // A dropped stream reconnects by itself, quietly, a few times with growing pauses (the spinner
+    // stays up); the error card shows only if it still fails. Once it plays again the count starts
+    // over, so a long match survives any number of short drops.
+    val retryScope = rememberCoroutineScope()
+    val retryJob = remember(channel.url) { arrayOfNulls<Job>(1) }
     fun onStreamProblem() {
-        if (autoRetries < 1) {
+        if (retryJob[0]?.isActive == true) return
+        if (autoRetries < RetryPauses.size) {
+            val pause = RetryPauses[autoRetries]
             autoRetries++
-            restart()
+            buffering = true
+            player.stop()
+            retryJob[0] = retryScope.launch { delay(pause); restart() }
         } else {
             player.stop()
             buffering = false
@@ -224,7 +237,7 @@ fun PlayerScreen(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> buffering = true
-                    Player.STATE_READY -> { buffering = false; failed = false }
+                    Player.STATE_READY -> { buffering = false; failed = false; autoRetries = 0 }
                     Player.STATE_ENDED -> onStreamProblem()
                     else -> Unit
                 }

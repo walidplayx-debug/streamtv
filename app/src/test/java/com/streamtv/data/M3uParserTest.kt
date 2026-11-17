@@ -28,6 +28,13 @@ class M3uParserTest {
     @Test fun ignoresVlcOptionsBetweenInfoAndUrl() {
         assertEquals(1, M3uParser.parse("#EXTM3U\n#EXTINF:-1,A\n#EXTVLCOPT:http-user-agent=x\nhttps://x/a").size)
     }
+    @Test fun keepsVlcOptionsAsRequestHeaders() {
+        val url = M3uParser.parse("#EXTM3U\n#EXTINF:-1,A\n#EXTVLCOPT:http-user-agent=Box 1\n#EXTVLCOPT:http-referrer=https://r/\nhttps://x/a").single().url
+        assertEquals("https://x/a|User-Agent=Box+1&Referer=https%3A%2F%2Fr%2F", url)
+    }
+    @Test fun leavesPlainUrlsAlone() {
+        assertEquals("https://x/a", M3uParser.parse("#EXTM3U\n#EXTINF:-1,A\nhttps://x/a\n#EXTINF:-1,B\nhttps://x/b").first().url)
+    }
     @Test fun ignoresCommentOnlyInput() { assertTrue(M3uParser.parse("#EXTM3U\n#EXTVLCOPT:x").isEmpty()) }
     @Test fun ignoresUrlWithoutExtinf() { assertTrue(M3uParser.parse("https://x/a").isEmpty()) }
     @Test fun ignoresExtinfWithoutUrl() { assertTrue(M3uParser.parse("#EXTINF:-1,A").isEmpty()) }
