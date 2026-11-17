@@ -68,7 +68,7 @@ fun ChannelLogo(
     val context = LocalContext.current
     // Pixels are read only when the plate is wanted, so other logos keep the faster hardware bitmaps.
     val model = remember(logo, smartPlate) {
-        if (smartPlate && logo != null && logo !in LogoTone.known) ImageRequest.Builder(context).data(logo).allowHardware(false).build() else logo
+        if (smartPlate && logo != null && !LogoTone.known.containsKey(logo)) ImageRequest.Builder(context).data(logo).allowHardware(false).build() else logo
     }
     Box(modifier.clip(RoundedCornerShape(corner)), contentAlignment = Alignment.Center) {
         if (smartPlate && plate && hasLogo && loaded) {
