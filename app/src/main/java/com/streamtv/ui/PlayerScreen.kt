@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -128,7 +129,8 @@ fun PlayerScreen(
     val currentChannelIndex = channels.indexOfFirst { it.key == channel.key }.coerceAtLeast(0)
     val current = playerProgram(channel, programs)
 
-    // The lists the side panel can page through with left/right.
+    // The lists the side panel can page through with left/right: only the list the channel was
+    // opened from, Favorites and Last watched. Fewer pages, no going round in circles.
     val isLive = remember(channel.url) { channel.kind() == ChannelKind.Live }
     // Built off the main thread: sorting a whole playlist on every channel change made the
     // open panel stutter for a moment when a channel was picked.
@@ -138,12 +140,10 @@ fun PlayerScreen(
             val live = allChannels.filter { it.kind() == ChannelKind.Live }
             val byKey = live.associateBy { it.key }
             val watched = recent.mapNotNull { byKey[it] }
-            if (watched.isNotEmpty()) add("Last watched" to watched)
-            add("All channels" to live)
+            add(queueTitle to channels)
             val starred = live.filter { favorites.hasFavorite(it) }
-            if (starred.isNotEmpty()) add("Favorites" to starred)
-            live.groupBy { it.group.ifBlank { "Other" } }.forEach { (name, items) -> add(name to items) }
-            if (none { it.first == queueTitle }) add(0, queueTitle to channels)
+            if (starred.isNotEmpty() && queueTitle != "Favorites") add("Favorites" to starred)
+            if (watched.isNotEmpty() && queueTitle != "Last watched") add("Last watched" to watched)
         } }
         liveLists = built
     }
@@ -652,11 +652,10 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
             Row(
                 (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
                     .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
+                    // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
                     .background(
-                        when {
-                            focused -> Color(0xF2F2F2F7)
-                            else -> Color.White.copy(alpha = .12f * playingMark)
-                        }
+                        if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
+                        else SolidColor(Color.White.copy(alpha = .10f * playingMark))
                     )
                     .onFocusChanged { state ->
                         if (state.isFocused) {
@@ -676,7 +675,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(
                         channelDisplayName(item.name),
-                        color = if (focused) Color(0xFF1C1C1E) else PlayerWhite,
+                        color = if (focused) Color.White else Color.White.copy(alpha = .80f),
                         fontSize = 15.sp,
                         lineHeight = 18.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -686,7 +685,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     )
                     Text(
                         item.group,
-                        color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF),
+                        color = Color.White.copy(alpha = if (focused) .72f else .46f),
                         fontSize = 11.sp,
                         lineHeight = 13.sp,
                         textAlign = TextAlign.Start,
@@ -699,10 +698,10 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     Spacer(Modifier.width(8.dp))
                     Box(
                         Modifier.clip(RoundedCornerShape(6.dp))
-                            .background(if (focused) Color(0x1F000000) else Color(0x24FFFFFF))
+                            .background(Color.White.copy(alpha = if (focused) .16f else .10f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(quality, color = if (focused) Color(0xCC1C1C1E) else Color(0xD9FFFFFF), fontSize = 10.sp,
+                        Text(quality, color = Color.White.copy(alpha = if (focused) .85f else .60f), fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
