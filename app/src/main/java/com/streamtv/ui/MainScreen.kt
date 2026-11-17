@@ -374,7 +374,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
             ) {
                 listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
                     val selected = tab == item
-                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
+                    TabPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
                 }
             }
             // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
@@ -445,6 +445,46 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
             fontSize = fontSize.sp,
             maxLines = 1,
             softWrap = false,
+            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium,
+            onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
+        )
+    }
+}
+
+/**
+ * A top tab: a line icon and its name inside the one glass capsule, with no frame of its own. The
+ * open tab is filled with the app's blue-grey; the focused one is filled fully, lifts a little and
+ * gets a faint light edge.
+ */
+@Composable
+private fun TabPill(tab: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(if (pressed) .95f else if (focused) 1.04f else 1f, spring(stiffness = 500f), label = "tabScale")
+    Row(
+        modifier.scale(scale).clip(CircleShape)
+            .background(
+                when {
+                    pressed -> PressBrush
+                    focused -> FocusBrush
+                    selected -> Brush.verticalGradient(listOf(Color(0xFF8290A6).copy(alpha = .62f), Color(0xFF647187).copy(alpha = .62f)))
+                    else -> SolidColor(Color.Transparent)
+                }
+            )
+            .border(if (focused) 1.dp else 0.dp, if (focused) White.copy(alpha = .40f) else Color.Transparent, CircleShape)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = press).padding(horizontal = 12.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val tint = White.copy(alpha = if (focused || selected) .98f else .62f)
+        TabIcon(tab, tint, size = 17.dp)
+        Spacer(Modifier.width(8.dp))
+        // A word too long for its tab is drawn smaller rather than cut off.
+        val label = t(tab)
+        var fontSize by remember(label) { mutableStateOf(16f) }
+        Text(
+            label, color = tint, fontSize = fontSize.sp, maxLines = 1, softWrap = false,
             fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium,
             onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
         )
