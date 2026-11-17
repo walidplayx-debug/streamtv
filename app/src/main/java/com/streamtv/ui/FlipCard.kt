@@ -209,13 +209,17 @@ fun FlipCardDialog(
         // The OK press that opened this card may still be held down; ignore it until it is released.
         val armed = remember { booleanArrayOf(false) }
 
-        // A side-list entry's card opens right over the list, at the entry, as wide as the list;
-        // its first option sits where the entry was.
+        // A side-list entry's card opens over the list, as wide as it, always in the middle of the
+        // screen's height, and slides in gently from the screen edge on the list's side.
         val anchor = menu?.anchor
         val screenDensity = androidx.compose.ui.platform.LocalDensity.current
+        val screenWidth = with(screenDensity) { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() }
+        val fromRight = anchor != null && anchor.center.x > screenWidth / 2f
+        val slide = remember { Animatable(1f) }
+        LaunchedEffect(Unit) { if (anchor != null) slide.animateTo(0f, tween(320, easing = FastOutSlowInEasing)) else slide.snapTo(0f) }
         Box(
-            if (anchor != null) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(24.dp),
-            contentAlignment = if (anchor != null) Alignment.TopStart else if (atEnd) Alignment.CenterEnd else Alignment.Center
+            Modifier.fillMaxSize().then(if (anchor != null) Modifier else Modifier.padding(24.dp)),
+            contentAlignment = if (anchor != null) androidx.compose.ui.AbsoluteAlignment.CenterLeft else if (atEnd) Alignment.CenterEnd else Alignment.Center
         ) {
             Box(
                 Modifier
@@ -223,11 +227,15 @@ fun FlipCardDialog(
                         rotationY = rotation.value
                         cameraDistance = 16f * density
                         alpha = appear.value.coerceIn(0f, 1f)
+                        if (anchor != null) {
+                            val travel = if (fromRight) screenWidth - anchor.left else anchor.right
+                            translationX = (if (fromRight) travel else -travel) * slide.value
+                        }
                     }
                     .then(
                         if (anchor == null) Modifier.width(CardWidth)
                         else with(screenDensity) {
-                            Modifier.absoluteOffset(anchor.left.toDp(), (anchor.top.toDp() - 54.dp).coerceAtLeast(16.dp)).width(anchor.width.toDp())
+                            Modifier.absoluteOffset(x = anchor.left.toDp()).width(anchor.width.toDp())
                         }
                     )
                     .clip(RoundedCornerShape(28.dp)).background(CardGlass)
