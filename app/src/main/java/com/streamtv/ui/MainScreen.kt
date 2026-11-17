@@ -488,6 +488,18 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     }
     Row(Modifier.fillMaxSize()) {
         val groupsState = rememberLazyListState()
+        // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
+        // instead of showing the top of the list.
+        LaunchedEffect(Unit) {
+            val top = (if (recent.isNotEmpty()) 1 else 0) + (if (live.any { state.favorites.hasFavorite(it) }) 1 else 0)
+            val index = when (query) {
+                "__recent" -> 0
+                "__favorites" -> top - 1
+                "__all" -> top
+                else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
+            }
+            if (index > 2) groupsState.scrollToItem(index - 2)
+        }
         Box(Modifier.width(250.dp).fillMaxHeight()) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
@@ -576,6 +588,14 @@ private fun LibraryContent(
     }
     Row(Modifier.fillMaxSize()) {
         val menuState = rememberLazyListState()
+        // Back from a title or the player, the chosen genre is brought back into view.
+        LaunchedEffect(Unit) {
+            val genreIndex = genres.keys.indexOf(section)
+            if (query.isEmpty() && genreIndex >= 0) {
+                val before = (if (liveMenu) 2 else 3) + (if (history.isNotEmpty()) 1 else 0) + (if (favorites.isNotEmpty()) 1 else 0) + 1
+                menuState.scrollToItem((before + genreIndex - 2).coerceAtLeast(0))
+            }
+        }
         val searchHint = if (kind == ChannelKind.Movie) "Search movies" else "Search series"
         if (liveMenu) {
             // The same list as Live TV: plain rows, section headings, the scroll bar on its edge.
