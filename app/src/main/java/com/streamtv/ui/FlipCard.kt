@@ -203,9 +203,10 @@ fun FlipCardDialog(
         // The OK press that opened this card may still be held down; ignore it until it is released.
         val armed = remember { booleanArrayOf(false) }
 
+        // A side-list entry's card sits right beside the list, next to the entry it is about.
         Box(
-            Modifier.fillMaxSize().padding(24.dp),
-            contentAlignment = if (atEnd) Alignment.CenterEnd else Alignment.Center
+            Modifier.fillMaxSize().padding(24.dp).padding(start = if (menu != null) 268.dp else 0.dp),
+            contentAlignment = if (atEnd) Alignment.CenterEnd else if (menu != null) Alignment.CenterStart else Alignment.Center
         ) {
             Box(
                 Modifier
@@ -257,7 +258,8 @@ fun FlipCardDialog(
                         }
                     }
                 }
-                Box(
+                // A menu card never turns over, so it has no back and is only as tall as its rows.
+                if (menu == null) Box(
                     Modifier.fillMaxWidth().graphicsLayer { rotationY = 180f; alpha = if (backVisible) 1f else 0f },
                     contentAlignment = Alignment.Center
                 ) {
