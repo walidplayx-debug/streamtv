@@ -1,22 +1,20 @@
 package com.streamtv.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.streamtv.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,10 +58,37 @@ object UpdateNotice {
     }
 }
 
-/** A small red circle with "!" that says something new is waiting. */
+/**
+ * A glossy red circle with a white "!" that says something new is waiting. The mark is drawn, not
+ * typed, so it sits exactly in the middle whatever the font.
+ */
 @Composable
-fun AlertBadge(modifier: Modifier = Modifier, size: Dp = 18.dp) {
-    Box(modifier.size(size).clip(CircleShape).background(Color(0xFFE5484D)), contentAlignment = Alignment.Center) {
-        Text("!", color = Color.White, fontSize = (size.value * .68f).sp, fontWeight = FontWeight.Bold, maxLines = 1)
+fun AlertBadge(modifier: Modifier = Modifier, size: Dp = 22.dp) {
+    Canvas(modifier.size(size)) {
+        val r = this.size.minDimension / 2f
+        val c = center
+        // A soft shadow under it.
+        drawCircle(Color.Black.copy(alpha = .35f), radius = r, center = Offset(c.x, c.y + r * .12f))
+        // Red, lit from above: brighter at the top, deeper at the rim.
+        drawCircle(
+            Brush.radialGradient(
+                listOf(Color(0xFFFF5B4E), Color(0xFFE3241B), Color(0xFFB3120B)),
+                center = Offset(c.x, c.y - r * .35f), radius = r * 1.35f
+            ),
+            radius = r, center = c
+        )
+        // A thin light rim and a gloss on the upper half.
+        drawCircle(Color.White.copy(alpha = .55f), radius = r - r * .05f, center = c, style = Stroke(width = r * .09f))
+        drawOval(
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = .45f), Color.Transparent), startY = c.y - r * .9f, endY = c.y),
+            topLeft = Offset(c.x - r * .62f, c.y - r * .9f), size = Size(r * 1.24f, r * .85f)
+        )
+        // The "!": a rounded bar and a dot, centred.
+        val w = r * .26f
+        drawRoundRect(
+            Color.White, topLeft = Offset(c.x - w / 2f, c.y - r * .56f), size = Size(w, r * .70f),
+            cornerRadius = CornerRadius(w / 2f)
+        )
+        drawCircle(Color.White, radius = w * .62f, center = Offset(c.x, c.y + r * .42f))
     }
 }

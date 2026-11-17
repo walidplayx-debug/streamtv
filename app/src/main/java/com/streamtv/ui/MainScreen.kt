@@ -374,14 +374,14 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
             ) {
                 listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
                     val selected = tab == item
-                    Box(Modifier.weight(1f)) {
-                        FocusPill(item, selected, Modifier.fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
-                        // A newer version is waiting: a red mark on Settings.
-                        if (item == "Settings" && UpdateNotice.available) {
-                            AlertBadge(Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 8.dp), size = 15.dp)
-                        }
-                    }
+                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
                 }
+            }
+            // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
+            // last tab), centred on its height and half over its edge. Drawn outside the bar's clip
+            // so it is never cut.
+            if (UpdateNotice.available) {
+                AlertBadge(Modifier.align(Alignment.CenterEnd).offset(x = 8.dp), size = 24.dp)
             }
         }
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
@@ -1536,7 +1536,7 @@ private fun FocusRow(
         .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (alert) AlertBadge() else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
+        if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
     }
 }
 
