@@ -368,20 +368,20 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Row(
-                Modifier.onFocusChanged { onFocus(it.hasFocus) },
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp)
+                    .onFocusChanged { onFocus(it.hasFocus) },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
                     val selected = tab == item
-                    Box {
-                        TabText(item, selected, if (selected) Modifier.focusRequester(tabFocus) else Modifier) { onSelect(item) }
-                        // A newer version is waiting: a small red mark on the corner of Settings.
-                        if (item == "Settings" && UpdateNotice.available) {
-                            AlertBadge(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-4).dp), size = 17.dp)
-                        }
-                    }
+                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
                 }
+            }
+            // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
+            // last tab), centred on its height and half over its edge. Drawn outside the bar's clip
+            // so it is never cut.
+            if (UpdateNotice.available) {
+                AlertBadge(Modifier.align(Alignment.CenterEnd).offset(x = 8.dp), size = 24.dp)
             }
         }
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
@@ -448,34 +448,6 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
             fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium,
             onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
         )
-    }
-}
-
-/**
- * A top tab as plain text (no capsule, no frame). The open tab is white and bold with a short STV-red
- * line under it; the others are dim. The focused tab gets a soft glass pill and lifts a little, so
- * where you are (glass) and what is open (red line) never look alike.
- */
-@Composable
-private fun TabText(tab: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.06f else 1f, spring(stiffness = 700f), label = "tabScale")
-    Column(
-        modifier.scale(scale).clip(CircleShape)
-            .background(if (focused) White.copy(alpha = .13f) else Color.Transparent)
-            .border(1.dp, if (focused) White.copy(alpha = .28f) else Color.Transparent, CircleShape)
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            t(tab), maxLines = 1, softWrap = false, fontSize = 18.sp,
-            color = White.copy(alpha = if (selected || focused) 1f else .52f),
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-        )
-        Spacer(Modifier.height(4.dp))
-        Box(Modifier.width(18.dp).height(3.dp).clip(CircleShape).background(if (selected) Color(0xFFE8452F) else Color.Transparent))
     }
 }
 
