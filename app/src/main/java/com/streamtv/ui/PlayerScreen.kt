@@ -491,7 +491,7 @@ fun PlayerScreen(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))
                     .background(PlayerGlass)
                     .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
-                    .padding(top = 18.dp)
+                    .padding(top = 10.dp)
             ) {
                 val many = lists.size > 1
                 val pop = remember { Animatable(1f) }
@@ -508,11 +508,11 @@ fun PlayerScreen(
                         .focusRequester(listNameFocusRequester)
                         .onFocusChanged { nameFocused = it.isFocused }
                         .focusable()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val arrow = if (!many || pickerOpen) 0f else if (nameFocused) 1f else .5f
-                    Text(if (rtl) "›" else "‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
+                    Text(if (rtl) "›" else "‹", color = PlayerWhite.copy(alpha = arrow), fontSize = 21.sp)
                     AnimatedContent(
                         targetState = listTitle,
                         modifier = Modifier.weight(1f).scale(pop.value),
@@ -523,15 +523,15 @@ fun PlayerScreen(
                         label = "listTitle"
                     ) { title ->
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t(title), color = PlayerWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(t(title), color = PlayerWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, lineHeight = 21.sp)
                             val size = lists.firstOrNull { it.first == title }?.second?.size ?: 0
-                            Text(if (size == 1) "1 ${t("channel")}" else "$size ${t("channels")}", color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1)
+                            Text(if (size == 1) "1 ${t("channel")}" else "$size ${t("channels")}", color = Color(0x99FFFFFF), fontSize = 11.sp, maxLines = 1, lineHeight = 13.sp)
                         }
                     }
-                    Text(if (rtl) "‹" else "›", color = PlayerWhite.copy(alpha = arrow), fontSize = 24.sp)
+                    Text(if (rtl) "‹" else "›", color = PlayerWhite.copy(alpha = arrow), fontSize = 21.sp)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 AnimatedContent(
                     targetState = if (pickerOpen) ListPickerKey else listTitle,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -623,7 +623,8 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
         modifier = Modifier.fillMaxSize(),
         // Room on every side so the 1.04 focus scale and the last row are never clipped.
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        // Compact rows: about half as many again fit on screen, with the same logo, name, group and quality.
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         items(items, key = { it.key }) { item ->
             val isPlaying = item.key == playing.key
@@ -654,16 +655,17 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                         }
                     }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ChannelLogo(item.name, item.logo, Modifier.size(40.dp), fontSize = 14.sp, corner = 9.dp)
-                Spacer(Modifier.width(12.dp))
+                ChannelLogo(item.name, item.logo, Modifier.size(32.dp), fontSize = 12.sp, corner = 7.dp)
+                Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(
                         channelDisplayName(item.name),
                         color = if (focused) Color(0xFF1C1C1E) else PlayerWhite,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
@@ -672,7 +674,8 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     Text(
                         item.group,
                         color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
