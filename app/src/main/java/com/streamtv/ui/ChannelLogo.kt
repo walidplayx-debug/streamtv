@@ -58,12 +58,15 @@ fun ChannelLogo(
     contentScale: ContentScale = ContentScale.Fit,
     /** When given, a channel without a logo shows its name under its category's colour instead of initials. */
     group: String? = null,
-    /** Give a dark or see-through logo a soft light plate, so it does not sink into a dark tile. */
-    smartPlate: Boolean = false
+    /**
+     * When given, the logo is judged once as it loads, and this is told whether it is dark or
+     * see-through enough to need a light tile behind it (false while loading or without a logo).
+     */
+    onNeedsLight: ((Boolean) -> Unit)? = null
 ) {
+    val smartPlate = onNeedsLight != null
     var loaded by remember(logo) { mutableStateOf(false) }
     var failed by remember(logo) { mutableStateOf(false) }
-    var plate by remember(logo) { mutableStateOf(logo?.let { LogoTone.known[it] } ?: false) }
     val hasLogo = !logo.isNullOrBlank() && !failed
     val context = LocalContext.current
     // Pixels are read only when the plate is wanted, so other logos keep the faster hardware bitmaps.
@@ -71,9 +74,6 @@ fun ChannelLogo(
         if (smartPlate && logo != null && !LogoTone.known.containsKey(logo)) ImageRequest.Builder(context).data(logo).allowHardware(false).build() else logo
     }
     Box(modifier.clip(RoundedCornerShape(corner)), contentAlignment = Alignment.Center) {
-        if (smartPlate && plate && hasLogo && loaded) {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFF1F3F7), Color(0xFFD9DEE7)))))
-        }
         if (!hasLogo || !loaded) {
             if (group != null) {
                 CategoryFace(name, group)
@@ -87,17 +87,17 @@ fun ChannelLogo(
             AsyncImage(
                 model = model,
                 contentDescription = name,
-                modifier = Modifier.fillMaxSize().padding(if (smartPlate && plate) logoPadding + 4.dp else logoPadding),
+                modifier = Modifier.fillMaxSize().padding(logoPadding),
                 contentScale = contentScale,
                 onSuccess = { success ->
                     if (smartPlate && logo != null) {
                         val dark = LogoTone.known[logo] ?: ((success.result.drawable as? BitmapDrawable)?.bitmap
                             ?.let { LogoTone.needsPlate(it) } ?: false).also { LogoTone.known[logo] = it }
-                        plate = dark
+                        onNeedsLight?.invoke(dark)
                     }
                     loaded = true
                 },
-                onError = { failed = true }
+                onError = { failed = true; onNeedsLight?.invoke(false) }
             )
         }
     }

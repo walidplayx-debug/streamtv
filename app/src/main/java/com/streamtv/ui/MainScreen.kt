@@ -1060,15 +1060,22 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
     val (pressed, press) = rememberPress(onClick)
+    // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
+    var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
         // The focused tile grows and sits above its neighbours.
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)
             .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(if (focused) listOf(Color(0xFF465064), Color(0xFF2B3240)) else listOf(Color(0xFF252A33), Color(0xFF171B22))))
+            .background(Brush.linearGradient(when {
+                light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
+                light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
+                focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
+                else -> listOf(Color(0xFF252A33), Color(0xFF171B22))
+            }))
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
-            .border(1.dp, White.copy(alpha = if (focused) .16f else .07f), RoundedCornerShape(10.dp))
+            .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .onPreviewKeyEvent { event ->
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
@@ -1090,7 +1097,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
         ChannelLogo(
             channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp), fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
-            group = channel.group, smartPlate = true
+            group = channel.group, onNeedsLight = { light = it }
         )
         if (mark != null) LanguageMark(mark, Modifier.align(Alignment.TopStart).padding(top = 5.dp, start = 5.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
