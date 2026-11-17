@@ -718,7 +718,7 @@ private fun CardButton(label: String, modifier: Modifier = Modifier, onClick: ()
     }
 }
 
-internal fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
+private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
     val now = System.currentTimeMillis()
     return programs.firstOrNull {
         (it.channelId == channel.id || it.channelId.equals(channel.name, true)) &&
@@ -729,5 +729,5 @@ internal fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgPro
 internal fun channelDisplayName(name: String): String =
     name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
 
-internal fun channelQuality(name: String): String =
+private fun channelQuality(name: String): String =
     Regex("\\b(\\d{3,4}p|4K|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()
