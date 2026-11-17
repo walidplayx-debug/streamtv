@@ -584,16 +584,17 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     color = White.copy(alpha = .9f), fontSize = 13.sp
                 )
             }
+            // The same card as a channel's, with two rows: move the entry, or hide it.
             menuFor?.let { picked ->
-                SectionMenu(
-                    title = t(picked.title),
-                    onTop = {
-                        model.setSectionOrder(mode.key, listOf(picked.token) + arranged.map { it.token }.filter { it != picked.token })
+                FlipCardDialog(
+                    atEnd = false, pin = null, question = null,
+                    onPinSubmit = {}, onPinCancel = {}, onQuestionCancel = {},
+                    onDismiss = { menuFor = null }, onIdle = { menuFor = null }, options = null,
+                    menu = CardMenu(t(picked.title), listOf(Triple("Move section", "move", "move"), Triple("Hide this section", "hide", "hide"))) { id ->
                         menuFor = null
-                    },
-                    onMove = { draft = arranged; moving = picked.token; menuFor = null },
-                    onHide = { model.hideSection(mode.key, picked.token); menuFor = null },
-                    onDismiss = { menuFor = null }
+                        if (id == "move") { draft = arranged; moving = picked.token }
+                        else model.hideSection(mode.key, picked.token)
+                    }
                 )
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
@@ -1657,30 +1658,6 @@ private fun FocusRow(
         if (leading != null) { leading(); Spacer(Modifier.width(11.dp)) }
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
-    }
-}
-
-/**
- * The small card opened by holding OK on a side-list entry: move it to the top, move it step by
- * step, or hide it. Same glass look as the channel card.
- */
-@Composable
-private fun SectionMenu(title: String, onTop: () -> Unit, onMove: () -> Unit, onHide: () -> Unit, onDismiss: () -> Unit) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        val first = remember { FocusRequester() }
-        LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-        Column(
-            Modifier.width(288.dp).clip(RoundedCornerShape(24.dp))
-                .background(Brush.verticalGradient(listOf(Color(0xF2262931), Color(0xF2131519))))
-                .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 12.dp, vertical = 14.dp)
-        ) {
-            Text(title, color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp))
-            FocusRow("Move to top", "", false, Modifier.focusRequester(first), onClick = onTop)
-            FocusRow("Move", "", false, onClick = onMove)
-            FocusRow("Hide this section", "", false, onClick = onHide)
-        }
     }
 }
 

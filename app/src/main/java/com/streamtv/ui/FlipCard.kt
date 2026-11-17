@@ -78,6 +78,9 @@ private val CardWidth = 288.dp
 /** What the front of the card offers for a channel. [onPick] gets "favorite", "history", "hide", "lock" or "rename". */
 class CardOptions(val channel: Channel, val starred: Boolean, val locked: Boolean, val inHistory: Boolean, val onPick: (String) -> Unit)
 
+/** The same card with other rows: a heading, then (label, icon, id) rows; [onPick] gets the id. */
+class CardMenu(val heading: String, val rows: List<Triple<String, String, String>>, val onPick: (String) -> Unit)
+
 /** What the back of the card shows: who it is about, what it asks, and what went wrong last time. */
 data class PinFace(val heading: String, val message: String, val error: String?)
 
@@ -136,8 +139,11 @@ fun FlipCardDialog(
     /** Nothing pressed for a while (8 s on the options, 20 s on the PIN pad): put the card away. */
     onIdle: () -> Unit,
     /** The front; null when the card only asks for the PIN. */
-    options: CardOptions?
+    options: CardOptions?,
+    /** Another front with rows of its own (a side-list entry's card), used instead of [options]. */
+    menu: CardMenu? = null
 ) {
+    val hasFront = options != null || menu != null
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect { if (atEnd) window?.setDimAmount(0f) }
@@ -179,14 +185,14 @@ fun FlipCardDialog(
         // One focus target per option; the card remembers the last one focused, so turning back
         // from the PIN pad puts the white highlight where it was (on "Lock channel", say).
         val rowFocus = remember { mutableMapOf<String, FocusRequester>() }
-        val lastRow = remember { arrayOf("favorite") }
+        val lastRow = remember { arrayOf(menu?.rows?.firstOrNull()?.third ?: "favorite") }
         val backFirst = remember { FocusRequester() }
         val questionFirst = remember { FocusRequester() }
         // Focus follows the face: wait one frame so the face just turned to can take focus.
         LaunchedEffect(flipped, questionMode) {
             withFrameNanos { }
             if (flipped) (if (questionMode) questionFirst else backFirst).focusWhenReady()
-            else if (options != null) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
+            else if (hasFront) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
         }
         // Every key press restarts the idle clock.
         var keyTick by remember { mutableStateOf(0) }
@@ -234,12 +240,21 @@ fun FlipCardDialog(
             ) {
                 // Both faces are always laid out, so the card is as big as the bigger one and never
                 // changes size; the face turned away is invisible and cannot take focus.
-                if (options != null) {
+                if (hasFront) {
                     Column(
                         Modifier.fillMaxWidth().graphicsLayer { alpha = if (backVisible) 0f else 1f }
                             .padding(horizontal = 14.dp, vertical = 16.dp)
                     ) {
-                        ChannelOptionsFront(options, enabled = !flipped, settled = settled, focus = rowFocus) { lastRow[0] = it }
+                        if (options != null) ChannelOptionsFront(options, enabled = !flipped, settled = settled, focus = rowFocus) { lastRow[0] = it }
+                        else if (menu != null) {
+                            Text(menu.heading, color = CardWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+                            Spacer(Modifier.height(10.dp))
+                            for ((label, icon, id) in menu.rows) {
+                                val requester = remember(id) { rowFocus.getOrPut(id) { FocusRequester() } }
+                                OptionRow(label, icon, !flipped, settled, Modifier.focusRequester(requester), { lastRow[0] = id }) { menu.onPick(id) }
+                            }
+                        }
                     }
                 }
                 Box(
@@ -474,6 +489,15 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
                 drawCircle(tint, radius = w * .42f, center = Offset(w * .5f, h * .5f), style = line)
                 drawLine(tint, Offset(w * .5f, h * .5f), Offset(w * .5f, h * .26f), strokeWidth = w * .09f, cap = StrokeCap.Round)
                 drawLine(tint, Offset(w * .5f, h * .5f), Offset(w * .68f, h * .6f), strokeWidth = w * .09f, cap = StrokeCap.Round)
+            }
+            "move" -> {
+                // Up and down arrows.
+                val s = w * .09f
+                drawLine(tint, Offset(w * .5f, h * .1f), Offset(w * .5f, h * .9f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .5f, h * .1f), Offset(w * .28f, h * .32f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .5f, h * .1f), Offset(w * .72f, h * .32f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .5f, h * .9f), Offset(w * .28f, h * .68f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .5f, h * .9f), Offset(w * .72f, h * .68f), strokeWidth = s, cap = StrokeCap.Round)
             }
             "lock" -> {
                 drawRoundRect(tint, topLeft = Offset(w * .18f, h * .44f), size = Size(w * .64f, h * .48f),
