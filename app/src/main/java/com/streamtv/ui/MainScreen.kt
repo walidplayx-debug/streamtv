@@ -47,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
@@ -474,6 +476,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     var draft by remember { mutableStateOf<List<ChannelSection>?>(null) }
     var moving by remember { mutableStateOf<String?>(null) }
     var menuFor by remember { mutableStateOf<ChannelSection?>(null) }
+    // Where each entry is on screen, so its card can open right over it.
+    val rowBounds = remember { HashMap<String, androidx.compose.ui.geometry.Rect>() }
     val liftFocus = remember { FocusRequester() }
     val sections = draft ?: arranged
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
@@ -540,7 +544,9 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     val lifted = moving == item.token
                     FocusRow(
                         t(item.title), item.channels.size.toString(), query.equals(item.token, true),
-                        modifier = (if (lifted) Modifier.focusRequester(liftFocus) else Modifier).onPreviewKeyEvent { event ->
+                        modifier = (if (lifted) Modifier.focusRequester(liftFocus) else Modifier)
+                            .onGloballyPositioned { rowBounds[item.token] = it.boundsInWindow() }
+                            .onPreviewKeyEvent { event ->
                             val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
                             if (lifted) {
                                 // Up and down move the lifted entry; OK or Back puts it down and saves the order.
@@ -590,7 +596,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     atEnd = false, pin = null, question = null,
                     onPinSubmit = {}, onPinCancel = {}, onQuestionCancel = {},
                     onDismiss = { menuFor = null }, onIdle = { menuFor = null }, options = null,
-                    menu = CardMenu(t(picked.title), listOf(Triple("Move section", "move", "move"), Triple("Hide this section", "hide", "hide"))) { id ->
+                    menu = CardMenu(t(picked.title), listOf(Triple("Move section", "move", "move"), Triple("Hide this section", "hide", "hide")), rowBounds[picked.token]) { id ->
                         menuFor = null
                         if (id == "move") { draft = arranged; moving = picked.token }
                         else model.hideSection(mode.key, picked.token)

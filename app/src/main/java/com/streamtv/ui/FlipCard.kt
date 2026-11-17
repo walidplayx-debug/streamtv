@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -79,7 +80,12 @@ private val CardWidth = 288.dp
 class CardOptions(val channel: Channel, val starred: Boolean, val locked: Boolean, val inHistory: Boolean, val onPick: (String) -> Unit)
 
 /** The same card with other rows: a heading, then (label, icon, id) rows; [onPick] gets the id. */
-class CardMenu(val heading: String, val rows: List<Triple<String, String, String>>, val onPick: (String) -> Unit)
+class CardMenu(
+    val heading: String, val rows: List<Triple<String, String, String>>,
+    /** Where the entry is on screen: the card opens over it, as wide as the list. */
+    val anchor: androidx.compose.ui.geometry.Rect? = null,
+    val onPick: (String) -> Unit
+)
 
 /** What the back of the card shows: who it is about, what it asks, and what went wrong last time. */
 data class PinFace(val heading: String, val message: String, val error: String?)
@@ -203,10 +209,13 @@ fun FlipCardDialog(
         // The OK press that opened this card may still be held down; ignore it until it is released.
         val armed = remember { booleanArrayOf(false) }
 
-        // A side-list entry's card sits right beside the list, next to the entry it is about.
+        // A side-list entry's card opens right over the list, at the entry, as wide as the list;
+        // its first option sits where the entry was.
+        val anchor = menu?.anchor
+        val density = androidx.compose.ui.platform.LocalDensity.current
         Box(
-            Modifier.fillMaxSize().padding(24.dp).padding(start = if (menu != null) 268.dp else 0.dp),
-            contentAlignment = if (atEnd) Alignment.CenterEnd else if (menu != null) Alignment.CenterStart else Alignment.Center
+            if (anchor != null) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = if (anchor != null) Alignment.TopStart else if (atEnd) Alignment.CenterEnd else Alignment.Center
         ) {
             Box(
                 Modifier
@@ -215,7 +224,13 @@ fun FlipCardDialog(
                         cameraDistance = 16f * density
                         alpha = appear.value.coerceIn(0f, 1f)
                     }
-                    .width(CardWidth).clip(RoundedCornerShape(28.dp)).background(CardGlass)
+                    .then(
+                        if (anchor == null) Modifier.width(CardWidth)
+                        else with(density) {
+                            Modifier.absoluteOffset(anchor.left.toDp(), (anchor.top.toDp() - 54.dp).coerceAtLeast(16.dp)).width(anchor.width.toDp())
+                        }
+                    )
+                    .clip(RoundedCornerShape(28.dp)).background(CardGlass)
                     .border(1.dp, CardBorder, RoundedCornerShape(28.dp))
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown) keyTick++
