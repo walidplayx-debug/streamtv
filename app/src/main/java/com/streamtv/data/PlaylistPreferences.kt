@@ -17,6 +17,8 @@ class PlaylistPreferences(private val context: Context) {
     private val lastChannelKey = stringPreferencesKey("last_channel_id")
     private val languageKey = stringPreferencesKey("interface_language")
     private val groupModeKey = stringPreferencesKey("channel_group_mode")
+    private val sectionOrderKey = stringPreferencesKey("section_order")
+    private val sectionHiddenKey = stringPreferencesKey("section_hidden")
     private val recentKey = stringPreferencesKey("recent_channel_keys")
     private val hiddenKey = stringSetPreferencesKey("hidden_channel_keys")
     private val lockedKey = stringSetPreferencesKey("locked_channel_keys")
@@ -42,6 +44,15 @@ class PlaylistPreferences(private val context: Context) {
     suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
     val groupMode: Flow<String> = context.dataStore.data.map { it[groupModeKey] ?: "provider" }
     suspend fun saveGroupMode(mode: String) { context.dataStore.edit { it[groupModeKey] = mode } }
+    // The side list's own order and hidden entries, one line per grouping mode: "mode<TAB>a<US>b<US>c".
+    val sectionOrder: Flow<Map<String, List<String>>> = context.dataStore.data.map { decodeSections(it[sectionOrderKey]) }
+    val sectionHidden: Flow<Map<String, List<String>>> = context.dataStore.data.map { decodeSections(it[sectionHiddenKey]) }
+    suspend fun saveSectionOrder(map: Map<String, List<String>>) { context.dataStore.edit { it[sectionOrderKey] = encodeSections(map) } }
+    suspend fun saveSectionHidden(map: Map<String, List<String>>) { context.dataStore.edit { it[sectionHiddenKey] = encodeSections(map) } }
+    private fun encodeSections(map: Map<String, List<String>>) =
+        map.filterValues { it.isNotEmpty() }.entries.joinToString("\n") { (mode, tokens) -> mode + "\t" + tokens.joinToString("\u001f") }
+    private fun decodeSections(text: String?): Map<String, List<String>> =
+        text.orEmpty().lines().filter { '\t' in it }.associate { line -> line.substringBefore('\t') to line.substringAfter('\t').split('\u001f').filter { it.isNotEmpty() } }
     val hiddenKeys: Flow<Set<String>> = context.dataStore.data.map { it[hiddenKey] ?: emptySet() }
     suspend fun saveHidden(keys: Set<String>) { context.dataStore.edit { it[hiddenKey] = keys } }
     val lockedKeys: Flow<Set<String>> = context.dataStore.data.map { it[lockedKey] ?: emptySet() }

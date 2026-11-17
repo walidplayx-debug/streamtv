@@ -461,7 +461,21 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     // The side list's sections, divided the way Settings › Playlist says (provider, language,
     // country or genre).
     val mode = GroupMode.of(state.groupMode)
-    val sections = remember(live, mode, state.language) { Memo.of("sections", live, mode, state.language) { channelSections(live, mode, state.language) } }
+    val defaultSections = remember(live, mode, state.language) { Memo.of("sections", live, mode, state.language) { channelSections(live, mode, state.language) } }
+    // The user's own order first (what they moved), then the rest in the default order; hidden ones left out.
+    val savedOrder = state.sectionOrder[mode.key].orEmpty()
+    val hidden = state.sectionHidden[mode.key].orEmpty()
+    val arranged = remember(defaultSections, savedOrder, hidden) {
+        val byToken = defaultSections.associateBy { it.token }
+        val first = savedOrder.mapNotNull { byToken[it] }
+        (first + defaultSections.filter { it.token !in savedOrder }).filter { it.token !in hidden }
+    }
+    // Moving an entry: the list being rearranged, and which entry is lifted.
+    var draft by remember { mutableStateOf<List<ChannelSection>?>(null) }
+    var moving by remember { mutableStateOf<String?>(null) }
+    var menuFor by remember { mutableStateOf<ChannelSection?>(null) }
+    val liftFocus = remember { FocusRequester() }
+    val sections = draft ?: arranged
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
     // A choice that no longer matches anything falls back to the default list instead of "no channels".
     val chosen = state.searchQuery
@@ -488,6 +502,17 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     }
     Row(Modifier.fillMaxSize()) {
         val groupsState = rememberLazyListState()
+        // While moving: keep the lifted entry focused and on screen as it travels.
+        LaunchedEffect(moving, draft) {
+            val token = moving ?: return@LaunchedEffect
+            val top = (if (recent.isNotEmpty()) 1 else 0) + (if (live.any { state.favorites.hasFavorite(it) }) 1 else 0) + 2
+            val index = top + sections.indexOfFirst { it.token == token }
+            val visible = groupsState.layoutInfo.visibleItemsInfo
+            if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
+                groupsState.animateScrollToItem((index - 3).coerceAtLeast(0))
+            }
+            runCatching { liftFocus.requestFocus() }
+        }
         // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
         // instead of showing the top of the list.
         LaunchedEffect(Unit) {
@@ -511,11 +536,65 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 item { FocusRow("All channels", live.size.toString(), query == "__all") { model.setSearchQuery("__all") } }
                 item { Text(t(mode.heading), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                 items(sections, key = { it.token }) { item ->
+                    val held = remember { booleanArrayOf(false) }
+                    val lifted = moving == item.token
                     FocusRow(
                         t(item.title), item.channels.size.toString(), query.equals(item.token, true),
-                        leading = item.flag?.let { code -> { CountryFlag(code) } }
-                    ) { model.setSearchQuery(item.token) }
+                        modifier = (if (lifted) Modifier.focusRequester(liftFocus) else Modifier).onPreviewKeyEvent { event ->
+                            val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                            if (lifted) {
+                                // Up and down move the lifted entry; OK or Back puts it down and saves the order.
+                                val list = draft ?: return@onPreviewKeyEvent true
+                                val at = list.indexOfFirst { it.token == item.token }
+                                when {
+                                    event.type != KeyEventType.KeyDown -> if (ok || event.key == Key.Back) {
+                                        if (event.type == KeyEventType.KeyUp) {
+                                            model.setSectionOrder(mode.key, list.map { it.token })
+                                            moving = null; draft = null
+                                        }
+                                        true
+                                    } else event.key == Key.DirectionUp || event.key == Key.DirectionDown
+                                    event.key == Key.DirectionUp -> { if (at > 0) draft = list.toMutableList().apply { add(at - 1, removeAt(at)) }; true }
+                                    event.key == Key.DirectionDown -> { if (at < list.size - 1) draft = list.toMutableList().apply { add(at + 1, removeAt(at)) }; true }
+                                    ok || event.key == Key.Back -> true
+                                    else -> true
+                                }
+                            } else when {
+                                !ok -> false
+                                // Held OK opens the entry's menu (move, move to top, hide).
+                                event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 -> { held[0] = false; false }
+                                event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0 -> {
+                                    if (!held[0]) { held[0] = true; menuFor = item }
+                                    true
+                                }
+                                event.type == KeyEventType.KeyUp && held[0] -> { held[0] = false; true }
+                                else -> false
+                            }
+                        },
+                        leading = item.flag?.let { code -> { CountryFlag(code) } },
+                        lifted = lifted
+                    ) { if (!lifted) model.setSearchQuery(item.token) }
                 }
+            }
+            // While moving, a line at the foot of the list says how.
+            if (moving != null) {
+                Text(
+                    t("↑↓ to move · OK to drop"), Modifier.align(Alignment.BottomCenter).clip(CircleShape)
+                        .background(Color(0xE61C1F26)).padding(horizontal = 14.dp, vertical = 7.dp),
+                    color = White.copy(alpha = .9f), fontSize = 13.sp
+                )
+            }
+            menuFor?.let { picked ->
+                SectionMenu(
+                    title = t(picked.title),
+                    onTop = {
+                        model.setSectionOrder(mode.key, listOf(picked.token) + arranged.map { it.token }.filter { it != picked.token })
+                        menuFor = null
+                    },
+                    onMove = { draft = arranged; moving = picked.token; menuFor = null },
+                    onHide = { model.hideSection(mode.key, picked.token); menuFor = null },
+                    onDismiss = { menuFor = null }
+                )
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
         }
@@ -1423,6 +1502,11 @@ private fun SettingsContent(
                             }
                         }
                     }
+                    // Only when something was moved or hidden.
+                    if (state.sectionOrder.values.any { it.isNotEmpty() } || state.sectionHidden.values.any { it.isNotEmpty() }) {
+                        Spacer(Modifier.height(10.dp))
+                        WhiteButton("Reset list order") { model.resetSections() }
+                    }
                     Spacer(Modifier.height(24.dp))
                 }
                 "TV guide" -> {
@@ -1558,18 +1642,45 @@ private fun FocusRow(
     alert: Boolean = false,
     /** Something shown before the title (a country's flag). */
     leading: (@Composable () -> Unit)? = null,
+    /** Picked up to be moved: larger, with a light frame. */
+    lifted: Boolean = false,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) .97f else if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
+    val scale by animateFloatAsState(if (lifted) 1.06f else if (pressed) .97f else if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
     Row(modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
+        .border(if (lifted) 2.dp else 0.dp, if (lifted) White.copy(alpha = .85f) else Color.Transparent, RoundedCornerShape(15.dp))
         .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
         .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         if (leading != null) { leading(); Spacer(Modifier.width(11.dp)) }
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
+    }
+}
+
+/**
+ * The small card opened by holding OK on a side-list entry: move it to the top, move it step by
+ * step, or hide it. Same glass look as the channel card.
+ */
+@Composable
+private fun SectionMenu(title: String, onTop: () -> Unit, onMove: () -> Unit, onHide: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        val first = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+        Column(
+            Modifier.width(288.dp).clip(RoundedCornerShape(24.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xF2262931), Color(0xF2131519))))
+                .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 12.dp, vertical = 14.dp)
+        ) {
+            Text(title, color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp))
+            FocusRow("Move to top", "", false, Modifier.focusRequester(first), onClick = onTop)
+            FocusRow("Move", "", false, onClick = onMove)
+            FocusRow("Hide this section", "", false, onClick = onHide)
+        }
     }
 }
 

@@ -57,6 +57,9 @@ data class TvState(
     val language: String = "en",
     /** How the Live TV side list divides channels: "provider", "language", "country" or "genre". */
     val groupMode: String = "provider",
+    /** The side list's order chosen by the user, and the entries hidden, per grouping mode. */
+    val sectionOrder: Map<String, List<String>> = emptyMap(),
+    val sectionHidden: Map<String, List<String>> = emptyMap(),
     /** Channels the viewer removed from every list (by key). */
     val hidden: Set<String> = emptySet(),
     /** Channels that need the PIN before they play (by key). */
@@ -205,6 +208,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.groupMode.collect { mode -> _state.value = _state.value.copy(groupMode = mode) }
         }
+        viewModelScope.launch {
+            preferences.sectionOrder.collect { order -> _state.value = _state.value.copy(sectionOrder = order) }
+        }
+        viewModelScope.launch {
+            preferences.sectionHidden.collect { hidden -> _state.value = _state.value.copy(sectionHidden = hidden) }
+        }
+    }
+    fun setSectionOrder(mode: String, tokens: List<String>) {
+        val order = _state.value.sectionOrder + (mode to tokens)
+        _state.value = _state.value.copy(sectionOrder = order)
+        viewModelScope.launch { preferences.saveSectionOrder(order) }
+    }
+    fun hideSection(mode: String, token: String) {
+        val hidden = _state.value.sectionHidden + (mode to (_state.value.sectionHidden[mode].orEmpty() + token).distinct())
+        _state.value = _state.value.copy(sectionHidden = hidden, searchQuery = if (_state.value.searchQuery == token) "__all" else _state.value.searchQuery)
+        viewModelScope.launch { preferences.saveSectionHidden(hidden) }
+    }
+    /** Back to the default order, with every hidden entry shown again. */
+    fun resetSections() {
+        _state.value = _state.value.copy(sectionOrder = emptyMap(), sectionHidden = emptyMap())
+        viewModelScope.launch { preferences.saveSectionOrder(emptyMap()); preferences.saveSectionHidden(emptyMap()) }
     }
     fun setGroupMode(mode: String) {
         // The old choice in the side list belongs to the old sections; start again from the top.
