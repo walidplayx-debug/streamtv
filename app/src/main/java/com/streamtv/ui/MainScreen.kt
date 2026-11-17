@@ -368,20 +368,20 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Row(
-                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp)
-                    .onFocusChanged { onFocus(it.hasFocus) },
+                Modifier.onFocusChanged { onFocus(it.hasFocus) },
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
                     val selected = tab == item
-                    TabPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
+                    Box {
+                        TabText(item, selected, if (selected) Modifier.focusRequester(tabFocus) else Modifier) { onSelect(item) }
+                        // A newer version is waiting: a small red mark on the corner of Settings.
+                        if (item == "Settings" && UpdateNotice.available) {
+                            AlertBadge(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-4).dp), size = 17.dp)
+                        }
+                    }
                 }
-            }
-            // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
-            // last tab), centred on its height and half over its edge. Drawn outside the bar's clip
-            // so it is never cut.
-            if (UpdateNotice.available) {
-                AlertBadge(Modifier.align(Alignment.CenterEnd).offset(x = 8.dp), size = 24.dp)
             }
         }
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
@@ -452,48 +452,36 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
 }
 
 /**
- * A top tab: a line icon and its name inside the one glass capsule, with no frame of its own. The
- * open tab is filled with the app's blue-grey; the focused one is filled fully, lifts a little and
- * gets a faint light edge.
+ * A top tab as plain text (no capsule, no frame). The open tab is white and bold with a short STV-red
+ * line under it; the others are dim. The focused tab gets a soft glass pill and lifts a little, so
+ * where you are (glass) and what is open (red line) never look alike.
  */
 @Composable
-private fun TabPill(tab: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun TabText(tab: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) .95f else if (focused) 1.04f else 1f, spring(stiffness = 500f), label = "tabScale")
-    Row(
+    val scale by animateFloatAsState(if (focused) 1.06f else 1f, spring(stiffness = 700f), label = "tabScale")
+    Column(
         modifier.scale(scale).clip(CircleShape)
-            .background(
-                when {
-                    pressed -> PressBrush
-                    focused -> FocusBrush
-                    selected -> Brush.verticalGradient(listOf(Color(0xFF8290A6).copy(alpha = .62f), Color(0xFF647187).copy(alpha = .62f)))
-                    else -> SolidColor(Color.Transparent)
-                }
-            )
-            .border(if (focused) 1.dp else 0.dp, if (focused) White.copy(alpha = .40f) else Color.Transparent, CircleShape)
+            .background(if (focused) White.copy(alpha = .13f) else Color.Transparent)
+            .border(1.dp, if (focused) White.copy(alpha = .28f) else Color.Transparent, CircleShape)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = press).padding(horizontal = 12.dp, vertical = 11.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val tint = White.copy(alpha = if (focused || selected) .98f else .62f)
-        TabIcon(tab, tint, size = 17.dp)
-        Spacer(Modifier.width(8.dp))
-        // A word too long for its tab is drawn smaller rather than cut off.
-        val label = t(tab)
-        var fontSize by remember(label) { mutableStateOf(16f) }
         Text(
-            label, color = tint, fontSize = fontSize.sp, maxLines = 1, softWrap = false,
-            fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Medium,
-            onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
+            t(tab), maxLines = 1, softWrap = false, fontSize = 18.sp,
+            color = White.copy(alpha = if (selected || focused) 1f else .52f),
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.width(18.dp).height(3.dp).clip(CircleShape).background(if (selected) Color(0xFFE8452F) else Color.Transparent))
     }
 }
 
 @Composable
 private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
-    val live = remember(state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } }
+    val live = remember(state.channels) { Memo.of("live", state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } } }
     val recent = remember(live, state.recent) {
         val byKey = live.associateBy { it.key }
         state.recent.mapNotNull { byKey[it] }
@@ -501,7 +489,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     // The side list's sections, divided the way Settings › Playlist says (provider, language,
     // country or genre).
     val mode = GroupMode.of(state.groupMode)
-    val sections = remember(live, mode, state.language) { channelSections(live, mode, state.language) }
+    val sections = remember(live, mode, state.language) { Memo.of("sections", live, mode, state.language) { channelSections(live, mode, state.language) } }
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
     // A choice that no longer matches anything falls back to the default list instead of "no channels".
     val chosen = state.searchQuery
@@ -588,7 +576,7 @@ private fun LibraryContent(
     /** The menu looks like the Live TV list (plain rows, no glass card). */
     liveMenu: Boolean = false
 ) {
-    val titles = remember(state.channels, kind) { state.channels.filter { it.kind() == kind } }
+    val titles = remember(state.channels, kind) { Memo.of("titles", state.channels, kind) { state.channels.filter { it.kind() == kind } } }
     val name = if (kind == ChannelKind.Movie) "movies" else "series"
     if (titles.isEmpty()) {
         EmptyState("No $name yet", "Your playlist has no $name. Add one that includes them in Settings.", "Settings") {
@@ -1069,7 +1057,7 @@ private fun ChannelGrid(
     GlideToFocus(gridState, focusedKey)
     // Channels that share one logo (one channel in several languages or regions) are labelled with
     // what tells them apart; every other tile stays clean.
-    val marks = remember(channels) { distinguishingLabels(channels) }
+    val marks = remember(channels) { Memo.of("marks", channels) { distinguishingLabels(channels) } }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
