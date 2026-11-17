@@ -540,8 +540,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 PreviewPanel(
                     shown, state.programs, state.favorites.hasFavorite(shown),
                     onFullScreen = { preview = null; model.select(shown, filtered, heading) },
-                    modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset(x = (-34).dp)
-                        .width(306.dp).padding(top = 49.dp)
+                    modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset(x = (-50).dp)
+                        .width(326.dp).padding(top = 34.dp)
                 )
             } else Box(Modifier.fillMaxSize().blur((14 * melt).dp)) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {

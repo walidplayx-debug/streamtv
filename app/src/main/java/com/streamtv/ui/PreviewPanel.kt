@@ -100,10 +100,10 @@ fun PreviewPanel(
     val program = playerProgram(channel, programs)
     var pictureFocused by remember { mutableStateOf(false) }
     Column(modifier) {
-        // A clean picture with rounded corners and no frame or shading; a white outline only when focused.
+        // A clean picture with square corners, like a screen; a white outline only when focused.
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Color.Black)
-                .border(if (pictureFocused) 2.dp else 0.dp, if (pictureFocused) Color.White else Color.Transparent, RoundedCornerShape(12.dp))
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)
+                .border(if (pictureFocused) 2.dp else 0.dp, if (pictureFocused) Color.White else Color.Transparent)
                 .onFocusChanged { pictureFocused = it.isFocused }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onFullScreen)
         ) {
