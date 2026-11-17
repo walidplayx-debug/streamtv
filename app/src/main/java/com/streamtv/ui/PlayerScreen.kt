@@ -109,6 +109,10 @@ fun PlayerScreen(
     onOptions: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    // Live channels: a first-times tip on the remote's keys while watching.
+    LaunchedEffect(Unit) {
+        if (channel.kind() == ChannelKind.Live) Hints.offer(context, "player", "↑↓ change channel · ←→ channel list · Hold OK for options")
+    }
     // In a right-to-left layout the panel sits on the right, so the arrow keys swap roles.
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val side = if (rtl) 1 else -1

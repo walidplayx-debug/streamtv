@@ -455,6 +455,7 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
 
 @Composable
 private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
+    val context = LocalContext.current
     val live = remember(state.channels) { Memo.of("live", state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } } }
     val recent = remember(live, state.recent) {
         val byKey = live.associateBy { it.key }
@@ -578,6 +579,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                             }
                         },
                         leading = item.flag?.let { code -> { CountryFlag(code) } },
+                        onFocus = { Hints.offer(context, "section", "Hold OK to move or hide this section") },
                         lifted = lifted
                     ) { if (!lifted) model.setSearchQuery(item.token) }
                 }
@@ -1142,6 +1144,7 @@ private fun ChannelGrid(
 @Composable
 private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
     val (pressed, press) = rememberPress(onClick)
@@ -1161,7 +1164,10 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
             }))
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
-            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) { onFocus(); Hints.offer(context, "channel", "Hold OK for channel options") }
+            }
             .onPreviewKeyEvent { event ->
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
                 when {

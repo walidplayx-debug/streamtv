@@ -29,7 +29,10 @@ class MainActivity : ComponentActivity() {
                     LocalAppLanguage provides state.language,
                     LocalLayoutDirection provides if (state.language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr
                 ) {
-                    MainScreen(state, model)
+                    androidx.compose.foundation.layout.Box {
+                        MainScreen(state, model)
+                        com.streamtv.ui.HintOverlay()
+                    }
                 }
             }
         }
