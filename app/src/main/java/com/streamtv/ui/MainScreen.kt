@@ -1094,16 +1094,16 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
     ) {
         ChannelLogo(
             channel.name, channel.logo,
-            // With a label, the logo is smaller and stands clear of the band, never touching it.
+            // With a label, the logo is smaller and stands clear of the words under it.
             Modifier.fillMaxSize().padding(
                 start = if (mark != null) 12.dp else 8.dp, end = if (mark != null) 12.dp else 8.dp,
-                top = if (mark != null) 6.dp else 8.dp, bottom = if (mark != null) 27.dp else 8.dp
+                top = if (mark != null) 6.dp else 8.dp, bottom = if (mark != null) 25.dp else 8.dp
             ),
             fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
             group = channel.group, onNeedsLight = { light = it }
         )
-        if (mark != null) TileLabel(mark, Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(20.dp))
+        if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
 }
