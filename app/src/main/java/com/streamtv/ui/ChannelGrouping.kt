@@ -30,8 +30,11 @@ class ChannelSection(val token: String, val title: String, val channels: List<Ch
  */
 fun channelSections(live: List<Channel>, mode: GroupMode, appLanguage: String): List<ChannelSection> = when (mode) {
     GroupMode.Provider -> live.groupBy { it.group.ifBlank { "Other" } }.map { (name, list) -> ChannelSection(name, name, list) }
-    GroupMode.Language -> ranked(live, "__lang:") { languagesOf(it) }.map { (code, list) ->
-        ChannelSection("__lang:$code", if (code == OTHER) "Other" else languageName(code), list)
+    GroupMode.Language -> {
+        val shownIn = Locale.forLanguageTag(appLanguage)
+        ranked(live, "__lang:") { languagesOf(it) }.map { (code, list) ->
+            ChannelSection("__lang:$code", if (code == OTHER) "Other" else languageName(code, shownIn), list)
+        }
     }
     GroupMode.Country -> {
         val shownIn = Locale.forLanguageTag(appLanguage)
@@ -116,11 +119,9 @@ private val CountryLanguage: Map<String, String> = buildMap {
     put("BA", "bs"); put("MK", "mk"); put("LT", "lt"); put("LV", "lv"); put("EE", "et"); put("IS", "is"); put("AF", "fa")
 }
 
-/** A language's own name, as its speakers write it: العربية, Français, English. */
-private fun languageName(code: String): String {
-    val locale = Locale(code)
-    return locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
-}
+/** A language named in the app's language: "Spanish" in English, "الإسبانية" in Arabic, "Espagnol" in French. */
+private fun languageName(code: String, shownIn: Locale): String =
+    Locale(code).getDisplayLanguage(shownIn).ifBlank { code }.replaceFirstChar { it.titlecase(shownIn) }
 
 private val countryCodes: Set<String> by lazy { Locale.getISOCountries().toSet() }
 
