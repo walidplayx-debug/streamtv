@@ -3,6 +3,10 @@ package com.streamtv.ui
 import android.content.ActivityNotFoundException
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.animateDpAsState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -495,9 +499,39 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         query == "__all" -> "All channels"
         else -> query
     }
+    // The preview: OK on a channel plays it small where the list was; OK again on it goes full screen.
+    // Back, Close, another list or another tab put the list back and stop it.
+    var preview by remember { mutableStateOf<Channel?>(null) }
+    LaunchedEffect(query) { preview = null }
+    BackHandler(enabled = preview != null) { preview = null }
+    val pick: (Channel) -> Unit = { c ->
+        when {
+            // A locked channel asks for its PIN first, as before.
+            c.key in state.locked -> { preview = null; model.select(c, filtered, heading) }
+            preview?.key == c.key -> { preview = null; model.select(c, filtered, heading) }
+            else -> preview = c
+        }
+    }
+    val sideWidth by animateDpAsState(if (preview != null) 300.dp else 250.dp, tween(320, easing = FastOutSlowInEasing), label = "sideWidth")
     Row(Modifier.fillMaxSize()) {
         val groupsState = rememberLazyListState()
-        Box(Modifier.width(250.dp).fillMaxHeight()) {
+        Box(Modifier.width(sideWidth).fillMaxHeight()) {
+            AnimatedContent(
+                targetState = preview != null,
+                transitionSpec = {
+                    (fadeIn(tween(280)) + scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = .92f)) togetherWith fadeOut(tween(160))
+                },
+                label = "previewSwap"
+            ) { showing ->
+            val shown = preview
+            if (showing && shown != null) {
+                PreviewPanel(
+                    shown, state.programs, state.favorites.hasFavorite(shown),
+                    onFullScreen = { preview = null; model.select(shown, filtered, heading) },
+                    onClose = { preview = null },
+                    modifier = Modifier.fillMaxWidth().padding(end = 6.dp)
+                )
+            } else Box(Modifier.fillMaxSize()) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (recent.isNotEmpty()) {
                     item { FocusRow("Last watched", recent.size.toString(), query == "__recent") { model.setSearchQuery("__recent") } }
@@ -525,6 +559,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 }
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+            }
+            }
         }
         Spacer(Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
@@ -532,7 +568,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 Text("${filtered.size} ${t("channels")}", color = Muted, fontSize = 17.sp)
             }
             Spacer(Modifier.height(14.dp))
-            ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
+            ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored, onOptions, previewKey = preview?.key, onPick = pick)
         }
     }
 }
@@ -1011,7 +1047,11 @@ private fun RestoreFocus(restoreKey: String?, found: Boolean, target: FocusReque
 @Composable
 private fun ChannelGrid(
     channels: List<Channel>, title: String, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel,
-    restoreKey: String? = null, onRestored: () -> Unit = {}, onOptions: (Channel) -> Unit = {}
+    restoreKey: String? = null, onRestored: () -> Unit = {}, onOptions: (Channel) -> Unit = {},
+    /** The channel playing in the preview, marked on its tile. */
+    previewKey: String? = null,
+    /** When given, OK on a tile goes here (the preview) instead of straight to the player. */
+    onPick: ((Channel) -> Unit)? = null
 ) {
     if (channels.isEmpty()) {
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
@@ -1043,7 +1083,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], channel.key == previewKey, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { if (onPick != null) onPick(channel) else model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1053,7 +1093,7 @@ private fun ChannelGrid(
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, previewing: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
@@ -1074,6 +1114,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
             }))
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
+            // The channel playing in the preview carries the STV red frame.
+            .then(if (previewing) Modifier.border(2.dp, Color(0xFFE8452F), RoundedCornerShape(10.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .onPreviewKeyEvent { event ->
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
