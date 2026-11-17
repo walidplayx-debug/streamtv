@@ -55,6 +55,8 @@ data class TvState(
     val ready: Boolean = false,
     /** Interface language: "en", "fr" or "ar". */
     val language: String = "en",
+    /** How the Live TV side list divides channels: "provider", "language", "country" or "genre". */
+    val groupMode: String = "provider",
     /** Channels the viewer removed from every list (by key). */
     val hidden: Set<String> = emptySet(),
     /** Channels that need the PIN before they play (by key). */
@@ -200,6 +202,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.language.collect { code -> _state.value = _state.value.copy(language = code) }
         }
+        viewModelScope.launch {
+            preferences.groupMode.collect { mode -> _state.value = _state.value.copy(groupMode = mode) }
+        }
+    }
+    fun setGroupMode(mode: String) {
+        // The old choice in the side list belongs to the old sections; start again from the top.
+        _state.value = _state.value.copy(groupMode = mode, searchQuery = "")
+        viewModelScope.launch { preferences.saveGroupMode(mode) }
     }
     fun setLanguage(code: String) {
         _state.value = _state.value.copy(language = code)

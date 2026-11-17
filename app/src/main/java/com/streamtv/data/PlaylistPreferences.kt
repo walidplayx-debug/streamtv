@@ -16,6 +16,7 @@ class PlaylistPreferences(private val context: Context) {
     private val playlistsKey = stringSetPreferencesKey("saved_playlists")
     private val lastChannelKey = stringPreferencesKey("last_channel_id")
     private val languageKey = stringPreferencesKey("interface_language")
+    private val groupModeKey = stringPreferencesKey("channel_group_mode")
     private val recentKey = stringPreferencesKey("recent_channel_keys")
     private val hiddenKey = stringSetPreferencesKey("hidden_channel_keys")
     private val lockedKey = stringSetPreferencesKey("locked_channel_keys")
@@ -36,6 +37,8 @@ class PlaylistPreferences(private val context: Context) {
     suspend fun saveRecent(keys: List<String>) { context.dataStore.edit { it[recentKey] = keys.joinToString("\n") } }
     val language: Flow<String> = context.dataStore.data.map { it[languageKey] ?: "en" }
     suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
+    val groupMode: Flow<String> = context.dataStore.data.map { it[groupModeKey] ?: "provider" }
+    suspend fun saveGroupMode(mode: String) { context.dataStore.edit { it[groupModeKey] = mode } }
     val hiddenKeys: Flow<Set<String>> = context.dataStore.data.map { it[hiddenKey] ?: emptySet() }
     suspend fun saveHidden(keys: Set<String>) { context.dataStore.edit { it[hiddenKey] = keys } }
     val lockedKeys: Flow<Set<String>> = context.dataStore.data.map { it[lockedKey] ?: emptySet() }

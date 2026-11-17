@@ -458,42 +458,33 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         val byKey = live.associateBy { it.key }
         state.recent.mapNotNull { byKey[it] }
     }
+    // The side list's sections, divided the way Settings › Playlist says (provider, language,
+    // country or genre).
+    val mode = GroupMode.of(state.groupMode)
+    val sections = remember(live, mode, state.language) { channelSections(live, mode, state.language) }
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
-    val countryGroups = live.filter { it.country.isNotBlank() }
-        .groupBy { it.country.trim().uppercase() }.toSortedMap()
-    // Categories in the provider's order (the order they first appear in the playlist), not A to Z.
-    val categoryGroups = live.groupBy { it.group.ifBlank { "Other" } }
     // A choice that no longer matches anything falls back to the default list instead of "no channels".
     val chosen = state.searchQuery
     val stillValid = when {
         chosen.isBlank() -> false
         chosen == "__recent" -> recent.isNotEmpty()
         chosen == "__favorites" -> live.any { state.favorites.hasFavorite(it) }
-        chosen.startsWith("__") -> true
-        else -> categoryGroups.keys.any { it.equals(chosen, true) }
+        chosen == "__all" -> true
+        else -> sections.any { it.token.equals(chosen, true) }
     }
     val query = if (stillValid) chosen else if (recent.isNotEmpty()) "__recent" else "__all"
-    val languageGroups = listOf(
-        Triple("العربية", "__language_ar", live.count { it.detectedLanguage() == "ar" }),
-        Triple("Français", "__language_fr", live.count { it.detectedLanguage() == "fr" })
-    ).filter { it.third > 0 }
-    val filtered = when {
-        query == "__recent" -> recent
-        query == "__favorites" -> live.filter { state.favorites.hasFavorite(it) }
-        query == "__all" -> live
-        query == "__language_ar" -> live.filter { it.detectedLanguage() == "ar" }
-        query == "__language_fr" -> live.filter { it.detectedLanguage() == "fr" }
-        query.startsWith("__country:") -> live.filter { it.country.equals(query.removePrefix("__country:"), true) }
-        else -> live.filter { it.group.ifBlank { "Other" }.equals(query, true) }
+    val section = sections.firstOrNull { it.token.equals(query, true) }
+    val filtered = when (query) {
+        "__recent" -> recent
+        "__favorites" -> live.filter { state.favorites.hasFavorite(it) }
+        "__all" -> live
+        else -> section?.channels ?: live
     }
-    val heading = when {
-        query == "__recent" -> "Last watched"
-        query == "__favorites" -> "Favorites"
-        query == "__language_ar" -> "العربية"
-        query == "__language_fr" -> "Français"
-        query.startsWith("__country:") -> query.removePrefix("__country:")
-        query == "__all" -> "All channels"
-        else -> query
+    val heading = when (query) {
+        "__recent" -> "Last watched"
+        "__favorites" -> "Favorites"
+        "__all" -> "All channels"
+        else -> section?.title ?: "All channels"
     }
     Row(Modifier.fillMaxSize()) {
         val groupsState = rememberLazyListState()
@@ -506,22 +497,9 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     item { FocusRow("Favorites", live.count { state.favorites.hasFavorite(it) }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
                 }
                 item { FocusRow("All channels", live.size.toString(), query == "__all") { model.setSearchQuery("__all") } }
-                if (languageGroups.isNotEmpty()) {
-                    item { Text(t("BY LANGUAGE"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
-                    items(languageGroups) { item ->
-                        FocusRow(item.first, item.third.toString(), query == item.second) { model.setSearchQuery(item.second) }
-                    }
-                }
-                if (countryGroups.isNotEmpty()) {
-                    item { Text(t("BY COUNTRY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
-                    items(countryGroups.toList()) { (country, channels) ->
-                        val token = "__country:$country"
-                        FocusRow(country, channels.size.toString(), query == token) { model.setSearchQuery(token) }
-                    }
-                }
-                item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
-                items(categoryGroups.toList()) { (name, channels) ->
-                    FocusRow(name, channels.size.toString(), query == name) { model.setSearchQuery(name) }
+                item { Text(t(mode.heading), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                items(sections, key = { it.token }) { item ->
+                    FocusRow(t(item.title), item.channels.size.toString(), query.equals(item.token, true)) { model.setSearchQuery(item.token) }
                 }
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
@@ -1408,6 +1386,17 @@ private fun SettingsContent(
                         for (item in state.playlists) {
                             PlaylistRow(item, item.url == state.playlistUrl, { model.selectPlaylist(item) }) {
                                 onConfirm(ConfirmRequest("Remove this playlist?", item.name, "Remove") { model.removePlaylist(item) })
+                            }
+                        }
+                    }
+                    // How the Live TV side list divides the channels.
+                    Spacer(Modifier.height(22.dp))
+                    Text(t("Group channels by"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    for (pair in GroupMode.entries.chunked(2)) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            for (choice in pair) {
+                                ChoiceBox(t(choice.label), state.groupMode == choice.key, Modifier.weight(1f)) { model.setGroupMode(choice.key) }
                             }
                         }
                     }
