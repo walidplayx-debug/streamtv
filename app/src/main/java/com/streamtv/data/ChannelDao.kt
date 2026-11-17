@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChannelDao {
-    @Query("SELECT * FROM channels ORDER BY groupName, name")
+    // In the playlist's own order: rows are written in that order, so their row id keeps it.
+    @Query("SELECT * FROM channels ORDER BY rowid")
     fun observeAll(): Flow<List<ChannelEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ChannelEntity>)

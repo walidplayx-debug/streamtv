@@ -461,7 +461,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
     val countryGroups = live.filter { it.country.isNotBlank() }
         .groupBy { it.country.trim().uppercase() }.toSortedMap()
-    val categoryGroups = live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap()
+    // Categories in the provider's order (the order they first appear in the playlist), not A to Z.
+    val categoryGroups = live.groupBy { it.group.ifBlank { "Other" } }
     // A choice that no longer matches anything falls back to the default list instead of "no channels".
     val chosen = state.searchQuery
     val stillValid = when {
@@ -576,7 +577,7 @@ private fun LibraryContent(
     // History and favourites of this page only: channels keep theirs apart.
     val history = remember(byKey, state.recentVod) { state.recentVod.mapNotNull { byKey[it] } }
     val favorites = remember(titles, state.favorites) { titles.filter { state.favorites.hasFavorite(it) } }
-    val genres = remember(titles) { titles.groupBy { it.group.ifBlank { "Other" } }.toSortedMap() }
+    val genres = remember(titles) { titles.groupBy { it.group.ifBlank { "Other" } } }
     val query = ui.search.trim()
     val chosen = ui.section
     val section = when {

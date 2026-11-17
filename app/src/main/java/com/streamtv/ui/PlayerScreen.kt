@@ -138,7 +138,7 @@ fun PlayerScreen(
             add("All channels" to live)
             val starred = live.filter { favorites.hasFavorite(it) }
             if (starred.isNotEmpty()) add("Favorites" to starred)
-            live.groupBy { it.group.ifBlank { "Other" } }.toSortedMap().forEach { (name, items) -> add(name to items) }
+            live.groupBy { it.group.ifBlank { "Other" } }.forEach { (name, items) -> add(name to items) }
             if (none { it.first == queueTitle }) add(0, queueTitle to channels)
         } }
         liveLists = built
