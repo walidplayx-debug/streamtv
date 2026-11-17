@@ -2,6 +2,13 @@ package com.streamtv.ui
 
 import com.streamtv.data.Channel
 import com.streamtv.data.detectedLanguage
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 /** How the Live TV side list divides the channels; chosen in Settings › Playlist. */
@@ -16,8 +23,8 @@ enum class GroupMode(val key: String, val label: String, val heading: String) {
     }
 }
 
-/** One entry of the side list: what is saved as the choice, what is shown, and its channels. */
-class ChannelSection(val token: String, val title: String, val channels: List<Channel>)
+/** One entry of the side list: what is saved as the choice, what is shown, its channels and, for a country, its code (for the flag). */
+class ChannelSection(val token: String, val title: String, val channels: List<Channel>, val flag: String? = null)
 
 /**
  * The side list's sections for a mode. A channel can sit in several (two languages, two
@@ -32,14 +39,17 @@ fun channelSections(live: List<Channel>, mode: GroupMode, appLanguage: String): 
     GroupMode.Provider -> live.groupBy { it.group.ifBlank { "Other" } }.map { (name, list) -> ChannelSection(name, name, list) }
     GroupMode.Language -> {
         val shownIn = Locale.forLanguageTag(appLanguage)
-        ranked(live, "__lang:") { languagesOf(it) }.map { (code, list) ->
+        // The app's language first, then Arabic, then the rest by size.
+        ranked(live, { code -> if (code == appLanguage) 0 else if (code == "ar") 1 else 2 }) { languagesOf(it) }.map { (code, list) ->
             ChannelSection("__lang:$code", if (code == OTHER) "Other" else languageName(code, shownIn), list)
         }
     }
     GroupMode.Country -> {
         val shownIn = Locale.forLanguageTag(appLanguage)
-        ranked(live, "__country:") { countriesOf(it) }.map { (code, list) ->
-            ChannelSection("__country:$code", if (code == OTHER) "Other" else countryName(code, shownIn), list)
+        // Countries speaking the app's language first, then the Arab countries, then the rest; by size within each.
+        ranked(live, { code -> CountryLanguage[code].let { if (it == appLanguage) 0 else if (it == "ar") 1 else 2 } }) { countriesOf(it) }.map { (code, list) ->
+            if (code == OTHER) ChannelSection("__country:$code", "Other", list)
+            else ChannelSection("__country:$code", countryName(code, shownIn), list, flag = code)
         }
     }
     GroupMode.Genre -> {
@@ -51,11 +61,12 @@ fun channelSections(live: List<Channel>, mode: GroupMode, appLanguage: String): 
 
 private const val OTHER = "zz"
 
-private fun ranked(live: List<Channel>, prefix: String, keys: (Channel) -> Set<String>): List<Pair<String, List<Channel>>> {
+private fun ranked(live: List<Channel>, rank: (String) -> Int, keys: (Channel) -> Set<String>): List<Pair<String, List<Channel>>> {
     val groups = HashMap<String, MutableList<Channel>>()
     for (channel in live) for (key in keys(channel).ifEmpty { setOf(OTHER) }) groups.getOrPut(key) { mutableListOf() } += channel
-    return groups.entries.sortedWith(compareBy<Map.Entry<String, MutableList<Channel>>> { it.key == OTHER }.thenByDescending { it.value.size })
-        .map { it.key to it.value }
+    return groups.entries.sortedWith(
+        compareBy<Map.Entry<String, MutableList<Channel>>> { it.key == OTHER }.thenBy { rank(it.key) }.thenByDescending { it.value.size }
+    ).map { it.key to it.value }
 }
 
 /**
@@ -139,11 +150,11 @@ private fun countriesOf(channel: Channel): Set<String> {
     return if (prefix != "AR" && prefix in countryCodes) setOf(prefix) else emptySet()
 }
 
-/** A country with its flag, named in the app's language: "🇫🇷 France", "🇸🇦 السعودية". */
-private fun countryName(code: String, shownIn: Locale): String {
-    val flag = code.map { Character.toChars(0x1F1E6 + (it - 'A')).concatToString() }.joinToString("")
-    return "$flag  " + Locale("", code).getDisplayCountry(shownIn).ifBlank { code }
-}
+/** A country named in the app's language: "France", "السعودية". */
+private fun countryName(code: String, shownIn: Locale): String = Locale("", code).getDisplayCountry(shownIn).ifBlank { code }
+
+/** The system's emoji flag, shown only when the flat flag picture cannot be loaded. */
+fun emojiFlag(code: String): String = code.uppercase().map { Character.toChars(0x1F1E6 + (it - 'A')).concatToString() }.joinToString("")
 
 /** The genres, in the order the side list shows them, with words that point to each. */
 private val Genres = listOf(
@@ -169,4 +180,25 @@ private fun genresOf(channel: Channel): Set<String> {
         Genres.firstOrNull { (_, words) -> words.any { it in text } }?.first
     }.toSet()
     return found.ifEmpty { setOf("Other") }
+}
+
+/**
+ * A country's flag, flat with softly rounded corners (the Twitter look) rather than the system's
+ * wavy emoji: a small picture from flagcdn.com, fetched once and kept in the image cache. Without
+ * a connection the emoji flag stands in.
+ */
+@androidx.compose.runtime.Composable
+fun CountryFlag(code: String, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    var failed by androidx.compose.runtime.remember(code) { androidx.compose.runtime.mutableStateOf(false) }
+    if (failed) {
+        androidx.compose.material3.Text(emojiFlag(code), modifier, fontSize = androidx.compose.ui.unit.TextUnit(17f, androidx.compose.ui.unit.TextUnitType.Sp))
+    } else {
+        coil.compose.AsyncImage(
+            model = "https://flagcdn.com/w80/${code.lowercase()}.png",
+            contentDescription = null,
+            modifier = modifier.size(24.dp, 16.dp).clip(RoundedCornerShape(3.dp)),
+            contentScale = ContentScale.Crop,
+            onError = { failed = true }
+        )
+    }
 }

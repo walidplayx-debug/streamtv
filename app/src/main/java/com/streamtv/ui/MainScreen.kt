@@ -499,7 +499,10 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                 item { FocusRow("All channels", live.size.toString(), query == "__all") { model.setSearchQuery("__all") } }
                 item { Text(t(mode.heading), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                 items(sections, key = { it.token }) { item ->
-                    FocusRow(t(item.title), item.channels.size.toString(), query.equals(item.token, true)) { model.setSearchQuery(item.token) }
+                    FocusRow(
+                        t(item.title), item.channels.size.toString(), query.equals(item.token, true),
+                        leading = item.flag?.let { code -> { CountryFlag(code) } }
+                    ) { model.setSearchQuery(item.token) }
                 }
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
@@ -1533,6 +1536,8 @@ private fun FocusRow(
     onFocus: (() -> Unit)? = null,
     /** Shows the red "!" mark in place of the trailing text. */
     alert: Boolean = false,
+    /** Something shown before the title (a country's flag). */
+    leading: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -1542,6 +1547,7 @@ private fun FocusRow(
         .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
         .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
         .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (leading != null) { leading(); Spacer(Modifier.width(11.dp)) }
         Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
     }

@@ -35,7 +35,10 @@ class PlaylistPreferences(private val context: Context) {
     suspend fun savePlaylists(entries: Set<String>) { context.dataStore.edit { it[playlistsKey] = entries } }
     val recentKeys: Flow<List<String>> = context.dataStore.data.map { it[recentKey].orEmpty().split("\n").filter { key -> key.isNotBlank() } }
     suspend fun saveRecent(keys: List<String>) { context.dataStore.edit { it[recentKey] = keys.joinToString("\n") } }
-    val language: Flow<String> = context.dataStore.data.map { it[languageKey] ?: "en" }
+    // Until a language is chosen, the TV's own (when the app has it), else English.
+    val language: Flow<String> = context.dataStore.data.map { it[languageKey] ?: systemLanguage() }
+    private fun systemLanguage(): String =
+        java.util.Locale.getDefault().language.takeIf { it in setOf("en", "fr", "ar", "es", "ru", "zh", "tr", "de", "pt", "nl") } ?: "en"
     suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
     val groupMode: Flow<String> = context.dataStore.data.map { it[groupModeKey] ?: "provider" }
     suspend fun saveGroupMode(mode: String) { context.dataStore.edit { it[groupModeKey] = mode } }
