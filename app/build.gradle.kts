@@ -5,6 +5,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 android {
+    lint {
+        // This optional Compose check crashes lint on some files (a lint bug); it only suggests
+        // primitive state types, so it is switched off rather than letting it stop the build.
+        disable += "AutoboxingStateCreation"
+    }
     namespace = "com.streamtv"
     compileSdk = 34
     defaultConfig {

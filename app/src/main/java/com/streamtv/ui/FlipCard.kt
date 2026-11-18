@@ -191,7 +191,7 @@ fun FlipCardDialog(
 
         var digits by remember { mutableStateOf("") }
         // The channel number typed so far; it may start with the digit pressed on the remote.
-        var typed by remember { mutableStateOf(number?.initial.orEmpty()) }
+        var typed by remember { mutableStateOf<String>(number?.initial ?: "") }
         fun type(digit: Char) {
             if (!flipped || questionMode) return
             if (numberMode) { if (typed.length < 5) typed += digit; return }
