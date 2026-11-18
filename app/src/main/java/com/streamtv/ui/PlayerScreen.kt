@@ -750,6 +750,14 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                 ) {
                     ChannelLogo(item.name, item.logo, Modifier.size(30.dp), fontSize = 11.sp, corner = 6.dp)
                     Spacer(Modifier.width(10.dp))
+                    // The channel playing keeps a red dot before its name, focused or not: the
+                    // focus colour alone hid which row was playing.
+                    if (playingMark > 0f) {
+                        Box(
+                            Modifier.padding(end = 7.dp).size(7.dp).graphicsLayer { alpha = playingMark }
+                                .clip(CircleShape).background(Color(0xFFE8452F))
+                        )
+                    }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                         Text(
                             com.streamtv.data.shortChannelName(item.name, prefix),
