@@ -44,14 +44,16 @@ object Hints {
         private set
     private val shownThisRun = HashSet<String>()
 
-    fun offer(context: Context, key: String, text: String) {
-        if (key in shownThisRun) return
+    /** Shows the tip if it is still due; true when it was shown. */
+    fun offer(context: Context, key: String, text: String): Boolean {
+        if (current != null || key in shownThisRun) return false
         val prefs = context.getSharedPreferences("hints", Context.MODE_PRIVATE)
         val seen = prefs.getInt(key, 0)
-        if (seen >= Times) return
+        if (seen >= Times) return false
         shownThisRun += key
         prefs.edit().putInt(key, seen + 1).apply()
         current = text
+        return true
     }
 
     fun clear() { current = null }
@@ -105,4 +107,14 @@ fun HintOverlay() {
             }
         }
     }
+}
+
+/**
+ * "Go to number": the list on screen (so a number means its place there, as in the player's info
+ * bar), and a number begun with the remote's digit keys on the channel grid.
+ */
+object NumberJump {
+    var list: List<com.streamtv.data.Channel> = emptyList()
+    var title: String = ""
+    var started by mutableStateOf<String?>(null)
 }

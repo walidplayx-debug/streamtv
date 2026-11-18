@@ -80,6 +80,9 @@ private val CardWidth = 288.dp
 class CardOptions(val channel: Channel, val starred: Boolean, val locked: Boolean, val inHistory: Boolean, val onPick: (String) -> Unit)
 
 /** The same card with other rows: a heading, then (label, icon, id) rows; [onPick] gets the id. */
+/** "Go to number" on the back of the card: what was typed so far (from the remote), and what to do with it. */
+class NumberAsk(val initial: String, val error: String?, val onSubmit: (Int) -> Unit, val onCancel: () -> Unit)
+
 class CardMenu(
     val heading: String, val rows: List<Triple<String, String, String>>,
     /** Where the entry is on screen: the card opens over it, as wide as the list. */
@@ -147,7 +150,9 @@ fun FlipCardDialog(
     /** The front; null when the card only asks for the PIN. */
     options: CardOptions?,
     /** Another front with rows of its own (a side-list entry's card), used instead of [options]. */
-    menu: CardMenu? = null
+    menu: CardMenu? = null,
+    /** A channel number pad on the back ("Go to number"). */
+    number: NumberAsk? = null
 ) {
     val hasFront = options != null || menu != null
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -163,11 +168,15 @@ fun FlipCardDialog(
         val keptQuestion = remember { arrayOf(CardQuestion("", "", "Cancel") {}) }
         if (question != null) keptQuestion[0] = question
         val ask = question ?: keptQuestion[0]
-        // Which of the two backs is in use; kept while the card turns back to the front.
-        val keptMode = remember { booleanArrayOf(false) }
-        if (pin != null) keptMode[0] = false else if (question != null) keptMode[0] = true
-        val questionMode = keptMode[0]
-        val flipped = pin != null || question != null
+        // Which back is in use (PIN pad, question, number pad); kept while the card turns back to the front.
+        val keptMode = remember { intArrayOf(0) }
+        if (pin != null) keptMode[0] = 0 else if (question != null) keptMode[0] = 1 else if (number != null) keptMode[0] = 2
+        val questionMode = keptMode[0] == 1
+        val numberMode = keptMode[0] == 2
+        val keptNumber = remember { arrayOf(NumberAsk("", null, {}, {})) }
+        if (number != null) keptNumber[0] = number
+        val ask2 = number ?: keptNumber[0]
+        val flipped = pin != null || question != null || number != null
 
         val rotation = remember { Animatable(if (flipped) 180f else 0f) }
         LaunchedEffect(flipped) { rotation.animateTo(if (flipped) 180f else 0f, tween(560, easing = FastOutSlowInEasing)) }
@@ -181,12 +190,18 @@ fun FlipCardDialog(
         val backVisible = rotation.value > 90f
 
         var digits by remember { mutableStateOf("") }
+        // The channel number typed so far; it may start with the digit pressed on the remote.
+        var typed by remember { mutableStateOf(number?.initial.orEmpty()) }
         fun type(digit: Char) {
-            if (!flipped || questionMode || digits.length >= 4) return
+            if (!flipped || questionMode) return
+            if (numberMode) { if (typed.length < 5) typed += digit; return }
+            if (digits.length >= 4) return
             val next = digits + digit
             if (next.length == 4) { digits = ""; onPinSubmit(next) } else digits = next
         }
-        LaunchedEffect(flipped) { digits = "" }
+        LaunchedEffect(flipped) { digits = ""; if (!numberMode) typed = "" }
+        val numberFirst = remember { FocusRequester() }
+        val numberGo = remember { FocusRequester() }
 
         // One focus target per option; the card remembers the last one focused, so turning back
         // from the PIN pad puts the white highlight where it was (on "Lock channel", say).
@@ -195,9 +210,10 @@ fun FlipCardDialog(
         val backFirst = remember { FocusRequester() }
         val questionFirst = remember { FocusRequester() }
         // Focus follows the face: wait one frame so the face just turned to can take focus.
-        LaunchedEffect(flipped, questionMode) {
+        LaunchedEffect(flipped, questionMode, numberMode) {
             withFrameNanos { }
-            if (flipped) (if (questionMode) questionFirst else backFirst).focusWhenReady()
+            // A number begun on the remote has focus on Go, so OK opens it at once.
+            if (flipped) (if (questionMode) questionFirst else if (numberMode) (if (typed.isNotEmpty()) numberGo else numberFirst) else backFirst).focusWhenReady()
             else if (hasFront) rowFocus.getOrPut(lastRow[0]) { FocusRequester() }.focusWhenReady()
         }
         // Every key press restarts the idle clock.
@@ -288,12 +304,21 @@ fun FlipCardDialog(
                 ) {
                     // The PIN pad sets the size of the back; the question sits in the same space.
                     Column(
-                        Modifier.fillMaxWidth().graphicsLayer { alpha = if (questionMode) 0f else 1f }
+                        Modifier.fillMaxWidth().graphicsLayer { alpha = if (questionMode || numberMode) 0f else 1f }
                             .padding(horizontal = 20.dp, vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        PinBack(face, digits, enabled = flipped && !questionMode, first = backFirst,
+                        PinBack(face, digits, enabled = flipped && !questionMode && !numberMode, first = backFirst,
                             onDigit = { type(it) }, onDelete = { digits = digits.dropLast(1) }, onCancel = onPinCancel)
+                    }
+                    Column(
+                        Modifier.matchParentSize().graphicsLayer { alpha = if (numberMode) 1f else 0f }
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        NumberBack(typed, ask2.error, enabled = flipped && numberMode, first = numberFirst, go = numberGo,
+                            onDigit = { type(it) }, onDelete = { typed = typed.dropLast(1) },
+                            onGo = { typed.toIntOrNull()?.let { ask2.onSubmit(it) } })
                     }
                     Column(
                         Modifier.matchParentSize().graphicsLayer { alpha = if (questionMode) 1f else 0f }
@@ -346,6 +371,41 @@ private fun PinBack(
                             when (key) {
                                 '<' -> onDelete()
                                 'x' -> onCancel()
+                                else -> onDigit(key)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+/** The number pad on the back: the number typed, large, then digits, delete and Go. */
+@Composable
+private fun NumberBack(
+    typed: String, error: String?, enabled: Boolean, first: FocusRequester, go: FocusRequester,
+    onDigit: (Char) -> Unit, onDelete: () -> Unit, onGo: () -> Unit
+) {
+    Text(t("Go to number"), color = CardMuted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Spacer(Modifier.height(4.dp))
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(typed.ifEmpty { "–" }, color = Color(0xFFE8452F), fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(if (error != null) t(error) else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
+            Spacer(Modifier.height(6.dp))
+            for (row in listOf("123", "456", "789", "<0>")) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    for (key in row) {
+                        PinKey(
+                            label = when (key) { '<' -> "⌫"; '>' -> "OK"; else -> key.toString() },
+                            enabled = enabled,
+                            modifier = when (key) { '1' -> Modifier.focusRequester(first); '>' -> Modifier.focusRequester(go); else -> Modifier }
+                        ) {
+                            when (key) {
+                                '<' -> onDelete()
+                                '>' -> onGo()
                                 else -> onDigit(key)
                             }
                         }
@@ -438,6 +498,8 @@ private fun ChannelOptionsFront(
     row("Hide channel", "hide", "hide")
     row(if (locked) "Unlock channel" else "Lock channel", "lock", "lock")
     row("Rename", "edit", "rename")
+    // Type a channel's number to jump straight to it.
+    row("Go to number", "number", "goto")
 }
 
 @Composable
@@ -514,6 +576,14 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
                 drawCircle(tint, radius = w * .42f, center = Offset(w * .5f, h * .5f), style = line)
                 drawLine(tint, Offset(w * .5f, h * .5f), Offset(w * .5f, h * .26f), strokeWidth = w * .09f, cap = StrokeCap.Round)
                 drawLine(tint, Offset(w * .5f, h * .5f), Offset(w * .68f, h * .6f), strokeWidth = w * .09f, cap = StrokeCap.Round)
+            }
+            "number" -> {
+                // A hash sign.
+                val s = w * .09f
+                drawLine(tint, Offset(w * .38f, h * .1f), Offset(w * .3f, h * .9f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .7f, h * .1f), Offset(w * .62f, h * .9f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .14f, h * .36f), Offset(w * .9f, h * .36f), strokeWidth = s, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * .1f, h * .64f), Offset(w * .86f, h * .64f), strokeWidth = s, cap = StrokeCap.Round)
             }
             "move" -> {
                 // Up and down arrows.

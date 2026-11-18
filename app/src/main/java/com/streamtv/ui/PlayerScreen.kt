@@ -472,7 +472,8 @@ fun PlayerScreen(
                 // At least as wide as before, wider when the number is longer (11460): never cut.
                 Column(Modifier.widthIn(min = 52.dp), horizontalAlignment = Alignment.Start) {
                     Text(t("CH"), color = PlayerMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                    Text((currentChannelIndex + 1).toString(), color = PlayerWhite, fontSize = 24.sp,
+                    // The number in the red of the logo's S: a touch of colour in the bar.
+                    Text((currentChannelIndex + 1).toString(), color = Color(0xFFE8452F), fontSize = 24.sp,
                         fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.width(14.dp))

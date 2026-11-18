@@ -172,11 +172,17 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
     // Holding OK on a channel (a tile, or the video while it plays) opens the channel card.
     var optionsFor by remember { mutableStateOf<Channel?>(null) }
+    // "Go to number": null when not asking; what was typed first otherwise (a remote digit, or nothing).
+    var numberAsk by remember { mutableStateOf<String?>(null) }
+    var numberError by remember { mutableStateOf<String?>(null) }
+    // A digit pressed on the channel grid opens the number pad straight away.
+    NumberJump.started?.let { first -> SideEffect { numberError = null; numberAsk = first; NumberJump.started = null } }
     val handleOption: (Channel, String) -> Unit = { target, option ->
         // Locking and hiding keep the card open: it turns over to ask for the PIN. A favourite keeps
         // it open too, so the star can be seen filling in. Everything else closes it.
-        if (option != "lock" && option != "hide" && option != "favorite") optionsFor = null
+        if (option != "lock" && option != "hide" && option != "favorite" && option != "goto") optionsFor = null
         when (option) {
+            "goto" -> { numberError = null; numberAsk = "" }
             "favorite" -> model.toggleFavorite(target)
             "history" -> model.removeFromHistory(target)
             "hide" -> {
@@ -201,7 +207,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     var closeCard by remember { mutableStateOf(false) }
     if (closeCard && prompt == null) SideEffect { closeCard = false; optionsFor = null }
     val cardChannel = if (closeCard && prompt == null) null else optionsFor
-    if (cardChannel != null || prompt != null || question != null) {
+    if (cardChannel != null || prompt != null || question != null || numberAsk != null) {
         FlipCardDialog(
             atEnd = state.playing,
             pin = prompt?.let { pinFace(it, state.pinError) },
@@ -213,11 +219,22 @@ fun MainScreen(state: TvState, model: MainViewModel) {
                 when {
                     prompt != null -> { model.cancelPin() }
                     question != null -> { question = null }
-                    else -> { optionsFor = null }
+                    else -> { optionsFor = null; numberAsk = null }
                 }
             },
             // Left alone for a while, the card puts itself away, PIN question and all.
-            onIdle = { if (prompt != null) model.cancelPin(); question = null; optionsFor = null },
+            onIdle = { if (prompt != null) model.cancelPin(); question = null; optionsFor = null; numberAsk = null },
+            // The number is the channel's place in the list on screen; it plays at once.
+            number = numberAsk?.let { first ->
+                NumberAsk(first, numberError, onSubmit = { n ->
+                    val list = NumberJump.list
+                    if (n in 1..list.size) {
+                        numberAsk = null; optionsFor = null
+                        returnKey = list[n - 1].key
+                        model.select(list[n - 1], list, NumberJump.title)
+                    } else numberError = "No channel with this number"
+                }, onCancel = { numberAsk = null })
+            },
             options = cardChannel?.let { target ->
                 CardOptions(
                     channel = target, starred = state.favorites.hasFavorite(target), locked = target.key in state.locked,
@@ -582,7 +599,13 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                             }
                         },
                         leading = item.flag?.let { code -> { CountryFlag(code) } },
-                        onFocus = { Hints.offer(context, "section", "Hold OK to move or hide this section") },
+                        onFocus = {
+                            when (mode) {
+                                GroupMode.Country -> Hints.offer(context, "section_country", "Want this country first? 😉 Hold OK and move it up")
+                                GroupMode.Language -> Hints.offer(context, "section_language", "Want this language first? 😉 Hold OK and move it up")
+                                else -> Hints.offer(context, "section_list", "Prefer this section higher? Hold OK and arrange the list your way")
+                            }
+                        },
                         lifted = lifted
                     ) { if (!lifted) model.setSearchQuery(item.token) }
                 }
@@ -1125,6 +1148,7 @@ private fun ChannelGrid(
     // CH+ / CH− (or Page up / down) jump four rows at a time (16 channels with four across). A held
     // key repeats at a calm, fixed pace, so it speeds through the list without piling up work.
     val tileFocus = remember { HashMap<String, FocusRequester>() }
+    SideEffect { NumberJump.list = channels; NumberJump.title = title }
     val pageScope = rememberCoroutineScope()
     val lastPage = remember { longArrayOf(0L) }
     fun page(direction: Int) {
@@ -1148,7 +1172,18 @@ private fun ChannelGrid(
             Key.ChannelUp, Key.PageUp -> -1
             else -> 0
         }
-        if (direction == 0) false else { if (event.type == KeyEventType.KeyDown) page(direction); true }
+        val code = event.nativeKeyEvent.keyCode
+        val digit = when (code) {
+            in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_0)
+            in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 -> '0' + (code - android.view.KeyEvent.KEYCODE_NUMPAD_0)
+            else -> null
+        }
+        when {
+            // The remote's digits start "Go to number" with that digit.
+            digit != null -> { if (event.type == KeyEventType.KeyDown) NumberJump.started = digit.toString(); true }
+            direction == 0 -> false
+            else -> { if (event.type == KeyEventType.KeyDown) page(direction); true }
+        }
     }) {
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
@@ -1163,7 +1198,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], qualities[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], qualities[channel.key], channels.size > 100, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1173,7 +1208,7 @@ private fun ChannelGrid(
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, quality: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, quality: String?, bigList: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
@@ -1197,7 +1232,12 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged {
                 focused = it.isFocused
-                if (it.isFocused) { onFocus(); Hints.offer(context, "channel", "Hold OK for channel options") }
+                if (it.isFocused) {
+                    onFocus()
+                    // In a long list, first the tip on getting around it quickly.
+                    if (!(bigList && Hints.offer(context, "biglist", "So many channels? 😄 CH+ / CH− jump 16 at a time, or type the channel number")))
+                        Hints.offer(context, "channel", "Hold OK for channel options")
+                }
             }
             .onPreviewKeyEvent { event ->
                 val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
