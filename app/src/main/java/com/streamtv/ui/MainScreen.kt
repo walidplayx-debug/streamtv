@@ -341,154 +341,75 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         return
     }
 
-    // Back first returns to the section switcher at the top of the side panel; from there it leaves the app.
-    val tabFocus = remember { FocusRequester() }
-    var topBarFocused by remember { mutableStateOf(false) }
-    BackHandler(enabled = !topBarFocused) {
-        if (runCatching { tabFocus.requestFocus() }.isFailure) topBarFocused = true
-    }
-    val header: @Composable () -> Unit = {
-        SidePanelHeader(state.tab, { tab ->
-            // Changing sections closes an open title page.
+    // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
+    // Every page sits on the softer, less black backdrop.
+    Column(
+        Modifier.fillMaxSize()
+            .background(LibraryBackdrop)
+            .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
+    ) {
+        // Back first returns to the tab bar; from the tab bar it leaves the app.
+        val tabFocus = remember { FocusRequester() }
+        var topBarFocused by remember { mutableStateOf(false) }
+        BackHandler(enabled = !topBarFocused) {
+            if (runCatching { tabFocus.requestFocus() }.isFailure) topBarFocused = true
+        }
+        TopNavigation(state.tab, { tab ->
+            // Changing tabs closes an open title page.
             movieUi.details = null
             seriesUi.details = null
             model.selectTab(tab)
         }, tabFocus) { topBarFocused = it }
-    }
-    val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
-    // No bar across the top: every page has the side panel on the left (logo, clock, the section
-    // switcher and the page's own list), fixed, and its content beside it.
-    CompositionLocalProvider(LocalSideHeader provides header) {
-    Box(Modifier.fillMaxSize().background(LibraryBackdrop)) {
+        // The pages start right under the tab bar; the tab already says where you are.
+        Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
+        val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
         when (state.tab) {
+            // Movies uses the Live TV style of list for its menu.
             "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
-            "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
-            "Favorites" -> SideLayout(edgeToEdge = true, side = {}) {
-                ChannelGrid(state.channels.filter { state.favorites.hasFavorite(it) }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions, columns = 4)
+            "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
+            "Favorites" -> {
+                ScreenHeading("Favorites", "${state.channels.count { state.favorites.hasFavorite(it) }} ${t("saved channels")}")
+                Spacer(Modifier.height(20.dp))
+                ChannelGrid(state.channels.filter { state.favorites.hasFavorite(it) }, "Favorites", state.programs, state.favorites, model, returnKey, { returnKey = null }, openOptions)
             }
-            "Search" -> SideLayout(side = {}) { SearchContent(state, model, returnKey, { returnKey = null }, openOptions) }
-            "Settings" -> SideLayout(side = {}) {
-                SettingsContent(state, model, settingsSection, { settingsSection = it }, { request ->
-                    if (state.pinSet) {
-                        model.protect(request.subject, "Please enter the PIN to remove this playlist", request.action)
-                    } else {
-                        question = CardQuestion(request.subject, request.question, request.confirmLabel) { request.action(); question = null }
-                    }
-                }) { entry = it }
-            }
+            "Search" -> SearchContent(state, model, returnKey, { returnKey = null }, openOptions)
+            "Settings" -> SettingsContent(state, model, settingsSection, { settingsSection = it }, { request ->
+                if (state.pinSet) {
+                    model.protect(request.subject, "Please enter the PIN to remove this playlist", request.action)
+                } else {
+                    question = CardQuestion(request.subject, request.question, request.confirmLabel) { request.action(); question = null }
+                }
+            }) { entry = it }
             else -> LiveContent(state, model, returnKey, { returnKey = null }, openOptions)
         }
     }
-    }
 }
 
-/** The top of the side panel (logo, clock, section switcher), handed by MainScreen to every page. */
-private val LocalSideHeader = staticCompositionLocalOf<@Composable () -> Unit> { {} }
-
-private val SidePanelColor = Color(0xFF0B0E15)
-
-/**
- * A page: the side panel on the left, fixed, with the section switcher on top and the page's own
- * list under it ([side]); the page's content beside it. [edgeToEdge]: the content runs to the top
- * and bottom of the screen, so a grid scrolls up under the edge while the panel stays; otherwise it
- * keeps the TV's safe margins.
- */
 @Composable
-private fun SideLayout(edgeToEdge: Boolean = false, side: @Composable BoxScope.() -> Unit, content: @Composable BoxScope.() -> Unit) {
-    val direction = LocalLayoutDirection.current
-    val header = LocalSideHeader.current
-    // Left in every language, as drawn; inside, each part keeps the language's own direction.
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Row(Modifier.fillMaxSize()) {
-            CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                Column(
-                    Modifier.width(300.dp).fillMaxHeight().background(SidePanelColor)
-                        .absolutePadding(left = 40.dp, right = 14.dp, top = 28.dp, bottom = 24.dp)
-                ) {
-                    header()
-                    Spacer(Modifier.height(14.dp))
-                    Box(Modifier.weight(1f).fillMaxWidth(), content = side)
-                }
-                Box(
-                    Modifier.weight(1f).fillMaxHeight().absolutePadding(
-                        left = 14.dp, right = 40.dp,
-                        top = if (edgeToEdge) 0.dp else 30.dp, bottom = if (edgeToEdge) 0.dp else 30.dp
-                    ),
-                    content = content
-                )
-            }
-        }
-    }
-}
-
-private val SectionTabs = listOf("Live TV", "Movies", "Series", "Search", "Settings")
-
-@Composable
-private fun SidePanelHeader(tab: String, onSelect: (String) -> Unit, tabFocus: FocusRequester, onFocus: (Boolean) -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(20.dp))
-            Spacer(Modifier.weight(1f))
-            Clock()
-        }
-        Spacer(Modifier.height(18.dp))
-        SectionSwitcher(tab, onSelect, tabFocus, onFocus)
-    }
-}
-
-/** "‹ Live TV ›": left and right turn through the sections; dots under it say which one of how many. */
-@Composable
-private fun SectionSwitcher(tab: String, onSelect: (String) -> Unit, tabFocus: FocusRequester, onFocus: (Boolean) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val index = SectionTabs.indexOf(tab).coerceAtLeast(0)
-    fun step(by: Int) = onSelect(SectionTabs[(index + by + SectionTabs.size) % SectionTabs.size])
-    val shape = RoundedCornerShape(16.dp)
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.fillMaxWidth()) {
+private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: FocusRequester, onFocus: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Row(
-                Modifier.fillMaxWidth().clip(shape)
-                    .background(if (focused) White.copy(alpha = .22f) else Color(0xFF232A3A))
-                    .border(1.dp, if (focused) White.copy(alpha = .55f) else Color.Transparent, shape)
-                    .focusRequester(tabFocus)
-                    .onFocusChanged { focused = it.isFocused; onFocus(it.isFocused) }
-                    .onPreviewKeyEvent { event ->
-                        // The next section is the way the text reads: left in Arabic, right in English.
-                        val forward = if (rtl) Key.DirectionLeft else Key.DirectionRight
-                        val backward = if (rtl) Key.DirectionRight else Key.DirectionLeft
-                        when (event.key) {
-                            forward, backward -> {
-                                if (event.type == KeyEventType.KeyDown) step(if (event.key == forward) 1 else -1)
-                                true
-                            }
-                            else -> false
-                        }
-                    }
-                    .focusable()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp)
+                    .onFocusChanged { onFocus(it.hasFocus) },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Arrows pointing outwards on both ends.
-                Text(if (rtl) "›" else "‹", color = White.copy(alpha = if (focused) 1f else .7f), fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    t(tab), Modifier.weight(1f), color = White, fontSize = 21.sp, fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Text(if (rtl) "‹" else "›", color = White.copy(alpha = if (focused) 1f else .7f), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
+                    val selected = tab == item
+                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
+                }
             }
-            // A newer version is waiting: the mark sits on the switcher's corner.
+            // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
+            // last tab), centred on its height and half over its edge. Drawn outside the bar's clip
+            // so it is never cut.
             if (UpdateNotice.available) {
-                AlertBadge(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp), size = 20.dp)
+                AlertBadge(Modifier.align(Alignment.CenterEnd).offset(x = 8.dp), size = 24.dp)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            SectionTabs.indices.forEach { i ->
-                Box(
-                    Modifier.height(5.dp).width(if (i == index) 18.dp else 5.dp).clip(CircleShape)
-                        .background(if (i == index) White else White.copy(alpha = .28f))
-                )
-            }
+        Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
+            // Quiet in the corner: a little smaller and dimmed, so the eye goes to the content.
+            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(20.dp).graphicsLayer { alpha = .6f })
         }
     }
 }
@@ -600,32 +521,31 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         "__all" -> "All channels"
         else -> section?.title ?: "All channels"
     }
-    val groupsState = rememberLazyListState()
-    // While moving: keep the lifted entry focused and on screen as it travels.
-    LaunchedEffect(moving, draft) {
-        val token = moving ?: return@LaunchedEffect
-        val top = (if (hasFavorites) 1 else 0) + 2
-        val index = top + sections.indexOfFirst { it.token == token }
-        val visible = groupsState.layoutInfo.visibleItemsInfo
-        if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
-            groupsState.animateScrollToItem((index - 3).coerceAtLeast(0))
+    Row(Modifier.fillMaxSize()) {
+        val groupsState = rememberLazyListState()
+        // While moving: keep the lifted entry focused and on screen as it travels.
+        LaunchedEffect(moving, draft) {
+            val token = moving ?: return@LaunchedEffect
+            val top = (if (hasFavorites) 1 else 0) + 2
+            val index = top + sections.indexOfFirst { it.token == token }
+            val visible = groupsState.layoutInfo.visibleItemsInfo
+            if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
+                groupsState.animateScrollToItem((index - 3).coerceAtLeast(0))
+            }
+            runCatching { liftFocus.requestFocus() }
         }
-        runCatching { liftFocus.requestFocus() }
-    }
-    // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
-    // instead of showing the top of the list.
-    LaunchedEffect(Unit) {
-        val top = if (hasFavorites) 1 else 0
-        val index = when (query) {
-            "__favorites" -> top - 1
-            "__all" -> top
-            else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
+        // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
+        // instead of showing the top of the list.
+        LaunchedEffect(Unit) {
+            val top = if (hasFavorites) 1 else 0
+            val index = when (query) {
+                "__favorites" -> top - 1
+                "__all" -> top
+                else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
+            }
+            if (index > 2) groupsState.scrollToItem(index - 2)
         }
-        if (index > 2) groupsState.scrollToItem(index - 2)
-    }
-    // The lists in the side panel; the channels beside it, running to the screen's top and bottom edges.
-    SideLayout(edgeToEdge = true, side = {
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.width(250.dp).fillMaxHeight()) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 if (live.any { state.favorites.hasFavorite(it) }) {
                     item { FocusRow("Favorites", live.count { state.favorites.hasFavorite(it) }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
@@ -706,9 +626,14 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
             }
             ScrollIndicator(groupsState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
         }
-    }) {
-        // (The number of channels is on the list's row; the grid has the whole height.)
-        ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored, onOptions, columns = 4)
+        Spacer(Modifier.width(30.dp))
+        Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text("${filtered.size} ${t("channels")}", color = Muted, fontSize = 17.sp)
+            }
+            Spacer(Modifier.height(14.dp))
+            ChannelGrid(filtered, heading, state.programs, state.favorites, model, restoreKey, onRestored, onOptions)
+        }
     }
 }
 
@@ -733,11 +658,8 @@ private fun LibraryContent(
     val titles = remember(state.channels, kind) { Memo.of("titles", state.channels, kind) { state.channels.filter { it.kind() == kind } } }
     val name = if (kind == ChannelKind.Movie) "movies" else "series"
     if (titles.isEmpty()) {
-        // Inside the side panel, so the switcher is still there to go to another section.
-        SideLayout(side = {}) {
-            EmptyState("No $name yet", "Your playlist has no $name. Add one that includes them in Settings.", "Settings") {
-                model.selectTab("Settings")
-            }
+        EmptyState("No $name yet", "Your playlist has no $name. Add one that includes them in Settings.", "Settings") {
+            model.selectTab("Settings")
         }
         return
     }
@@ -771,37 +693,70 @@ private fun LibraryContent(
         section == "__all" -> titles
         else -> genres[section].orEmpty()
     }
-    val menuState = rememberLazyListState()
-    // Back from a title or the player, the chosen genre is brought back into view.
-    LaunchedEffect(Unit) {
-        val genreIndex = genres.keys.indexOf(section)
-        if (query.isEmpty() && genreIndex >= 0) {
-            val before = (if (liveMenu) 2 else 3) + (if (history.isNotEmpty()) 1 else 0) + (if (favorites.isNotEmpty()) 1 else 0) + 1
-            menuState.scrollToItem((before + genreIndex - 2).coerceAtLeast(0))
+    Row(Modifier.fillMaxSize()) {
+        val menuState = rememberLazyListState()
+        // Back from a title or the player, the chosen genre is brought back into view.
+        LaunchedEffect(Unit) {
+            val genreIndex = genres.keys.indexOf(section)
+            if (query.isEmpty() && genreIndex >= 0) {
+                val before = (if (liveMenu) 2 else 3) + (if (history.isNotEmpty()) 1 else 0) + (if (favorites.isNotEmpty()) 1 else 0) + 1
+                menuState.scrollToItem((before + genreIndex - 2).coerceAtLeast(0))
+            }
         }
-    }
-    val searchHint = if (kind == ChannelKind.Movie) "Search movies" else "Search series"
-    // The menu in the side panel (search, history, favourites, genres); the posters beside it.
-    SideLayout(side = {
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                item { LibrarySearch(ui.search, searchHint, large = true) { ui.search = it } }
-                item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+        val searchHint = if (kind == ChannelKind.Movie) "Search movies" else "Search series"
+        if (liveMenu) {
+            // The same list as Live TV: plain rows, section headings, the scroll bar on its edge.
+            Box(Modifier.width(250.dp).fillMaxHeight()) {
+                LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    item { LibrarySearch(ui.search, searchHint, large = true) { ui.search = it } }
+                    item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+                    if (history.isNotEmpty()) {
+                        item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
+                    }
+                    if (favorites.isNotEmpty()) {
+                        item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
+                    }
+                    item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    items(genres.toList()) { (genre, list) ->
+                        FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
+                    }
+                }
+                ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+            }
+            Spacer(Modifier.width(30.dp))
+        } else {
+        // A floating card of dark glass that never goes away.
+        Box(
+            Modifier.width(210.dp).fillMaxHeight()
+                .padding(top = 4.dp, bottom = 6.dp)
+                .shadow(22.dp, RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(24.dp)).background(GlassFill)
+                .border(1.dp, GlassEdge, RoundedCornerShape(24.dp))
+        ) {
+            LazyColumn(
+                state = menuState, modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 10.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                item { LibrarySearch(ui.search, searchHint) { ui.search = it } }
+                item { Spacer(Modifier.height(4.dp)) }
+                item { MenuRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
                 if (history.isNotEmpty()) {
-                    item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
+                    item { MenuRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
                 }
                 if (favorites.isNotEmpty()) {
-                    item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
+                    item { MenuRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
                 }
-                item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                item { Text(t("GENRES"), color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)) }
                 items(genres.toList()) { (genre, list) ->
-                    FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
+                    MenuRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
                 }
             }
-            ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
+            ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 18.dp, bottom = 18.dp, end = 4.dp))
         }
-    }) {
-        Box(Modifier.fillMaxSize()) {
+        Spacer(Modifier.width(22.dp))
+        }
+        Box(Modifier.weight(1f).fillMaxHeight()) {
             if (shown.isEmpty()) {
                 Text(t(if (query.isNotEmpty()) "No results" else "Nothing here yet"), color = Muted, fontSize = 18.sp, modifier = Modifier.align(Alignment.Center))
             } else {
@@ -1160,9 +1115,7 @@ private fun RestoreFocus(restoreKey: String?, found: Boolean, target: FocusReque
 @Composable
 private fun ChannelGrid(
     channels: List<Channel>, title: String, programs: List<EpgProgram>, favorites: Set<String>, model: MainViewModel,
-    restoreKey: String? = null, onRestored: () -> Unit = {}, onOptions: (Channel) -> Unit = {},
-    /** A set number of columns, the tiles widening to fill them (Live TV: 4); else tiles of one size. */
-    columns: Int? = null
+    restoreKey: String? = null, onRestored: () -> Unit = {}, onOptions: (Channel) -> Unit = {}
 ) {
     if (channels.isEmpty()) {
         EmptyState("No channels yet", "Add a playlist or choose another group.", "Settings") { model.selectTab("Settings") }
@@ -1224,14 +1177,12 @@ private fun ChannelGrid(
         LazyVerticalGrid(
             // One tile size everywhere (Live TV, Favourites, Search): four across beside the Live TV
             // lists; a wider grid fits more tiles of the same size instead of stretching them.
-            columns = columns?.let { GridCells.Fixed(it) } ?: GridCells.FixedSize(112.dp),
+            columns = GridCells.FixedSize(112.dp),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             // Room around the grid so the enlarged, focused tile is never cut off.
             // The free room under the last row lets every row glide up to the focus height.
-            // Next to the side panel the grid runs to the screen's top edge: the first row starts
-            // inside the safe margin and scrolls up under the edge.
-            contentPadding = PaddingValues(start = 16.dp, top = if (columns != null) 34.dp else 12.dp, bottom = maxHeight, end = 20.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, bottom = maxHeight, end = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
