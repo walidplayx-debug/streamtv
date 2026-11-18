@@ -1121,6 +1121,7 @@ private fun ChannelGrid(
     // Channels that share one logo (one channel in several languages or regions) are labelled with
     // what tells them apart; every other tile stays clean.
     val marks = remember(channels) { Memo.of("marks", channels) { distinguishingLabels(channels) } }
+    val qualities = remember(channels) { Memo.of("qualities", channels) { qualityBadges(channels) } }
     // CH+ / CH− (or Page up / down) jump four rows at a time (16 channels with four across). A held
     // key repeats at a calm, fixed pace, so it speeds through the list without piling up work.
     val tileFocus = remember { HashMap<String, FocusRequester>() }
@@ -1162,7 +1163,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], qualities[channel.key], { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1172,7 +1173,7 @@ private fun ChannelGrid(
 }
 
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, quality: String?, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
@@ -1226,6 +1227,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, onLo
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
             group = channel.group, onNeedsLight = { light = it }
         )
+        // The same channel in another quality: a small badge at the foot (the star keeps the top).
+        if (quality != null) QualityBadge(quality, Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = if (mark != null) 22.dp else 6.dp))
         if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }

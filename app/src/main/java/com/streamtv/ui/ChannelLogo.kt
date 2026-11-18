@@ -1,6 +1,7 @@
 package com.streamtv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -212,4 +213,39 @@ fun TileLabel(text: String, onLight: Boolean, modifier: Modifier = Modifier) {
             style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false), lineHeight = 15.sp)
         )
     }
+}
+
+/** A stream's quality as a short tag: "4K", "HD" or "SD" (empty when the name says nothing). */
+fun qualityTag(name: String): String = when (val q = channelQuality(name)) {
+    "" -> ""
+    "4K", "2160P" -> "4K"
+    "SD", "480P", "360P", "576P", "240P" -> "SD"
+    else -> "HD"
+}
+
+/**
+ * Among channels that share one logo, those whose quality differs (ZDF HD next to ZDF 4K): channel
+ * key -> its quality tag. Others get none.
+ */
+fun qualityBadges(channels: List<com.streamtv.data.Channel>): Map<String, String> {
+    val out = HashMap<String, String>()
+    for (group in channels.filter { !it.logo.isNullOrBlank() }.groupBy { it.logo!! }.values) {
+        if (group.size < 2) continue
+        val tags = group.associate { it.key to qualityTag(it.name) }
+        if (tags.values.toSet().size > 1) tags.forEach { (key, tag) -> if (tag.isNotEmpty()) out[key] = tag }
+    }
+    return out
+}
+
+/** The quality badge at the foot of a tile: a dark pill, red for 4K. */
+@Composable
+fun QualityBadge(tag: String, modifier: Modifier = Modifier) {
+    Text(
+        tag,
+        modifier.clip(RoundedCornerShape(6.dp))
+            .background(if (tag == "4K") Color(0xFFE8452F) else Color.Black.copy(alpha = .62f))
+            .border(1.dp, if (tag == "4K") Color(0xFFE8452F) else Color.White.copy(alpha = .30f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1
+    )
 }
