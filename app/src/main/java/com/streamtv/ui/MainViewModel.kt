@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.streamtv.data.Channel
 import com.streamtv.data.PlaylistRepository
 import com.streamtv.data.StreamDatabase
-import com.streamtv.data.ChannelEntity
 import com.streamtv.data.PlaylistPreferences
 import com.streamtv.data.M3uParser
 import com.streamtv.data.EpgProgram
@@ -16,6 +15,7 @@ import com.streamtv.data.kind
 import com.streamtv.data.hasFavorite
 import com.streamtv.data.LogoIndex
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -169,11 +169,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
-            dao.observeAll().collect { cached ->
-                if (_state.value.channels.isEmpty() && cached.isNotEmpty()) {
-                    val channels = cached.map { it.toChannel() }
-                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull())
-                }
+            // The cache is read once, at start. Watching it read the whole table again after every
+            // save, a second copy of a big playlist in memory that nobody used.
+            val cached = dao.observeAll().first()
+            if (_state.value.channels.isEmpty() && cached.isNotEmpty()) {
+                val channels = cached.map { it.toChannel() }
+                _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull())
             }
         }
     }
@@ -314,7 +315,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
                     // Remembered as the active playlist, so the app reopens on it.
                     preferences.savePlaylist(localUrl)
-                    dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                    dao.replaceAll(channels)
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
@@ -375,7 +376,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
                 // Remembered as the active playlist, so the app reopens on it.
                 preferences.savePlaylist(entry.url)
-                dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                dao.replaceAll(channels)
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.friendly("Unable to load saved playlist"))
@@ -606,7 +607,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 moveOldFavorites(channels)
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
-                dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                dao.replaceAll(channels)
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.friendly("Unable to load playlist"))
@@ -620,5 +621,6 @@ private fun Throwable.friendly(fallback: String): String = when (this) {
     is java.net.UnknownHostException, is java.net.ConnectException ->
         "Cannot reach the server. Check the internet connection and the address."
     is java.io.InterruptedIOException -> "The server is taking too long to answer. Try again in a moment."
+    is OutOfMemoryError -> "This playlist is too big for this device's memory."
     else -> message ?: fallback
 }

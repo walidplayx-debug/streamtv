@@ -34,6 +34,7 @@ fun translate(language: String, text: String): String = when (language) {
 } ?: text
 
 private val French = mapOf(
+    "This playlist is too big for this device's memory." to "Cette liste est trop grande pour la mémoire de cet appareil.",
     "Cannot reach the server. Check the internet connection and the address." to "Impossible de joindre le serveur. Vérifiez la connexion Internet et l\u2019adresse.",
     "The server is taking too long to answer. Try again in a moment." to "Le serveur met trop de temps à répondre. Réessayez dans un instant.",
     // tabs and headings
@@ -136,6 +137,7 @@ private val French = mapOf(
 )
 
 private val Arabic = mapOf(
+    "This playlist is too big for this device's memory." to "هذه القائمة أكبر من ذاكرة هذا الجهاز.",
     "Cannot reach the server. Check the internet connection and the address." to "تعذّر الوصول إلى الخادم. تحقّق من اتصال الإنترنت ومن العنوان.",
     "The server is taking too long to answer. Try again in a moment." to "الخادم يتأخر كثيراً في الرد. حاول مرة أخرى بعد قليل.",
     // tabs and headings
