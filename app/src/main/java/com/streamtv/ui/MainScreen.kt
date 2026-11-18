@@ -478,10 +478,6 @@ private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modi
 private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
     val context = LocalContext.current
     val live = remember(state.channels) { Memo.of("live", state.channels) { state.channels.filter { it.kind() == ChannelKind.Live } } }
-    val recent = remember(live, state.recent) {
-        val byKey = live.associateBy { it.key }
-        state.recent.mapNotNull { byKey[it] }
-    }
     // The side list's sections, divided the way Settings › Playlist says (provider, language,
     // country or genre).
     val mode = GroupMode.of(state.groupMode)
@@ -502,26 +498,25 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
     val rowBounds = remember { HashMap<String, androidx.compose.ui.geometry.Rect>() }
     val liftFocus = remember { FocusRequester() }
     val sections = draft ?: arranged
-    // Nothing chosen yet (app just opened): start on "Last watched" when there is one.
+    // "Last watched" is not in this list (it is in the player's side panel), to leave room for more lists.
+    // Nothing chosen yet (app just opened): start on Favorites when there are some, else All channels.
     // A choice that no longer matches anything falls back to the default list instead of "no channels".
     val chosen = state.searchQuery
+    val hasFavorites = live.any { state.favorites.hasFavorite(it) }
     val stillValid = when {
         chosen.isBlank() -> false
-        chosen == "__recent" -> recent.isNotEmpty()
-        chosen == "__favorites" -> live.any { state.favorites.hasFavorite(it) }
+        chosen == "__favorites" -> hasFavorites
         chosen == "__all" -> true
         else -> sections.any { it.token.equals(chosen, true) }
     }
-    val query = if (stillValid) chosen else if (recent.isNotEmpty()) "__recent" else "__all"
+    val query = if (stillValid) chosen else if (hasFavorites) "__favorites" else "__all"
     val section = sections.firstOrNull { it.token.equals(query, true) }
     val filtered = when (query) {
-        "__recent" -> recent
         "__favorites" -> live.filter { state.favorites.hasFavorite(it) }
         "__all" -> live
         else -> section?.channels ?: live
     }
     val heading = when (query) {
-        "__recent" -> "Last watched"
         "__favorites" -> "Favorites"
         "__all" -> "All channels"
         else -> section?.title ?: "All channels"
@@ -531,7 +526,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         // While moving: keep the lifted entry focused and on screen as it travels.
         LaunchedEffect(moving, draft) {
             val token = moving ?: return@LaunchedEffect
-            val top = (if (recent.isNotEmpty()) 1 else 0) + (if (live.any { state.favorites.hasFavorite(it) }) 1 else 0) + 2
+            val top = (if (hasFavorites) 1 else 0) + 2
             val index = top + sections.indexOfFirst { it.token == token }
             val visible = groupsState.layoutInfo.visibleItemsInfo
             if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
@@ -542,9 +537,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
         // instead of showing the top of the list.
         LaunchedEffect(Unit) {
-            val top = (if (recent.isNotEmpty()) 1 else 0) + (if (live.any { state.favorites.hasFavorite(it) }) 1 else 0)
+            val top = if (hasFavorites) 1 else 0
             val index = when (query) {
-                "__recent" -> 0
                 "__favorites" -> top - 1
                 "__all" -> top
                 else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
@@ -553,9 +547,6 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         }
         Box(Modifier.width(250.dp).fillMaxHeight()) {
             LazyColumn(state = groupsState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                if (recent.isNotEmpty()) {
-                    item { FocusRow("Last watched", recent.size.toString(), query == "__recent") { model.setSearchQuery("__recent") } }
-                }
                 if (live.any { state.favorites.hasFavorite(it) }) {
                     item { FocusRow("Favorites", live.count { state.favorites.hasFavorite(it) }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
                 }
