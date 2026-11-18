@@ -23,7 +23,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -704,7 +704,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
         // Compact rows: about half as many again fit on screen, with the same logo, name, group and quality.
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        items(items, key = { it.key }) { item ->
+        itemsIndexed(items, key = { _, it -> it.key }) { index, item ->
             val isPlaying = item.key == playing.key
             val focused = focusedKey == item.key
             // The "now playing" mark fades out instead of snapping off when another channel is picked.
@@ -714,61 +714,63 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                 spring(dampingRatio = .78f, stiffness = 420f),
                 label = "channelItemScale"
             )
-            Row(
-                (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
-                    .focusRequester(rowFocus.getOrPut(item.key) { FocusRequester() })
-                    .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
-                    // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
-                    .background(
-                        if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
-                        else SolidColor(Color.White.copy(alpha = .10f * playingMark))
-                    )
-                    .onFocusChanged { state ->
-                        if (state.isFocused) {
-                            focusedKey = item.key
-                        } else if (focusedKey == item.key) {
-                            // An older row's delayed focus-loss callback must not clear a
-                            // newer row that has already acquired focus.
-                            focusedKey = null
+            // A merged list ("Sports") gathers several of the provider's groups: the group is a
+            // small heading where it changes, once, instead of a line under every channel.
+            val heading = !oneGroup && (index == 0 || items[index - 1].group != item.group)
+            Column {
+                if (heading) Text(
+                    com.streamtv.data.tidyCase(item.group),
+                    Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, top = if (index == 0) 2.dp else 12.dp, bottom = 3.dp),
+                    color = Color.White.copy(alpha = .50f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
+                        .focusRequester(rowFocus.getOrPut(item.key) { FocusRequester() })
+                        .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
+                        // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
+                        .background(
+                            if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
+                            else SolidColor(Color.White.copy(alpha = .10f * playingMark))
+                        )
+                        .onFocusChanged { state ->
+                            if (state.isFocused) {
+                                focusedKey = item.key
+                            } else if (focusedKey == item.key) {
+                                // An older row's delayed focus-loss callback must not clear a
+                                // newer row that has already acquired focus.
+                                focusedKey = null
+                            }
                         }
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ChannelLogo(item.name, item.logo, Modifier.size(30.dp), fontSize = 11.sp, corner = 6.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                        Text(
+                            com.streamtv.data.shortChannelName(item.name, prefix),
+                            color = if (focused) Color.White else Color.White.copy(alpha = .80f),
+                            fontSize = 15.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Start,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ChannelLogo(item.name, item.logo, Modifier.size(30.dp), fontSize = 11.sp, corner = 6.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(
-                        com.streamtv.data.shortChannelName(item.name, prefix),
-                        color = if (focused) Color.White else Color.White.copy(alpha = .80f),
-                        fontSize = 15.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (!oneGroup) Text(
-                        item.group,
-                        color = Color.White.copy(alpha = if (focused) .72f else .46f),
-                        fontSize = 11.sp,
-                        lineHeight = 13.sp,
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                val quality = channelQuality(item.name)
-                if (quality.isNotBlank()) {
-                    Spacer(Modifier.width(8.dp))
-                    Box(
-                        Modifier.clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = if (focused) .16f else .10f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(quality, color = Color.White.copy(alpha = if (focused) .85f else .60f), fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    val quality = channelQuality(item.name)
+                    if (quality.isNotBlank()) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(Color.White.copy(alpha = if (focused) .16f else .10f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(quality, color = Color.White.copy(alpha = if (focused) .85f else .60f), fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
                     }
                 }
             }
