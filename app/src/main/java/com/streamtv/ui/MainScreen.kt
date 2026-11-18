@@ -1268,9 +1268,14 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
             group = channel.group, onNeedsLight = { light = it }
         )
-        // The same channel in another quality: a small badge in the top corner, beside the star when
-        // there is one, so it is always in the same place.
-        if (quality != null) QualityBadge(quality, Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = if (favorite) 29.dp else 7.dp))
+        // The same channel in another quality: a small badge in the star's corner. When the channel
+        // is a favourite the badge glides down to make room for the star above it.
+        if (quality != null) {
+            val badgeTop by androidx.compose.animation.core.animateDpAsState(
+                if (favorite) 27.dp else 8.dp, spring(dampingRatio = .8f, stiffness = 380f), label = "badge"
+            )
+            QualityBadge(quality, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
+        }
         if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
     }
