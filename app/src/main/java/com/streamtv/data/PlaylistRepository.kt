@@ -7,7 +7,10 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 class PlaylistRepository {
-    private val client = OkHttpClient.Builder().callTimeout(45, TimeUnit.SECONDS).build()
+    // No limit on the whole download: a big Xtream playlist from a slow server needs more than a
+    // minute. It gives up only when the server cannot be reached or stops sending for a minute.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
     suspend fun load(url: String): List<Channel> = withContext(Dispatchers.IO) {
         require(url.startsWith("http://") || url.startsWith("https://")) { "Enter a valid http(s) playlist URL" }
         val request = Request.Builder().url(url).header("User-Agent", "streamtv/1.0").build()

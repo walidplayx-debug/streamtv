@@ -318,7 +318,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
-                    _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist")
+                    _state.value = _state.value.copy(loading = false, error = e.friendly("Unable to import playlist"))
                 }
         }
     }
@@ -378,7 +378,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 dao.replaceAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
                 if (e is CancellationException) throw e
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
+                _state.value = _state.value.copy(loading = false, error = e.friendly("Unable to load saved playlist"))
             }
         }
     }
@@ -392,7 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 preferences.saveEpg(url)
             }.onFailure { e ->
                 if (e is CancellationException) throw e
-                if (!silent) _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG")
+                if (!silent) _state.value = _state.value.copy(error = e.friendly("Unable to load EPG"))
             }
         }
     }
@@ -609,8 +609,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 dao.replaceAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
                 if (e is CancellationException) throw e
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
+                _state.value = _state.value.copy(loading = false, error = e.friendly("Unable to load playlist"))
             }
         }
     }
+}
+
+/** A load's error in words a viewer can act on, not the network library's ("timeout"). */
+private fun Throwable.friendly(fallback: String): String = when (this) {
+    is java.net.UnknownHostException, is java.net.ConnectException ->
+        "Cannot reach the server. Check the internet connection and the address."
+    is java.io.InterruptedIOException -> "The server is taking too long to answer. Try again in a moment."
+    else -> message ?: fallback
 }

@@ -1132,8 +1132,6 @@ private fun ChannelGrid(
     GlideToFocus(gridState, focusedKey)
     // Channels that share one logo (one channel in several languages or regions) are labelled with
     // what tells them apart; every other tile stays clean.
-    val marks = remember(channels) { Memo.of("marks", channels) { distinguishingLabels(channels) } }
-    val qualities = remember(channels) { Memo.of("qualities", channels) { qualityBadges(channels) } }
     // CH+ / CH− (or Page up / down) jump four rows at a time (16 channels with four across). A held
     // key repeats at a calm, fixed pace, so it speeds through the list without piling up work.
     val tileFocus = remember { HashMap<String, FocusRequester>() }
@@ -1187,7 +1185,7 @@ private fun ChannelGrid(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             gridItems(channels, key = { it.key }) { channel ->
-                ChannelCard(channel, favorites.hasFavorite(channel), marks[channel.key], qualities[channel.key], channels.size > 100, { onOptions(channel) }, Modifier.fillMaxWidth().height(72.dp).focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
+                ChannelCard(channel, favorites.hasFavorite(channel), channels.size > 100, { onOptions(channel) }, Modifier.fillMaxWidth().focusRequester(tileFocus.getOrPut(channel.key) { FocusRequester() }).then(if (channel.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier), { focusedKey = channel.key }) { model.select(channel, channels, title) }
             }
         }
         // A thin, faint bar on the far side of the tiles (the left in Arabic) shows where in the list you are.
@@ -1196,29 +1194,26 @@ private fun ChannelGrid(
     }
 }
 
+/**
+ * A channel: its logo on a card (the favourite's star in the corner), and under the card its name
+ * with the quality after it, and its category in yellow.
+ */
 @Composable
-private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, quality: String?, bigList: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun ChannelCard(channel: Channel, favorite: Boolean, bigList: Boolean, onLongPress: () -> Unit, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Holding OK: the first repeat of the key opens the options, and its release must not also open the channel.
     val held = remember { booleanArrayOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
+    // A dark or see-through logo gets a soft silver card instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
-    val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
-    Box(
-        // The focused tile grows and sits above its neighbours.
-        modifier.zIndex(if (focused) 1f else 0f).scale(scale)
-            .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
-            .clip(RoundedCornerShape(10.dp))
-            .background(Brush.linearGradient(when {
-                light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
-                light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
-                focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
-                else -> listOf(Color(0xFF252A33), Color(0xFF171B22))
-            }))
-            // No white frame: the tile is picked out by its size, its lighter face and its shadow.
-            .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
+    // Only the card grows when focused, a little, so it never runs into the name under it.
+    val scale by animateFloatAsState(if (pressed) 1.05f else if (focused) 1.10f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
+    val name = remember(channel.name) { cleanChannelName(channel.name) }
+    val quality = remember(channel.name) { channelQuality(channel.name) }
+    val category = remember(channel.group) { channel.group.split(';', '|').firstOrNull { it.isNotBlank() }?.trim().orEmpty() }
+    Column(
+        modifier.zIndex(if (focused) 1f else 0f)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) {
@@ -1242,32 +1237,44 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
                     else -> false
                 }
             }
-            .clickable(onClick = press),
-        contentAlignment = Alignment.Center
-    ) {
-        ChannelLogo(
-            // Without a logo, a labelled tile's face shows the name its siblings share (the label
-            // under it says which one): "ITV1" over "North West", not the same category on every tile.
-            if (mark != null) sharedName(channel.name, mark) else channel.name, channel.logo,
-            // With a label, the logo is smaller and stands clear of the words under it.
-            Modifier.fillMaxSize().padding(
-                start = if (mark != null) 12.dp else 8.dp, end = if (mark != null) 12.dp else 8.dp,
-                top = if (mark != null) 6.dp else 8.dp, bottom = if (mark != null) 25.dp else 8.dp
-            ),
-            fontSize = 25.sp, corner = 8.dp,
-            placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
-            group = channel.group, compact = mark != null, onNeedsLight = { light = it }
-        )
-        // The same channel in another quality: a small badge in the star's corner. When the channel
-        // is a favourite the badge glides down to make room for the star above it.
-        if (quality != null) {
-            val badgeTop by androidx.compose.animation.core.animateDpAsState(
-                if (favorite) 27.dp else 8.dp, spring(dampingRatio = .8f, stiffness = 380f), label = "badge"
+            // The card itself shows the focus (size, lighter face, shadow): no overlay on the words.
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null, onClick = press
             )
-            QualityBadge(quality, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
+    ) {
+        Box(
+            Modifier.fillMaxWidth().height(72.dp).scale(scale)
+                .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(10.dp))
+                .background(Brush.linearGradient(when {
+                    light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
+                    light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
+                    focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
+                    else -> listOf(Color(0xFF252A33), Color(0xFF171B22))
+                }))
+                // No white frame: the card is picked out by its size, its lighter face and its shadow.
+                .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            ChannelLogo(
+                channel.name, channel.logo, Modifier.fillMaxSize().padding(8.dp),
+                fontSize = 25.sp, corner = 8.dp,
+                placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
+                group = channel.group, onNeedsLight = { light = it }
+            )
+            if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
         }
-        if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
-        if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(
+                name, Modifier.weight(1f, fill = false), color = if (focused) White else White.copy(alpha = .86f),
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            if (quality.isNotBlank()) QualityBadge(quality)
+        }
+        // Kept even when empty, so every tile in a row has the same height.
+        Text(category, color = Color(0xFFEFAA3A), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1559,7 +1566,7 @@ private fun SettingsContent(
                             color = White.copy(alpha = .86f), fontSize = 14.sp, maxLines = 1
                         )
                     }
-                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
+                    state.error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
                         Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -1595,7 +1602,7 @@ private fun SettingsContent(
                         WhiteButton("Set guide address") { onEntry("epg") }
                         if (state.epgUrl.isNotBlank()) WhiteButton("Reload TV guide") { model.loadEpg() }
                     }
-                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
+                    state.error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
