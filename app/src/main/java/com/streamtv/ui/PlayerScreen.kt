@@ -731,7 +731,9 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                         // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
                         .background(
                             if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
-                            else SolidColor(Color.White.copy(alpha = .10f * playingMark))
+                            // The channel playing: a clear blue tint, seen over a bright picture too
+                            // (a faint white one vanished behind the see-through panel).
+                            else SolidColor(Color(0xFF6E8BD3).copy(alpha = .38f * playingMark))
                         )
                         .onFocusChanged { state ->
                             if (state.isFocused) {
