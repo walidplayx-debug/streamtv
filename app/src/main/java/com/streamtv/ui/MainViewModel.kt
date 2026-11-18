@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -114,6 +115,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingAction: (() -> Unit)? = null
     /** A new PIN typed once, waiting to be typed again. */
     private var pendingPin: String = ""
+    /** Only the newest playlist request may publish state or replace the cached channels. */
+    private var playlistLoadJob: Job? = null
+    private var playlistLoadGeneration: Long = 0L
+    private fun cancelPlaylistLoad(): Long {
+        playlistLoadJob?.cancel()
+        playlistLoadJob = null
+        playlistLoadGeneration += 1
+        return playlistLoadGeneration
+    }
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
@@ -255,7 +265,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setPlaylistName(value: String) { _state.value = _state.value.copy(playlistName = value) }
     fun setError(value: String) { _state.value = _state.value.copy(error = value) }
     fun importPlaylist(text: String) {
-        viewModelScope.launch {
+        playlistLoadJob?.cancel()
+        val requestId = ++playlistLoadGeneration
+        playlistLoadJob = viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             val name = _state.value.playlistName.trim().ifBlank { "Imported playlist ${_state.value.playlists.size + 1}" }
             runCatching {
@@ -269,19 +281,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     File(playlistDirectory, fileName).writeText(text)
                     Triple(channels, name, fileName)
                 }
-            }
-                .onSuccess { (channels, name, fileName) ->
-                    val localUrl = "local://$fileName"
-                    val updated = (_state.value.playlists.filterNot { it.url == localUrl } + PlaylistEntry(name, localUrl))
-                    _state.value = _state.value.copy(
-                        channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false,
-                        tab = "Live TV", playlistName = name, playlistUrl = localUrl, playlists = updated
-                    )
-                    preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
-                    dao.clear()
-                    dao.insertAll(channels.map { ChannelEntity.from(it) })
+            }.onSuccess { (channels, importedName, fileName) ->
+                if (requestId != playlistLoadGeneration) return@onSuccess
+                val localUrl = "local://$fileName"
+                val updated = (_state.value.playlists.filterNot { it.url == localUrl } + PlaylistEntry(importedName, localUrl))
+                _state.value = _state.value.copy(
+                    channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false,
+                    tab = "Live TV", playlistName = importedName, playlistUrl = localUrl, playlists = updated
+                )
+                preferences.savePlaylists(updated.map { "${it.name}\\t${it.url}" }.toSet())
+                if (requestId != playlistLoadGeneration) return@onSuccess
+                preferences.savePlaylist(localUrl)
+                if (requestId == playlistLoadGeneration) dao.replaceAll(channels.map { ChannelEntity.from(it) })
+            }.onFailure { e ->
+                if (requestId == playlistLoadGeneration) {
+                    _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist")
                 }
-                .onFailure { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist") }
+            }
         }
     }
     fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
@@ -300,6 +316,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = _state.value.playlists.filterNot { it.url == entry.url }
         val wasActive = entry.url == _state.value.playlistUrl
         val nothingLeft = updated.isEmpty()
+        if (nothingLeft) cancelPlaylistLoad()
         _state.value = if (nothingLeft) {
             // No playlist left: drop its channels too, so the app goes back to the welcome screen.
             _state.value.copy(
@@ -325,25 +342,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun selectPlaylist(entry: PlaylistEntry) {
         _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)
-        if (!entry.url.startsWith("local://")) {
-            loadPlaylist(entry.url)
-            return
-        }
-        viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
-                        .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
-                }
-            }.onSuccess { channels ->
-                _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
-                dao.clear()
-                dao.insertAll(channels.map { ChannelEntity.from(it) })
-            }.onFailure { e ->
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
-            }
-        }
+        loadPlaylist(entry.url)
     }
     fun loadEpg(silent: Boolean = false) {
         val url = _state.value.epgUrl
@@ -544,16 +543,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** [openLive]: a playlist that was just added opens on Live TV once its channels are in. */
     fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false) {
         val url = (urlOverride ?: _state.value.playlistUrl).trim()
-        viewModelScope.launch {
+        playlistLoadJob?.cancel()
+        val requestId = ++playlistLoadGeneration
+        playlistLoadJob = viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
-            runCatching { repository.load(url) }.onSuccess { channels ->
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val channels = if (url.startsWith("local://")) {
+                        val fileName = url.removePrefix("local://")
+                        require(fileName.isNotBlank() && File(fileName).name == fileName) { "Invalid local playlist path" }
+                        val file = File(playlistDirectory, fileName)
+                        require(file.isFile) { "The saved M3U playlist file is missing" }
+                        M3uParser.parse(file.readText())
+                    } else {
+                        repository.load(url)
+                    }
+                    channels.also { require(it.isNotEmpty()) { "The playlist contains no playable channels" } }
+                }
+            }.onSuccess { channels ->
+                if (requestId != playlistLoadGeneration) return@onSuccess
                 _state.value = _state.value.copy(channels = channels, loading = false, selected = channels.firstOrNull())
                 moveOldFavorites(channels)
-                if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
+                if (openLive || url.startsWith("local://")) {
+                    _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
+                }
                 preferences.savePlaylist(url)
-                dao.clear()
-                dao.insertAll(channels.map { ChannelEntity.from(it) })
-            }.onFailure { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist") }
+                if (requestId == playlistLoadGeneration) dao.replaceAll(channels.map { ChannelEntity.from(it) })
+            }.onFailure { e ->
+                if (requestId == playlistLoadGeneration) {
+                    _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
+                }
+            }
         }
     }
 }
