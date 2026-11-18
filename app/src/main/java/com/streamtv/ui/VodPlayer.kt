@@ -89,6 +89,8 @@ private val PanelEdge = Brush.linearGradient(listOf(Color(0x66FFFFFF), Color(0x1
 
 /** One subtitle track found in the file. */
 private class TextTrack(val label: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
+/** A sound track: [code] is what its button shows ("AR", "EN", or its number). */
+private class AudioTrack(val code: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 
 /**
  * The movie and episode player: a progress bar with times, rewind / play-pause / forward, and the
@@ -132,13 +134,24 @@ fun VodPlayerScreen(
     // Subtitles carried inside the file. The one in the app's language is picked by itself.
     var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
     var subtitlesOff by remember { mutableStateOf(false) }
+    // Sound tracks (a dubbed and an original language, say). The app's language is picked by itself.
+    var audios by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
     val appLanguage = LocalAppLanguage.current
     LaunchedEffect(player, appLanguage) {
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setPreferredTextLanguage(appLanguage).build()
+            .setPreferredTextLanguage(appLanguage).setPreferredAudioLanguage(appLanguage).build()
     }
-    val buttons = if (subtitles.isEmpty()) listOf("back10", "play", "fwd10", "favorite")
-        else listOf("back10", "play", "fwd10", "favorite", "subtitles")
+    // The sound button only when there is a choice, the subtitles button only when there are some.
+    val buttons = listOf("back10", "play", "fwd10", "favorite") +
+        (if (audios.size > 1) listOf("audio") else emptyList()) +
+        (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList())
+    val audioCode = audios.firstOrNull { it.selected }?.code ?: ""
+    fun nextAudio() {
+        // One track after the other, back to the first.
+        val next = (audios.indexOfFirst { it.selected } + 1) % audios.size
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(audios[next].group, 0)).build()
+    }
     val chosenSubtitle = if (subtitlesOff) -1 else subtitles.indexOfFirst { it.selected }
     fun nextSubtitle() {
         // Off -> first track -> second -> ... -> off.
@@ -178,6 +191,7 @@ fun VodPlayerScreen(
             "play" -> togglePlay()
             "favorite" -> { onFavorite(); show() }
             "subtitles" -> { nextSubtitle(); show() }
+            "audio" -> { if (audios.size > 1) nextAudio(); show() }
         }
     }
     fun leave() { save(); onExit() }
@@ -199,6 +213,10 @@ fun VodPlayerScreen(
                         ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
                         ?: "${index + 1}"
                     TextTrack(label, group.mediaTrackGroup, group.isSelected)
+                }
+                audios = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO && it.isSupported }.mapIndexed { index, group ->
+                    val language = group.getTrackFormat(0).language?.takeIf { it.isNotBlank() && it != "und" }
+                    AudioTrack(language?.substringBefore('-')?.take(3)?.uppercase() ?: "${index + 1}", group.mediaTrackGroup, group.isSelected)
                 }
             }
         }
@@ -360,7 +378,7 @@ fun VodPlayerScreen(
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         buttons.forEachIndexed { index, name ->
                             if (index > 0) Spacer(Modifier.width(10.dp))
-                            VodIconButton(name, playing = playing, favorite = favorite, subtitlesOn = chosenSubtitle >= 0, selected = row == 1 && button == index)
+                            VodIconButton(name, playing = playing, favorite = favorite, subtitlesOn = chosenSubtitle >= 0, selected = row == 1 && button == index, audioCode = audioCode)
                         }
                     }
                     Spacer(Modifier.height(6.dp))
@@ -402,7 +420,7 @@ private fun ProgressBar(position: Long, duration: Long, selected: Boolean) {
 }
 
 @Composable
-private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean) {
+private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
     val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
     val big = name == "play"
     Box(
@@ -414,6 +432,11 @@ private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, sub
         val tint = if (selected) Color(0xFF1C1C1E) else VodWhite
         when (name) {
             "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            // The sound being played, by its language: a press goes to the next one.
+            "audio" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("♪", color = tint, fontSize = 10.sp, lineHeight = 10.sp)
+                Text(audioCode, color = tint, fontSize = 9.sp, fontWeight = FontWeight.Bold, lineHeight = 10.sp)
+            }
             // "CC" in a box; dimmed while subtitles are off.
             "subtitles" -> Box(
                 Modifier.border(1.5.dp, tint.copy(alpha = if (subtitlesOn) 1f else .5f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp)

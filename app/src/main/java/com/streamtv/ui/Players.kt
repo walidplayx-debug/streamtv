@@ -3,6 +3,9 @@ package com.streamtv.ui
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -42,7 +45,14 @@ object Players {
         val buffers = DefaultLoadControl.Builder()
             .setBufferDurationsMs(/* min = */ 15_000, /* max = */ 50_000, /* forPlayback = */ 1_500, /* afterRebuffer = */ 3_000)
             .build()
-        return ExoPlayer.Builder(app)
+        // The device's own decoders first; FFmpeg (Dolby AC3 / E-AC3, DTS, TrueHD...) only for a sound
+        // the device cannot play, which otherwise left the picture silent.
+        val renderers = DefaultRenderersFactory(app)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        // Audio focus: the sound steps aside while the remote's voice search or the assistant speaks.
+        val audio = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
+        return ExoPlayer.Builder(app, renderers)
+            .setAudioAttributes(audio, /* handleAudioFocus = */ true)
             .setBandwidthMeter(bandwidth)
             .setTrackSelector(DefaultTrackSelector(app, selection))
             .setLoadControl(buffers)
