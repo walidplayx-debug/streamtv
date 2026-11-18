@@ -289,7 +289,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false,
                     tab = "Live TV", playlistName = importedName, playlistUrl = localUrl, playlists = updated
                 )
-                preferences.savePlaylists(updated.map { "${it.name}\\t${it.url}" }.toSet())
+                preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
                 if (requestId != playlistLoadGeneration) return@onSuccess
                 preferences.savePlaylist(localUrl)
                 if (requestId == playlistLoadGeneration) dao.replaceAll(channels.map { ChannelEntity.from(it) })
