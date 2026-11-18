@@ -93,9 +93,50 @@ private val languageCodes: Map<String, String> by lazy {
     map
 }
 
+/**
+ * Channels whose language is not their country's, from the iptv-org database (made by
+ * tools/gen_channel_languages.py): "RTArabic.ru" -> "ara", "MBC1USA.us" -> "ara",
+ * "France24.fr@Arabic" -> "ara". A feed marked "-" speaks its country's language after all.
+ */
+private val idLanguages: Map<String, String> by lazy {
+    runCatching {
+        object {}.javaClass.getResourceAsStream("/channel_languages.tsv")!!.bufferedReader().useLines { lines ->
+            lines.mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to it[1] } }.toMap()
+        }
+    }.getOrDefault(emptyMap())
+}
+
+/** The language a channel's id is filed under in that table, if any. */
+private fun idLanguagesOf(channel: Channel): Set<String> {
+    // Only a real channel id ("Name.cc" or "Name.cc@Feed"), not the stand-in made from the name and address.
+    if (channel.id.isBlank() || '/' in channel.id || '|' in channel.id) return emptySet()
+    val value = idLanguages[channel.id] ?: idLanguages[channel.id.substringBefore('@')] ?: return emptySet()
+    if (value == "-") return emptySet()
+    return value.split(';').mapNotNull { languageCodes[it] }.toSet()
+}
+
+/** A language said in the channel's own name: "RT Arabic", "Sky News Arabia", "Al Jazeera English". */
+private val nameLanguageWords = mapOf(
+    "arabic" to "ar", "arabia" to "ar", "arabi" to "ar", "عربي" to "ar", "العربية" to "ar",
+    "english" to "en", "french" to "fr", "français" to "fr", "francais" to "fr",
+    "spanish" to "es", "español" to "es", "espanol" to "es", "deutsch" to "de", "german" to "de",
+    "russian" to "ru", "persian" to "fa", "farsi" to "fa", "turkish" to "tr", "türkçe" to "tr",
+    "urdu" to "ur", "hindi" to "hi", "kurdish" to "ku", "portuguese" to "pt", "português" to "pt",
+    "italian" to "it", "italiano" to "it"
+)
+
+private val nonLetters = Regex("""[^\p{L}]+""")
+
+private fun nameLanguagesOf(channel: Channel): Set<String> =
+    channel.name.lowercase().split(nonLetters).mapNotNull { nameLanguageWords[it] }.toSet()
+
 private fun languagesOf(channel: Channel): Set<String> {
     val tagged = channel.language.split(';', ',', '/').mapNotNull { languageCodes[it.trim().lowercase()] }.toSet()
     if (tagged.isNotEmpty()) return tagged
+    // The name says it ("RT Arabic"), or the channel is known to speak another language than its
+    // country's ("RTArabic.ru", "MBC1USA.us"): either beats the guess from the country.
+    nameLanguagesOf(channel).takeIf { it.isNotEmpty() }?.let { return it }
+    idLanguagesOf(channel).takeIf { it.isNotEmpty() }?.let { return it }
     // Arabic letters in the name settle it.
     if (channel.name.any { it in '\u0600'..'\u06FF' }) return setOf("ar")
     when (val prefix = prefixOf(channel)) {

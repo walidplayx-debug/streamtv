@@ -310,10 +310,6 @@ fun PlayerScreen(
 
     // Back from the channels goes to the list name, from the list name it closes the panel.
     fun backInList() {
-        // The same press can arrive twice (as a key and as a system back); count it once.
-        val now = android.os.SystemClock.uptimeMillis()
-        if (now - lastBack[0] < 300L) return
-        lastBack[0] = now
         when {
             pickerOpen -> {
                 pickerOpen = false
@@ -329,9 +325,20 @@ fun PlayerScreen(
             }
         }
     }
-    BackHandler {
-        if (overlayState == OverlayState.ChannelList) backInList() else onBack()
+    // Back: closes the channel list, else hides the info bar at the bottom, and only then leaves the player.
+    fun back() {
+        // The same press can arrive twice (as a key and as a system back); count it once, or the
+        // second would leave the player right after the first hid the bar or closed the list.
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastBack[0] < 300L) return
+        lastBack[0] = now
+        when (overlayState) {
+            OverlayState.ChannelList -> backInList()
+            OverlayState.InfoBar -> overlayState = OverlayState.None
+            else -> onBack()
+        }
     }
+    BackHandler { back() }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
@@ -363,7 +370,7 @@ fun PlayerScreen(
                     Key.ChannelUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
                     Key.ChannelDown -> if (listOpen) false else { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
                     // Handled here, before the system moves focus on its own for the Back key.
-                    Key.Back -> { if (listOpen) backInList() else onBack(); true }
+                    Key.Back -> { back(); true }
                     Key.DirectionUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
                     Key.DirectionDown -> if (listOpen) false else { zap(-1, event.nativeKeyEvent.repeatCount > 0); true }
                     // On the list name, left/right page between lists; on the channels they close the panel.
