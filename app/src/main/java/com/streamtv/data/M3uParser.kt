@@ -44,7 +44,7 @@ object M3uParser {
                     }
                 }
                 line.isNotEmpty() && !line.startsWith("#") && info != null -> {
-                    val raw = info!!
+                    val raw = info
                     val attrs = attribute.findAll(raw).associate { m ->
                         m.groupValues[1].lowercase() to (m.groupValues[2].ifEmpty { m.groupValues[3].ifEmpty { m.groupValues[4] } })
                     }

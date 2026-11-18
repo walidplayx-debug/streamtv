@@ -9,6 +9,9 @@ android {
         // This optional Compose check crashes lint on some files (a lint bug); it only suggests
         // primitive state types, so it is switched off rather than letting it stop the build.
         disable += "AutoboxingStateCreation"
+        // Every finding is listed in the build log too, not only in the report file.
+        textReport = true
+        textOutput = file("stdout")
     }
     namespace = "com.streamtv"
     // 35 for media3 1.5 (compiling against it only; the app still targets 34).

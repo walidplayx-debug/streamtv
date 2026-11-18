@@ -98,10 +98,10 @@ fun ChannelLogo(
                 modifier = Modifier.fillMaxSize().padding(logoPadding),
                 contentScale = contentScale,
                 onSuccess = { success ->
-                    if (smartPlate && logo != null) {
+                    if (smartPlate) {
                         val dark = LogoTone.known[logo] ?: ((success.result.drawable as? BitmapDrawable)?.bitmap
                             ?.let { LogoTone.needsPlate(it) } ?: false).also { LogoTone.known[logo] = it }
-                        onNeedsLight?.invoke(dark)
+                        onNeedsLight(dark)
                     }
                     loaded = true
                 },
