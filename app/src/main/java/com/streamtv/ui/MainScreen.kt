@@ -601,8 +601,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                         leading = item.flag?.let { code -> { CountryFlag(code) } },
                         onFocus = {
                             when (mode) {
-                                GroupMode.Country -> Hints.offer(context, "section_country", "Want this country first? 😉 Hold OK and move it up")
-                                GroupMode.Language -> Hints.offer(context, "section_language", "Want this language first? 😉 Hold OK and move it up")
+                                GroupMode.Country -> Hints.offer(context, "section_country", "Want this country first? Hold OK and move it up")
+                                GroupMode.Language -> Hints.offer(context, "section_language", "Want this language first? Hold OK and move it up")
                                 else -> Hints.offer(context, "section_list", "Prefer this section higher? Hold OK and arrange the list your way")
                             }
                         },
@@ -1235,7 +1235,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
                 if (it.isFocused) {
                     onFocus()
                     // In a long list, first the tip on getting around it quickly.
-                    if (!(bigList && Hints.offer(context, "biglist", "So many channels? 😄 CH+ / CH− jump 16 at a time, or type the channel number")))
+                    if (!(bigList && Hints.offer(context, "biglist", "So many channels? CH+ / CH− jump 16 at a time, or type the channel number")))
                         Hints.offer(context, "channel", "Hold OK for channel options")
                 }
             }
