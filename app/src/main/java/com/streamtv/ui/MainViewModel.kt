@@ -314,8 +314,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
                     // Remembered as the active playlist, so the app reopens on it.
                     preferences.savePlaylist(localUrl)
-                    dao.clear()
-                    dao.insertAll(channels.map { ChannelEntity.from(it) })
+                    dao.replaceAll(channels.map { ChannelEntity.from(it) })
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
@@ -376,8 +375,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
                 // Remembered as the active playlist, so the app reopens on it.
                 preferences.savePlaylist(entry.url)
-                dao.clear()
-                dao.insertAll(channels.map { ChannelEntity.from(it) })
+                dao.replaceAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
@@ -608,8 +606,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 moveOldFavorites(channels)
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
-                dao.clear()
-                dao.insertAll(channels.map { ChannelEntity.from(it) })
+                dao.replaceAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
