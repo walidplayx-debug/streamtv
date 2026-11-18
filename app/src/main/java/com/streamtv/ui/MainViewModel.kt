@@ -289,10 +289,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val fileName = "import-${System.currentTimeMillis()}.m3u"
                     playlistDirectory.mkdirs()
                     val file = File(playlistDirectory, fileName)
-                    val input = getApplication<Application>().contentResolver.openInputStream(uri)
-                        ?: error("Unable to open the selected M3U file")
                     // Copied to the app's own file first, then read from there line by line.
                     try {
+                        val input = getApplication<Application>().contentResolver.openInputStream(uri)
+                            ?: error("Unable to open the selected M3U file")
                         input.use { source -> file.outputStream().use { source.copyTo(it) } }
                         val channels = M3uParser.parse(file.reader()).also {
                             require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }

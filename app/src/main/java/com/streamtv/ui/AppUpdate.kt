@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -107,7 +108,7 @@ fun AppUpdateSection() {
                                 context.startActivity(
                                     Intent(
                                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                        Uri.parse("package:${context.packageName}")
+                                        "package:${context.packageName}".toUri()
                                     )
                                 )
                             } else {

@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import androidx.compose.ui.Modifier
 import com.streamtv.data.Channel
 import com.streamtv.data.detectedLanguage
 import androidx.compose.foundation.layout.size
@@ -229,7 +230,7 @@ private fun genresOf(channel: Channel): Set<String> {
  * a connection the emoji flag stands in.
  */
 @androidx.compose.runtime.Composable
-fun CountryFlag(code: String, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+fun CountryFlag(code: String, modifier: Modifier = Modifier) {
     var failed by androidx.compose.runtime.remember(code) { androidx.compose.runtime.mutableStateOf(false) }
     if (failed) {
         androidx.compose.material3.Text(emojiFlag(code), modifier, fontSize = androidx.compose.ui.unit.TextUnit(17f, androidx.compose.ui.unit.TextUnitType.Sp))

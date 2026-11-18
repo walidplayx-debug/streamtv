@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import androidx.core.graphics.get
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -215,7 +216,7 @@ object LogoTone {
         var dark = 0
         var light = 0.0
         for (y in 0 until steps) for (x in 0 until steps) {
-            val c = bitmap.getPixel(x * (bitmap.width - 1) / (steps - 1), y * (bitmap.height - 1) / (steps - 1))
+            val c = bitmap[x * (bitmap.width - 1) / (steps - 1), y * (bitmap.height - 1) / (steps - 1)]
             val a = (c ushr 24) and 0xFF
             if (a < 60) continue
             val l = (.299 * ((c shr 16) and 0xFF) + .587 * ((c shr 8) and 0xFF) + .114 * (c and 0xFF)) / 255.0

@@ -119,16 +119,13 @@ fun PlayerScreen(
     // In a right-to-left layout the panel sits on the right, so the arrow keys swap roles.
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val side = if (rtl) 1 else -1
-    val player = remember(channel.url) {
-        Players.create(context).apply {
-            setMediaSource(Players.stream(context, channel.url))
-            prepare()
-            playWhenReady = true
-        }
-    }
-    var buffering by remember(channel.url) { mutableStateOf(true) }
-    var failed by remember(channel.url) { mutableStateOf(false) }
-    var autoRetries by remember(channel.url) { mutableIntStateOf(0) }
+    // One player for the whole time the player is open: a channel change hands it the new stream
+    // (below). A new player per channel, with the old one shut down on the main thread, held the
+    // screen for a moment on every change: the bar's name trembled and zapping felt laggy.
+    val player = remember { Players.create(context) }
+    var buffering by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var autoRetries by remember { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
     var infoBarTick by remember { mutableIntStateOf(0) }
     val playerFocusRequester = remember { FocusRequester() }
@@ -209,7 +206,7 @@ fun PlayerScreen(
     // stays up); the error card shows only if it still fails. Once it plays again the count starts
     // over, so a long match survives any number of short drops.
     val retryScope = rememberCoroutineScope()
-    val retryJob = remember(channel.url) { arrayOfNulls<Job>(1) }
+    val retryJob = remember { arrayOfNulls<Job>(1) }
     fun onStreamProblem() {
         if (retryJob[0]?.isActive == true) return
         if (autoRetries < RetryPauses.size) {
@@ -239,17 +236,33 @@ fun PlayerScreen(
         showInfoBar()
     }
 
+    // A channel change (and the first channel): the same player takes the new stream at its live
+    // point; a retry still pending for the previous channel is dropped.
+    LaunchedEffect(channel.url) {
+        retryJob[0]?.cancel()
+        failed = false
+        buffering = true
+        autoRetries = 0
+        player.stop()
+        player.setMediaSource(Players.stream(context, channel.url))
+        player.prepare()
+        player.playWhenReady = true
+    }
+    // The player's listener and the lifecycle observer live as long as the player, so they call
+    // the newest versions of these (made for the channel now playing), not the first ones.
+    val streamProblem by rememberUpdatedState(newValue = { onStreamProblem() })
+    val restartNow by rememberUpdatedState(newValue = { restart() })
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> buffering = true
                     Player.STATE_READY -> { buffering = false; failed = false; autoRetries = 0 }
-                    Player.STATE_ENDED -> onStreamProblem()
+                    Player.STATE_ENDED -> streamProblem()
                     else -> Unit
                 }
             }
-            override fun onPlayerError(error: PlaybackException) = onStreamProblem()
+            override fun onPlayerError(error: PlaybackException) = streamProblem()
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
@@ -257,7 +270,7 @@ fun PlayerScreen(
     // Home (or anything else that takes the app off screen) stops playback, sound included;
     // coming back starts the channel again.
     val lifecycleOwner = LocalLifecycleOwner.current
-    val stoppedInBackground = remember(channel.url) { booleanArrayOf(false) }
+    val stoppedInBackground = remember { booleanArrayOf(false) }
     DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -269,7 +282,7 @@ fun PlayerScreen(
                 }
                 Lifecycle.Event.ON_START -> if (stoppedInBackground[0]) {
                     stoppedInBackground[0] = false
-                    restart()
+                    restartNow()
                 }
                 else -> Unit
             }
@@ -278,7 +291,7 @@ fun PlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     // A stream that buffers forever is treated like a broken one.
-    LaunchedEffect(player, buffering, failed, autoRetries) {
+    LaunchedEffect(player, channel.url, buffering, failed, autoRetries) {
         if (buffering && !failed) {
             delay(StallMillis)
             onStreamProblem()

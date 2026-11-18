@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import androidx.core.content.edit
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,7 +54,7 @@ object Hints {
         val seen = prefs.getInt(key, 0)
         if (seen >= Times) return false
         shownThisRun += key
-        prefs.edit().putInt(key, seen + 1).apply()
+        prefs.edit { putInt(key, seen + 1) }
         current = text
         return true
     }
