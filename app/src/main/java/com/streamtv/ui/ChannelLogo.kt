@@ -111,49 +111,93 @@ fun ChannelLogo(
     }
 }
 
-/** A colour for a playlist category, found from words in its name (in English, French or Arabic). */
-private fun categoryColor(group: String): Color {
-    val g = group.lowercase()
-    fun has(vararg words: String) = words.any { it in g }
-    return when {
-        has("news", "info", "أخبار", "اخبار", "actualit") -> Color(0xFF3B82F6)
-        has("sport", "رياض", "bein", "foot", "soccer") -> Color(0xFF22C55E)
-        has("movie", "film", "cinema", "ciné", "أفلام", "افلام", "سينما") -> Color(0xFFF59E0B)
-        has("kid", "child", "cartoon", "anim", "enfant", "أطفال", "اطفال", "كرتون") -> Color(0xFFEC4899)
-        has("music", "musique", "أغاني", "اغاني", "موسيق") -> Color(0xFF06B6D4)
-        has("docu", "nature", "science", "وثائق", "علوم") -> Color(0xFF14B8A6)
-        has("relig", "islam", "quran", "coran", "دين", "قرآن", "قران") -> Color(0xFF84CC16)
-        has("series", "série", "drama", "مسلسل", "دراما") -> Color(0xFFA855F7)
-        else -> Color(0xFF94A3B8)
+/**
+ * The face of a channel without a logo: its name only, cleaned of tags, split over two balanced
+ * lines when that reads better, at the largest size the tile holds. [group] and [compact] are kept
+ * for the callers; the face no longer shows the category.
+ */
+@Composable
+private fun CategoryFace(name: String, @Suppress("UNUSED_PARAMETER") group: String, @Suppress("UNUSED_PARAMETER") compact: Boolean = false) {
+    Box(
+        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF30353F), Color(0xFF22262E)))).padding(6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        FittedName(cleanChannelName(name))
     }
 }
 
-/**
- * The face of a channel without a logo: a coloured stripe and the category on the start side,
- * the channel's full name under it, large enough to read from the sofa.
- * [compact]: a label sits under the face, so only the name is shown, on one line. (With the
- * category over it, two lines did not fit and the name was cut down to a row of dashes.)
- */
+/** The name at the largest size that fits, on the layout (one line or two) that allows the larger size. */
 @Composable
-private fun CategoryFace(name: String, group: String, compact: Boolean = false) {
-    val color = categoryColor(group)
-    val label = if (compact) "" else group.split(';', '|', '/').firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-    Row(
-        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF30353F), Color(0xFF22262E))))
-            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
-    ) {
-        Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(color))
-        Spacer(Modifier.width(7.dp))
-        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.Center) {
-            if (label.isNotEmpty()) {
-                Text(label.uppercase(), color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, letterSpacing = .4.sp)
-                Spacer(Modifier.height(2.dp))
+private fun FittedName(name: String) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val maxW = with(density) { maxWidth.toPx() }
+        val maxH = with(density) { maxHeight.toPx() }
+        val fit = remember(name, maxW, maxH) {
+            val candidates = listOfNotNull(name, smartSplit(name))
+            var best = candidates.first() to MinNameSize
+            for (text in candidates) {
+                // Largest size, in half points, whose layout stays inside the face.
+                var low = MinNameSize; var high = MaxNameSize
+                while (high - low > .5f) {
+                    val mid = (low + high) / 2f
+                    val size = measurer.measure(text, nameStyle(mid), softWrap = false).size
+                    if (size.width <= maxW && size.height <= maxH) low = mid else high = mid
+                }
+                // Two lines only when they allow a clearly larger size: "BBC One" stays on one line.
+                if (low > best.second * (if (text == name) 1f else 1.1f)) best = text to low
             }
-            Text(name, color = Color.White, fontSize = if (compact) 15.sp else 14.sp, fontWeight = FontWeight.Bold,
-                maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+            best
         }
+        Text(
+            fit.first, style = nameStyle(fit.second), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2, softWrap = false, overflow = TextOverflow.Ellipsis
+        )
     }
+}
+
+private const val MinNameSize = 11f
+private const val MaxNameSize = 34f
+
+private fun nameStyle(size: Float) = TextStyle(
+    fontSize = size.sp, lineHeight = (size * 1.12f).sp, fontWeight = FontWeight.Bold,
+    platformStyle = PlatformTextStyle(includeFontPadding = false)
+)
+
+/** Tags, quality marks and anything in brackets left out: "Adult Swim West [Not 24/7;Geo-blocked]" -> "Adult Swim West". */
+fun cleanChannelName(name: String): String {
+    val noBrackets = name.replace(Regex("""[\(\[\{][^)\]}]*[\)\]\}]"""), " ")
+    val quality = setOf("hd", "fhd", "uhd", "sd", "4k", "8k", "hevc", "h265", "h264", "720p", "1080p", "2160p", "480p", "360p")
+    val words = noBrackets.split(Regex("\\s+")).filter { it.isNotBlank() && it.lowercase().trim('|', '-', ':') !in quality }
+    val cleaned = words.joinToString(" ").trim(' ', '|', '-', ':', '•')
+    return cleaned.ifBlank { name.trim() }
+}
+
+/**
+ * The name over two lines of about the same length, or null when it is one word. Numbers and
+ * very short words stay with the word before them ("MBC 3", "Mubasher 24"); a word is never cut.
+ */
+fun smartSplit(name: String): String? {
+    val words = name.split(' ').filter { it.isNotBlank() }
+    // Glue short pieces to their neighbour so they never sit alone on a line.
+    val chunks = ArrayList<String>()
+    for (word in words) {
+        val short = word.length <= 2 || word.all { it.isDigit() || it == '+' }
+        if (short && chunks.isNotEmpty()) chunks[chunks.size - 1] = chunks.last() + " " + word else chunks += word
+    }
+    if (chunks.size > 1 && (chunks[0].length <= 2)) { chunks[1] = chunks[0] + " " + chunks[1]; chunks.removeAt(0) }
+    if (chunks.size < 2) return null
+    // The most even split; among splits about as even (one letter apart), the one with the longer
+    // first line, so the name's lead words stay together: "Adult Swim / West", not "Adult / Swim West".
+    val splits = (1 until chunks.size).map { at ->
+        val first = chunks.subList(0, at).joinToString(" ").length
+        val second = chunks.subList(at, chunks.size).joinToString(" ").length
+        Triple(at, first, maxOf(first, second))
+    }
+    val even = splits.minOf { it.third }
+    val bestAt = splits.filter { it.third <= even + 1 }.maxBy { it.second }.first
+    return chunks.subList(0, bestAt).joinToString(" ") + "\n" + chunks.subList(bestAt, chunks.size).joinToString(" ")
 }
 
 /**
