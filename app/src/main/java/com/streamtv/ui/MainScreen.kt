@@ -601,28 +601,28 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
         else -> section?.title ?: "All channels"
     }
     val groupsState = rememberLazyListState()
-        // While moving: keep the lifted entry focused and on screen as it travels.
-        LaunchedEffect(moving, draft) {
-            val token = moving ?: return@LaunchedEffect
-            val top = (if (hasFavorites) 1 else 0) + 2
-            val index = top + sections.indexOfFirst { it.token == token }
-            val visible = groupsState.layoutInfo.visibleItemsInfo
-            if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
-                groupsState.animateScrollToItem((index - 3).coerceAtLeast(0))
-            }
-            runCatching { liftFocus.requestFocus() }
+    // While moving: keep the lifted entry focused and on screen as it travels.
+    LaunchedEffect(moving, draft) {
+        val token = moving ?: return@LaunchedEffect
+        val top = (if (hasFavorites) 1 else 0) + 2
+        val index = top + sections.indexOfFirst { it.token == token }
+        val visible = groupsState.layoutInfo.visibleItemsInfo
+        if (visible.isNotEmpty() && (index <= visible.first().index || index >= visible.last().index)) {
+            groupsState.animateScrollToItem((index - 3).coerceAtLeast(0))
         }
-        // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
-        // instead of showing the top of the list.
-        LaunchedEffect(Unit) {
-            val top = if (hasFavorites) 1 else 0
-            val index = when (query) {
-                "__favorites" -> top - 1
-                "__all" -> top
-                else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
-            }
-            if (index > 2) groupsState.scrollToItem(index - 2)
+        runCatching { liftFocus.requestFocus() }
+    }
+    // Coming back from a channel the list is rebuilt: bring the chosen entry back into view
+    // instead of showing the top of the list.
+    LaunchedEffect(Unit) {
+        val top = if (hasFavorites) 1 else 0
+        val index = when (query) {
+            "__favorites" -> top - 1
+            "__all" -> top
+            else -> sections.indexOfFirst { it.token.equals(query, true) }.let { if (it < 0) 0 else top + 2 + it }
         }
+        if (index > 2) groupsState.scrollToItem(index - 2)
+    }
     // The lists in the side panel; the channels beside it, running to the screen's top and bottom edges.
     SideLayout(edgeToEdge = true, side = {
         Box(Modifier.fillMaxSize()) {
