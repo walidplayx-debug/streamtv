@@ -736,14 +736,15 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ChannelLogo(item.name, item.logo, Modifier.size(28.dp), fontSize = 11.sp, corner = 6.dp)
+                ChannelLogo(item.name, item.logo, Modifier.size(30.dp), fontSize = 11.sp, corner = 6.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(
                         com.streamtv.data.shortChannelName(item.name, prefix),
                         color = if (focused) Color.White else Color.White.copy(alpha = .80f),
-                        fontSize = 13.sp,
-                        lineHeight = 16.sp,
+                        // Between the old 15 and the too small 13: read easily from the sofa.
+                        fontSize = 14.5.sp,
+                        lineHeight = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
