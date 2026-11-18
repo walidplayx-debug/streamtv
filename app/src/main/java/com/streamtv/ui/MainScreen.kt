@@ -600,7 +600,8 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                         },
                         leading = item.flag?.let { code -> { CountryFlag(code) } },
                         onFocus = {
-                            when (mode) {
+                            // Only worth suggesting for an entry a little way down: the first ones are already on top.
+                            if (sections.indexOf(item) >= 3) when (mode) {
                                 GroupMode.Country -> Hints.offer(context, "section_country", "Want this country first? Hold OK and move it up")
                                 GroupMode.Language -> Hints.offer(context, "section_language", "Want this language first? Hold OK and move it up")
                                 else -> Hints.offer(context, "section_list", "Prefer this section higher? Hold OK and arrange the list your way")
