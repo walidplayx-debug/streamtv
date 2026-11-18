@@ -1143,8 +1143,8 @@ private fun ChannelGrid(
     }
     BoxWithConstraints(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         val direction = when (event.key) {
-            Key.ChannelUp, Key.PageDown -> 1
-            Key.ChannelDown, Key.PageUp -> -1
+            Key.ChannelDown, Key.PageDown -> 1
+            Key.ChannelUp, Key.PageUp -> -1
             else -> 0
         }
         if (direction == 0) false else { if (event.type == KeyEventType.KeyDown) page(direction); true }
