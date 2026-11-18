@@ -42,6 +42,9 @@ jobs:
           STV_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           STV_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew --no-daemon lint testDebugUnitTest assembleRelease
+      - name: Lint findings
+        if: always()
+        run: cat app/build/reports/lint-results-debug.txt 2>/dev/null || echo "No lint report"
       - name: Check the signed APK
         run: |
           mkdir -p release
