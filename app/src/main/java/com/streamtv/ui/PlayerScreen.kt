@@ -742,9 +742,8 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     Text(
                         com.streamtv.data.shortChannelName(item.name, prefix),
                         color = if (focused) Color.White else Color.White.copy(alpha = .80f),
-                        // Between the old 15 and the too small 13: read easily from the sofa.
-                        fontSize = 14.5.sp,
-                        lineHeight = 17.sp,
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
