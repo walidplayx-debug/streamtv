@@ -34,6 +34,7 @@ fun translate(language: String, text: String): String = when (language) {
 } ?: text
 
 private val French = mapOf(
+    "Wrong username or password, or the account has expired." to "Identifiant ou mot de passe incorrect, ou abonnement expiré.",
     "This playlist is too big for this device's memory." to "Cette liste est trop grande pour la mémoire de cet appareil.",
     "Cannot reach the server. Check the internet connection and the address." to "Impossible de joindre le serveur. Vérifiez la connexion Internet et l\u2019adresse.",
     "The server is taking too long to answer. Try again in a moment." to "Le serveur met trop de temps à répondre. Réessayez dans un instant.",
@@ -137,6 +138,7 @@ private val French = mapOf(
 )
 
 private val Arabic = mapOf(
+    "Wrong username or password, or the account has expired." to "اسم المستخدم أو كلمة المرور غير صحيحة، أو انتهى الاشتراك.",
     "This playlist is too big for this device's memory." to "هذه القائمة أكبر من ذاكرة هذا الجهاز.",
     "Cannot reach the server. Check the internet connection and the address." to "تعذّر الوصول إلى الخادم. تحقّق من اتصال الإنترنت ومن العنوان.",
     "The server is taking too long to answer. Try again in a moment." to "الخادم يتأخر كثيراً في الرد. حاول مرة أخرى بعد قليل.",
