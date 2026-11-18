@@ -57,7 +57,8 @@ object M3uParser {
                         else line + "|" + options.entries.joinToString("&") { (k, v) -> k + "=" + java.net.URLEncoder.encode(v, "UTF-8") }
                     val id = attrs["tvg-id"]?.takeIf { it.isNotBlank() } ?: "$title|$url"
                     if (seen.add(id + "\u0000" + url)) {
-                        result += Channel(id, title, url, attrs["tvg-logo"], attrs["group-title"] ?: "Other",
+                        // A provider's heading ("##### SPORTS #####") is not a channel.
+                        if (!isSeparatorName(title)) result += Channel(id, title, url, attrs["tvg-logo"], attrs["group-title"] ?: "Other",
                             attrs["tvg-country"] ?: "", attrs["tvg-language"] ?: "")
                     }
                     info = null

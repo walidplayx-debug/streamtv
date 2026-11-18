@@ -667,6 +667,10 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
     // flags can briefly disagree while Compose dispatches focus loss/gain callbacks.
     var focusedKey by remember(items) { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
+    // Tidy rows: the tag most names of this list share ("AR - ") is left out, and the category
+    // line too when every channel here has the same one (it is the list's own name, above).
+    val prefix = remember(items) { com.streamtv.data.sharedListPrefix(items.map { it.name }) }
+    val oneGroup = remember(items) { items.map { it.group }.distinct().size <= 1 }
     // CH+ / CH− (Page up / down) jump eight rows at a time; held, at a calm fixed pace.
     val rowFocus = remember(items) { HashMap<String, FocusRequester>() }
     val pageScope = rememberCoroutineScope()
@@ -729,23 +733,23 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                         }
                     }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ChannelLogo(item.name, item.logo, Modifier.size(32.dp), fontSize = 12.sp, corner = 7.dp)
-                Spacer(Modifier.width(11.dp))
+                ChannelLogo(item.name, item.logo, Modifier.size(28.dp), fontSize = 11.sp, corner = 6.dp)
+                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(
-                        channelDisplayName(item.name),
+                        com.streamtv.data.shortChannelName(item.name, prefix),
                         color = if (focused) Color.White else Color.White.copy(alpha = .80f),
-                        fontSize = 15.sp,
-                        lineHeight = 18.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
+                    if (!oneGroup) Text(
                         item.group,
                         color = Color.White.copy(alpha = if (focused) .72f else .46f),
                         fontSize = 11.sp,
@@ -804,4 +808,4 @@ internal fun channelDisplayName(name: String): String =
     name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
 
 internal fun channelQuality(name: String): String =
-    Regex("\\b(\\d{3,4}p|4K|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()
+    Regex("\\b(\\d{3,4}p|[48]K|UHD|FHD|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()

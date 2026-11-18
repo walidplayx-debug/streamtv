@@ -53,3 +53,31 @@ fun Channel.kind(): ChannelKind {
         else -> ChannelKind.Live
     }
 }
+
+private val qualityToken = Regex("""(?i)[(\[]?\b(?:\d{3,4}p|[48]K|UHD|FHD|HD|SD)\b[)\]]?""")
+private val listPrefix = Regex("""^\s*(\p{L}{2,4})\s*[-|:]\s*""")
+private val separatorName = Regex("""^\s*[#=*★☆~•_+\-]{3,}.*[#=*★☆~•_+\-]{3,}\s*$|^[\s#=*★☆~•_+\-]+$""")
+
+/** A provider's heading dressed up as a channel: "##### BEIN SPORTS SA #####", "=====". */
+fun isSeparatorName(name: String): Boolean = separatorName.matches(name)
+
+/**
+ * The short tag most names of a list start with ("AR - ", "FR | ", "UK: "), or "" when fewer
+ * than six in ten share one. Works it out from the list itself, for any provider.
+ */
+fun sharedListPrefix(names: List<String>): String {
+    if (names.size < 3) return ""
+    val counts = names.mapNotNull { listPrefix.find(it)?.groupValues?.get(1)?.uppercase() }.groupingBy { it }.eachCount()
+    val best = counts.maxByOrNull { it.value } ?: return ""
+    return if (best.value * 10 >= names.size * 6) best.key else ""
+}
+
+/** "AR - BEIN SPORTS 1 FHD" with the list's tag "AR" -> "BEIN SPORTS 1" (the quality has its own badge). */
+fun shortChannelName(name: String, prefix: String): String {
+    var short = name
+    if (prefix.isNotEmpty()) {
+        listPrefix.find(short)?.let { if (it.groupValues[1].equals(prefix, ignoreCase = true)) short = short.substring(it.range.last + 1) }
+    }
+    short = qualityToken.replace(short, " ").replace(Regex("""\s{2,}"""), " ").trim(' ', '-', '|', ':', '·')
+    return short.ifBlank { name.trim() }
+}

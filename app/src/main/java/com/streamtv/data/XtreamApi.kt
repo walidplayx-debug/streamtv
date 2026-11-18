@@ -40,6 +40,8 @@ class XtreamApi(private val client: OkHttpClient) {
         val live = streams(login, "get_live_streams") { item ->
             val streamId = item["stream_id"] ?: return@streams null
             val name = item["name"]?.trim().orEmpty().ifBlank { return@streams null }
+            // A provider's heading ("##### SPORTS #####") is not a channel.
+            if (isSeparatorName(name)) return@streams null
             Channel(
                 id = item["epg_channel_id"]?.trim().orEmpty().ifBlank { "xtream-live-$streamId" },
                 name = name,
