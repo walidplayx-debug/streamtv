@@ -87,7 +87,7 @@ private val French = mapOf(
     "Fill in the server, username and password" to "Renseignez le serveur, le nom d'utilisateur et le mot de passe",
     // player
     "Can't play this channel" to "Impossible de lire cette chaîne", "The stream is not responding right now." to "Le flux ne répond pas pour le moment.",
-    "Retry" to "Réessayer", "Next channel" to "Chaîne suivante", "CH" to "CH",
+    "Retry" to "Réessayer", "Next channel" to "Chaîne suivante",
     // channel options and parental control
     "Add to favorites" to "Ajouter aux favoris", "Remove from favorites" to "Retirer des favoris",
     "Hide channel" to "Masquer la chaîne", "Lock channel" to "Verrouiller la chaîne", "Unlock channel" to "Déverrouiller la chaîne",
@@ -187,7 +187,7 @@ private val Arabic = mapOf(
     "Fill in the server, username and password" to "أدخل السيرفر واسم المستخدم وكلمة السر",
     // player
     "Can't play this channel" to "تعذّر تشغيل هذه القناة", "The stream is not responding right now." to "البث لا يستجيب حالياً.",
-    "Retry" to "إعادة المحاولة", "Next channel" to "القناة التالية", "CH" to "قناة",
+    "Retry" to "إعادة المحاولة", "Next channel" to "القناة التالية",
     // channel options and parental control
     "Add to favorites" to "إضافة إلى المفضلة", "Remove from favorites" to "إزالة من المفضلة",
     "Hide channel" to "إخفاء القناة", "Lock channel" to "قفل القناة", "Unlock channel" to "فتح قفل القناة",

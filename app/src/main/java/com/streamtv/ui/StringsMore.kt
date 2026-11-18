@@ -117,7 +117,7 @@ internal val Spanish: Map<String, String> = mapOf(
     "The stream is not responding right now." to "La emisión no responde en este momento.",
     "Retry" to "Reintentar",
     "Next channel" to "Canal siguiente",
-    "CH" to "CH",
+   
     "Add to favorites" to "Añadir a favoritos",
     "Remove from favorites" to "Quitar de favoritos",
     "Hide channel" to "Ocultar canal",
@@ -291,7 +291,7 @@ internal val Russian: Map<String, String> = mapOf(
     "The stream is not responding right now." to "Поток сейчас не отвечает.",
     "Retry" to "Повторить",
     "Next channel" to "Следующий канал",
-    "CH" to "КАН",
+   
     "Add to favorites" to "Добавить в избранное",
     "Remove from favorites" to "Убрать из избранного",
     "Hide channel" to "Скрыть канал",
@@ -465,7 +465,7 @@ internal val Chinese: Map<String, String> = mapOf(
     "The stream is not responding right now." to "该直播源暂时没有响应。",
     "Retry" to "重试",
     "Next channel" to "下一个频道",
-    "CH" to "频道",
+   
     "Add to favorites" to "添加到收藏",
     "Remove from favorites" to "取消收藏",
     "Hide channel" to "隐藏频道",
@@ -639,7 +639,7 @@ internal val Turkish: Map<String, String> = mapOf(
     "The stream is not responding right now." to "Yayın şu anda yanıt vermiyor.",
     "Retry" to "Tekrar dene",
     "Next channel" to "Sonraki kanal",
-    "CH" to "KN",
+   
     "Add to favorites" to "Favorilere ekle",
     "Remove from favorites" to "Favorilerden çıkar",
     "Hide channel" to "Kanalı gizle",
@@ -813,7 +813,7 @@ internal val German: Map<String, String> = mapOf(
     "The stream is not responding right now." to "Der Stream antwortet gerade nicht.",
     "Retry" to "Erneut versuchen",
     "Next channel" to "Nächster Sender",
-    "CH" to "CH",
+   
     "Add to favorites" to "Zu Favoriten hinzufügen",
     "Remove from favorites" to "Aus Favoriten entfernen",
     "Hide channel" to "Sender ausblenden",
@@ -987,7 +987,7 @@ internal val Portuguese: Map<String, String> = mapOf(
     "The stream is not responding right now." to "A emissão não está a responder neste momento.",
     "Retry" to "Tentar novamente",
     "Next channel" to "Canal seguinte",
-    "CH" to "CH",
+   
     "Add to favorites" to "Adicionar aos favoritos",
     "Remove from favorites" to "Remover dos favoritos",
     "Hide channel" to "Ocultar canal",
@@ -1161,7 +1161,7 @@ internal val Dutch: Map<String, String> = mapOf(
     "The stream is not responding right now." to "De stream reageert op dit moment niet.",
     "Retry" to "Opnieuw",
     "Next channel" to "Volgende zender",
-    "CH" to "CH",
+   
     "Add to favorites" to "Toevoegen aan favorieten",
     "Remove from favorites" to "Verwijderen uit favorieten",
     "Hide channel" to "Zender verbergen",
