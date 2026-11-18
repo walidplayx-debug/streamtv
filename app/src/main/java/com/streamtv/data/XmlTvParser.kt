@@ -33,6 +33,9 @@ object XmlTvParser {
             when (event) {
                 XmlPullParser.START_TAG -> {
                     tag = parser.name
+                    // A programme may give its title (and description) in several languages, one
+                    // element each; keep the first instead of running them together.
+                    if ((tag == "title" && title.isNotEmpty()) || (tag == "desc" && desc.isNotEmpty())) tag = ""
                     if (tag == "programme") {
                         channel = parser.getAttributeValue(null, "channel") ?: ""
                         start = parseTime(parser.getAttributeValue(null, "start") ?: "")
@@ -41,10 +44,14 @@ object XmlTvParser {
                     }
                 }
                 XmlPullParser.TEXT -> if (tag == "title") title += parser.text else if (tag == "desc") desc += parser.text
-                XmlPullParser.END_TAG -> if (parser.name == "programme" && channel.isNotBlank() && title.isNotBlank()) {
-                    val now = System.currentTimeMillis()
-                    if (end > now - 2 * 60 * 60 * 1000L && start < now + 24 * 60 * 60 * 1000L) {
-                        result += EpgProgram(channel, title.trim(), desc.trim(), start, end)
+                XmlPullParser.END_TAG -> {
+                    // Text after a closing tag (line breaks, indentation) belongs to no element.
+                    tag = ""
+                    if (parser.name == "programme" && channel.isNotBlank() && title.isNotBlank()) {
+                        val now = System.currentTimeMillis()
+                        if (end > now - 2 * 60 * 60 * 1000L && start < now + 24 * 60 * 60 * 1000L) {
+                            result += EpgProgram(channel, title.trim(), desc.trim(), start, end)
+                        }
                     }
                 }
             }

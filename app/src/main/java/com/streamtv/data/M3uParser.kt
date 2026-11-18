@@ -13,8 +13,17 @@ object M3uParser {
         return ""
     }
     private val attribute = Regex("""([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,]+))""")
-    fun parse(text: String): List<Channel> {
-        val lines = text.removePrefix("\uFEFF").lineSequence().map { it.trim().removeSuffix("\r") }.iterator()
+    fun parse(text: String): List<Channel> = parse(text.lineSequence())
+
+    /**
+     * Reads the playlist line by line, so a very large one (tens of megabytes) never has to sit
+     * in memory as a single string. The reader is closed when done.
+     */
+    fun parse(reader: java.io.Reader): List<Channel> = reader.buffered().useLines { parse(it) }
+
+    private fun parse(source: Sequence<String>): List<Channel> {
+        // A byte-order mark may start the first line; it is not whitespace, so trim() keeps it.
+        val lines = source.map { it.removePrefix("\uFEFF").trim().removeSuffix("\r") }.iterator()
         val result = mutableListOf<Channel>()
         // Seen (id, url) pairs. A set keeps big playlists (tens of thousands of entries) fast.
         val seen = HashSet<String>()

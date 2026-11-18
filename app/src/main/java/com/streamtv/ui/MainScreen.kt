@@ -1,6 +1,7 @@
 package com.streamtv.ui
 
 import android.content.ActivityNotFoundException
+import android.net.Uri
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1005,16 +1006,12 @@ private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier =
 @Composable
 private fun WelcomeScreen(
     loading: Boolean, error: String?, onAdd: () -> Unit, onXtream: () -> Unit,
-    onImport: (String) -> Unit, onError: (String) -> Unit
+    onImport: (Uri) -> Unit, onError: (String) -> Unit
 ) {
     val context = LocalContext.current
+    // The file is read by the view model, off the main thread: a large one froze the screen here.
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    ?: error("Unable to open the selected M3U file")
-            }.onSuccess(onImport).onFailure { onError(it.message ?: "Unable to import playlist") }
-        }
+        if (uri != null) onImport(uri)
     }
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -1490,12 +1487,8 @@ private fun SettingsContent(
 ) {
     val context = LocalContext.current
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    ?: error("Unable to open the selected M3U file")
-            }.onSuccess(model::importPlaylist).onFailure { model.setError(it.message ?: "Unable to import playlist") }
-        }
+        // Read by the view model, off the main thread: a large file froze the screen here.
+        if (uri != null) model.importPlaylist(uri)
     }
     Row(Modifier.fillMaxSize()) {
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;

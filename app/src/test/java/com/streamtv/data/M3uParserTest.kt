@@ -69,4 +69,16 @@ class M3uParserTest {
         assertEquals(40_000, result.size)
         assertTrue("parsing took $millis ms", millis < 5_000)
     }
+    @Test fun readerGivesTheSameChannelsAsText() {
+        val text = "#EXTM3U\n#EXTINF:-1 tvg-id=\"a\" group-title=\"News\",A\r\n#EXTVLCOPT:http-user-agent=Box\nhttps://x/a\n#EXTINF:-1,B\nhttps://x/b\n"
+        assertEquals(M3uParser.parse(text), M3uParser.parse(java.io.StringReader(text)))
+    }
+    @Test fun readerSkipsByteOrderMark() {
+        val channels = M3uParser.parse(java.io.StringReader("﻿#EXTM3U\n#EXTINF:-1,A\nhttps://x/a\n"))
+        assertEquals(listOf("A"), channels.map { it.name })
+    }
+    @Test fun byteOrderMarkBeforeFirstEntry() {
+        // A file without the #EXTM3U header, starting straight with a marked #EXTINF line.
+        assertEquals(listOf("A"), M3uParser.parse("﻿#EXTINF:-1,A\nhttps://x/a\n").map { it.name })
+    }
 }
