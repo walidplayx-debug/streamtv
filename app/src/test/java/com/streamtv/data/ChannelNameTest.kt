@@ -23,11 +23,19 @@ class ChannelNameTest {
     }
 
     @Test fun shortNamesDropTagAndQuality() {
-        assertEquals("BEIN SPORTS 1", shortChannelName("AR - BEIN SPORTS 1 FHD", "AR"))
-        assertEquals("BEIN SPORTS NEWS", shortChannelName("AR - BEIN SPORTS NEWS 4K", "AR"))
-        assertEquals("BEIN SPORTS 2", shortChannelName("AR - BEIN SPORTS 2 HD", "AR"))
+        assertEquals("Bein Sports 1", shortChannelName("AR - BEIN SPORTS 1 FHD", "AR"))
+        assertEquals("Bein Sports News", shortChannelName("AR - BEIN SPORTS NEWS 4K", "AR"))
+        assertEquals("Bein Sports 2", shortChannelName("AR - BEIN SPORTS 2 HD", "AR"))
         assertEquals("BBC One", shortChannelName("BBC One (1080p)", ""))
         // Another list's tag is kept.
         assertEquals("FR | TF1", shortChannelName("FR | TF1", "AR"))
+    }
+
+    @Test fun capitalsBecomeWords() {
+        assertEquals("MBC Drama", tidyCase("MBC DRAMA"))
+        assertEquals("Sky News TV", tidyCase("SKY NEWS TV"))
+        assertEquals("beIN Sports", tidyCase("beIN Sports"))
+        assertEquals("France 24", tidyCase("France 24"))
+        assertEquals("CNN", tidyCase("CNN"))
     }
 }

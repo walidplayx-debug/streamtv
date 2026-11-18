@@ -804,8 +804,8 @@ private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProg
     }
 }
 
-internal fun channelDisplayName(name: String): String =
-    name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
+internal fun channelDisplayName(name: String): String = com.streamtv.data.tidyCase(
+    name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim())
 
 internal fun channelQuality(name: String): String =
     Regex("\\b(\\d{3,4}p|[48]K|UHD|FHD|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()

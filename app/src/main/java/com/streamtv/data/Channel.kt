@@ -79,5 +79,21 @@ fun shortChannelName(name: String, prefix: String): String {
         listPrefix.find(short)?.let { if (it.groupValues[1].equals(prefix, ignoreCase = true)) short = short.substring(it.range.last + 1) }
     }
     short = qualityToken.replace(short, " ").replace(Regex("""\s{2,}"""), " ").trim(' ', '-', '|', ':', '·')
-    return short.ifBlank { name.trim() }
+    return tidyCase(short.ifBlank { name.trim() })
 }
+
+/**
+ * A name written all in capitals ("BEIN SPORTS NEWS") as words with one capital ("Bein Sports
+ * News"); short words (MBC, CNN, TV, 24) stay as they are. A name with lower case is left alone.
+ */
+fun tidyCase(name: String): String {
+    // (Short words that are words, not initials, get one capital too: "Sky One", not "SKY ONE".)
+    val letters = name.filter { it.isLetter() && it.code < 0x0250 }
+    if (letters.length < 4 || letters.any { it.isLowerCase() }) return name
+    return name.split(' ').joinToString(" ") { word ->
+        if (word.count { it.isLetter() } <= 3 && word.uppercase() !in shortWords) word
+        else word.lowercase().replaceFirstChar { it.titlecase() }
+    }
+}
+
+private val shortWords = setOf("ONE", "TWO", "SKY", "FOX", "MAX", "NET", "BOX", "HIT", "POP", "AIR", "SAT", "KID", "FUN", "GOLD")
