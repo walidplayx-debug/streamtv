@@ -96,6 +96,8 @@ private suspend fun FocusRequester.requestFocusSafely() {
     }
 }
 
+// The player is handed each stream as a MediaSource (headers, live settings), an API media3 marks unstable.
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun PlayerScreen(
     channel: Channel,
