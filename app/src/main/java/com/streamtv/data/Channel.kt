@@ -31,16 +31,25 @@ fun Channel.detectedLanguage(): String {
 
 enum class ChannelKind { Live, Movie, Series }
 
-private val videoFileExtensions = listOf(".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv", ".flv")
+// No ".flv": on playlists that is mostly a live stream (HTTP-FLV), not a file to watch from the start.
+private val videoFileExtensions = listOf(".mp4", ".mkv", ".avi", ".mov", ".m4v", ".wmv")
+private val streamingManifests = listOf(".m3u8", ".mpd")
+/** A registered TV channel's id ("Canal12Web.ar", "Canal12Web.ar@SD"): a channel, whatever its address ends with. */
+private val tvChannelId = Regex("""^[A-Za-z0-9]+\.[a-z]{2}(@.*)?$""")
 private val episodeMarker = Regex("""\bS\d{1,2}\s?E\d{1,3}\b""", RegexOption.IGNORE_CASE)
 
 /** Playlists mix live channels with on-demand files; tell them apart by the stream address. */
 fun Channel.kind(): ChannelKind {
     val path = url.substringBefore("|").substringBefore("?").lowercase()
     val file = videoFileExtensions.any { path.endsWith(it) }
+    // A live playlist (HLS / DASH) stays live even under a "movies" folder: a 24/7 movie channel.
+    val manifest = streamingManifests.any { path.endsWith(it) }
+    val vodFolder = !manifest && (path.contains("/movie/") || path.contains("/movies/"))
     return when {
         path.contains("/series/") || (file && episodeMarker.containsMatchIn(name)) -> ChannelKind.Series
-        path.contains("/movie/") || path.contains("/movies/") || file -> ChannelKind.Movie
+        vodFolder -> ChannelKind.Movie
+        // A plain video file is a movie, unless the playlist names it as a TV channel.
+        file && !tvChannelId.matches(id) -> ChannelKind.Movie
         else -> ChannelKind.Live
     }
 }
