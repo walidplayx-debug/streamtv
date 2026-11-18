@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -491,13 +492,14 @@ fun PlayerScreen(
                             .filter { it.isNotBlank() }.joinToString("  ·  "),
                         color = PlayerMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
-                    if (current != null) {
-                        Spacer(Modifier.height(6.dp))
-                        val progress = ((System.currentTimeMillis() - current.startEpochMillis).toFloat() /
-                            (current.endEpochMillis - current.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
-                        Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(PlayerWhite.copy(alpha = .20f))) {
-                            Box(Modifier.fillMaxWidth(progress).height(3.dp).clip(CircleShape).background(PlayerAccent))
-                        }
+                    // The progress line always keeps its room (just hidden without a guide), so the
+                    // name sits at the same height on every channel and does not jump while zapping.
+                    Spacer(Modifier.height(6.dp))
+                    val progress = if (current == null) 0f else ((System.currentTimeMillis() - current.startEpochMillis).toFloat() /
+                        (current.endEpochMillis - current.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                    Box(Modifier.fillMaxWidth().height(3.dp).graphicsLayer { alpha = if (current == null) 0f else 1f }
+                        .clip(CircleShape).background(PlayerWhite.copy(alpha = .20f))) {
+                        Box(Modifier.fillMaxWidth(progress).height(3.dp).clip(CircleShape).background(PlayerAccent))
                     }
                 }
                 Spacer(Modifier.width(14.dp))

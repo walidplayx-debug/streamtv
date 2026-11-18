@@ -1237,7 +1237,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
                     onFocus()
                     // In a long list, first the tip on getting around it quickly.
                     if (!(bigList && Hints.offer(context, "biglist", "So many channels? CH+ / CH− jump 16 at a time, or type the channel number")))
-                        Hints.offer(context, "channel", "Hold OK for channel options")
+                        Hints.offer(context, "channel_options", "Hold OK to add the channel to favourites, lock, hide or rename it")
                 }
             }
             .onPreviewKeyEvent { event ->
@@ -1802,5 +1802,37 @@ private fun WhiteButton(text: String, modifier: Modifier = Modifier, onClick: ()
         .onFocusChanged { focused = it.isFocused }
         .clickable(onClick = press).padding(horizontal = 26.dp, vertical = 14.dp)) {
         Text(t(text), color = if (focused && !pressed) White else Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+    }
+}
+
+
+/**
+ * Covers the first moments after the app opens with the wordmark, until the saved list is back:
+ * no empty "no channels" page flashing by. Gone for good once it fades out.
+ */
+@Composable
+fun StartCover(state: TvState) {
+    var done by remember { mutableStateOf(false) }
+    var waited by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { delay(8000); waited = true }
+    val starting = !state.ready ||
+        (state.playlistUrl.isNotBlank() && state.channels.isEmpty() && state.error == null && !waited)
+    LaunchedEffect(starting) {
+        // A short minimum, so a fast start does not just blink.
+        if (!starting) { delay(250); done = true }
+    }
+    Hints.paused = !done
+    AnimatedVisibility(visible = !done, enter = fadeIn(tween(0)), exit = fadeOut(tween(420))) {
+        Box(Modifier.fillMaxSize().background(LibraryBackdrop), contentAlignment = Alignment.Center) {
+            val pulse = remember { Animatable(.55f) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    pulse.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+                    pulse.animateTo(.55f, tween(900, easing = FastOutSlowInEasing))
+                }
+            }
+            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV",
+                modifier = Modifier.height(66.dp).graphicsLayer { alpha = pulse.value })
+        }
     }
 }

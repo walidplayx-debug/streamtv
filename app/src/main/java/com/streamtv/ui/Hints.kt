@@ -43,10 +43,12 @@ object Hints {
     var current by mutableStateOf<String?>(null)
         private set
     private val shownThisRun = HashSet<String>()
+    /** True while the start cover is up: nothing to point at yet. */
+    var paused = false
 
     /** Shows the tip if it is still due; true when it was shown. */
     fun offer(context: Context, key: String, text: String): Boolean {
-        if (current != null || key in shownThisRun) return false
+        if (paused || current != null || key in shownThisRun) return false
         val prefs = context.getSharedPreferences("hints", Context.MODE_PRIVATE)
         val seen = prefs.getInt(key, 0)
         if (seen >= Times) return false

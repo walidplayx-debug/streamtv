@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     androidx.compose.foundation.layout.Box {
                         MainScreen(state, model)
+                        com.streamtv.ui.StartCover(state)
                         com.streamtv.ui.HintOverlay()
                     }
                 }
