@@ -473,13 +473,14 @@ fun PlayerScreen(
             ) {
                 // "Ch" centred over the number; a longer number widens the column smoothly.
                 Column(
-                    Modifier.widthIn(min = 52.dp).animateContentSize(spring(dampingRatio = .85f, stiffness = 420f)),
+                    // Room for three digits, so the bar keeps still while zapping; only a fourth widens it.
+                    Modifier.widthIn(min = 64.dp).animateContentSize(spring(dampingRatio = .85f, stiffness = 420f)),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("Ch", color = PlayerMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     // The number in the red of the logo's S: a touch of colour in the bar.
                     Text((currentChannelIndex + 1).toString(), color = Color(0xFFE8452F), fontSize = 30.sp,
-                        lineHeight = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        lineHeight = 32.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum", maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.width(14.dp))
                 Box(Modifier.width(1.dp).height(46.dp).background(PlayerWhite.copy(alpha = .22f)))

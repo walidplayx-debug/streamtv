@@ -78,6 +78,10 @@ fun HintOverlay() {
         val focus = remember { androidx.compose.ui.focus.FocusRequester() }
         // The OK press that led here may still be held; only a press that starts here closes the tip.
         val armed = remember { booleanArrayOf(false) }
+        // A press already on its way when the tip appeared (meant for the screen behind) does not
+        // close it: keys only count once the tip has been up for a moment.
+        val shownAt = remember { android.os.SystemClock.uptimeMillis() }
+        fun settled() = android.os.SystemClock.uptimeMillis() - shownAt > 700L
         LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
         Box(
             Modifier.fillMaxSize().padding(bottom = 34.dp)
@@ -85,9 +89,9 @@ fun HintOverlay() {
                 .onPreviewKeyEvent { event ->
                     val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
                     when {
-                        ok && event.type == KeyEventType.KeyDown -> { armed[0] = true; true }
+                        ok && event.type == KeyEventType.KeyDown -> { if (settled()) armed[0] = true; true }
                         ok && event.type == KeyEventType.KeyUp -> { if (armed[0]) Hints.clear(); true }
-                        event.key == Key.Back && event.type == KeyEventType.KeyUp -> { Hints.clear(); true }
+                        event.key == Key.Back && event.type == KeyEventType.KeyUp -> { if (settled()) Hints.clear(); true }
                         else -> true
                     }
                 },
