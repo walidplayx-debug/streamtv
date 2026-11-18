@@ -1728,13 +1728,17 @@ private fun FocusRow(
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     val scale by animateFloatAsState(if (lifted) 1.06f else if (pressed) .97f else if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
-    Row(modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
+    // Rows closer together than before (about half as many again fit on screen).
+    Row(modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(15.dp))
         .border(if (lifted) 2.dp else 0.dp, if (lifted) White.copy(alpha = .85f) else Color.Transparent, RoundedCornerShape(15.dp))
         .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
         .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
-        .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         if (leading != null) { leading(); Spacer(Modifier.width(11.dp)) }
-        Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // One weight in every state: a bolder focused row got wider and cut its own name short.
+        // A name in capitals ("VIP | LA LIGA") reads as words ("VIP | La Liga").
+        Text(com.streamtv.data.tidyCase(t(title)), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(8.dp))
         if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
     }
 }
