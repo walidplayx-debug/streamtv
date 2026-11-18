@@ -1246,7 +1246,9 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
         contentAlignment = Alignment.Center
     ) {
         ChannelLogo(
-            channel.name, channel.logo,
+            // Without a logo, a labelled tile's face shows the name its siblings share (the label
+            // under it says which one): "ITV1" over "North West", not the same category on every tile.
+            if (mark != null) sharedName(channel.name, mark) else channel.name, channel.logo,
             // With a label, the logo is smaller and stands clear of the words under it.
             Modifier.fillMaxSize().padding(
                 start = if (mark != null) 12.dp else 8.dp, end = if (mark != null) 12.dp else 8.dp,
@@ -1254,7 +1256,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             ),
             fontSize = 25.sp, corner = 8.dp,
             placeholder = Brush.linearGradient(channelGradient(channel.name)), logoPadding = 2.dp,
-            group = channel.group, onNeedsLight = { light = it }
+            group = channel.group, compact = mark != null, onNeedsLight = { light = it }
         )
         // The same channel in another quality: a small badge in the star's corner. When the channel
         // is a favourite the badge glides down to make room for the star above it.

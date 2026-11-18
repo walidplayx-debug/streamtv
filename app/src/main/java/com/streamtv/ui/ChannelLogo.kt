@@ -62,6 +62,11 @@ fun ChannelLogo(
     /** When given, a channel without a logo shows its name under its category's colour instead of initials. */
     group: String? = null,
     /**
+     * The tile shows a label under the face (the words that tell this channel from its siblings),
+     * so the face has room for one line only: the shared name, without the category above it.
+     */
+    compact: Boolean = false,
+    /**
      * When given, the logo is judged once as it loads, and this is told whether it is dark or
      * see-through enough to need a light tile behind it (false while loading or without a logo).
      */
@@ -79,7 +84,7 @@ fun ChannelLogo(
     Box(modifier.clip(RoundedCornerShape(corner)), contentAlignment = Alignment.Center) {
         if (!hasLogo || !loaded) {
             if (group != null) {
-                CategoryFace(name, group)
+                CategoryFace(name, group, compact)
             } else {
                 Box(Modifier.fillMaxSize().background(placeholder), contentAlignment = Alignment.Center) {
                     Text(channelInitials(name), color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -126,11 +131,13 @@ private fun categoryColor(group: String): Color {
 /**
  * The face of a channel without a logo: a coloured stripe and the category on the start side,
  * the channel's full name under it, large enough to read from the sofa.
+ * [compact]: a label sits under the face, so only the name is shown, on one line. (With the
+ * category over it, two lines did not fit and the name was cut down to a row of dashes.)
  */
 @Composable
-private fun CategoryFace(name: String, group: String) {
+private fun CategoryFace(name: String, group: String, compact: Boolean = false) {
     val color = categoryColor(group)
-    val label = group.split(';', '|', '/').firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    val label = if (compact) "" else group.split(';', '|', '/').firstOrNull { it.isNotBlank() }?.trim().orEmpty()
     Row(
         Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF30353F), Color(0xFF22262E))))
             .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
@@ -143,8 +150,8 @@ private fun CategoryFace(name: String, group: String) {
                     overflow = TextOverflow.Ellipsis, letterSpacing = .4.sp)
                 Spacer(Modifier.height(2.dp))
             }
-            Text(name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 2,
-                overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+            Text(name, color = Color.White, fontSize = if (compact) 15.sp else 14.sp, fontWeight = FontWeight.Bold,
+                maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
         }
     }
 }
@@ -197,6 +204,22 @@ fun distinguishingLabels(channels: List<com.streamtv.data.Channel>): Map<String,
         }
     }
     return out
+}
+
+/**
+ * What a group of sibling channels share, once the words of [mark] (the part that tells this one
+ * apart) are taken out: "ITV1 North West (1080p)" with mark "North West" -> "ITV1". The name
+ * itself when nothing is left.
+ */
+fun sharedName(name: String, mark: String?): String {
+    if (mark.isNullOrBlank()) return name
+    val noise = Regex("""\s*[\(\[][^)\]]*[\)\]]""")
+    val quality = setOf("hd", "fhd", "uhd", "sd", "4k", "hevc", "h265", "720p", "1080p", "2160p", "480p", "360p")
+    val own = mark.lowercase().split(Regex("\\s+")).toSet()
+    val left = noise.replace(name, " ").split(Regex("\\s+"))
+        .filter { it.isNotBlank() && it.lowercase() !in own && it.lowercase() !in quality }
+        .joinToString(" ")
+    return left.ifBlank { name }
 }
 
 /**
