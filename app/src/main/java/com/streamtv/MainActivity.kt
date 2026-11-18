@@ -38,4 +38,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onStart() {
+        super.onStart()
+        // The TV keeps the app in memory for days; an old guide is loaded again on coming back.
+        model.refreshEpgIfStale()
+    }
 }

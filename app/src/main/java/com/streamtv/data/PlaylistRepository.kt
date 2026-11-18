@@ -13,7 +13,9 @@ class PlaylistRepository {
         val request = Request.Builder().url(url).header("User-Agent", "streamtv/1.0").build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("Playlist request failed: HTTP ${response.code}")
-            M3uParser.parse(response.body?.string().orEmpty())
+            // Streamed, not read whole into one string: big playlists ran out of memory on small TVs.
+            val body = response.body ?: return@use emptyList()
+            M3uParser.parse(body.charStream())
         }
     }
 }

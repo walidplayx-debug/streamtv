@@ -21,7 +21,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -114,6 +118,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingAction: (() -> Unit)? = null
     /** A new PIN typed once, waiting to be typed again. */
     private var pendingPin: String = ""
+    /**
+     * The playlist being loaded. Only one at a time: a slow download that finished after the
+     * viewer had already picked another playlist used to put the old channels back.
+     */
+    private var playlistJob: Job? = null
+    private var epgJob: Job? = null
+    /** When the guide was last loaded; it holds only the next day, so it is refreshed when older. */
+    private var epgLoadedAt = 0L
+
+    private fun startPlaylistJob(block: suspend CoroutineScope.() -> Unit) {
+        playlistJob?.cancel()
+        playlistJob = viewModelScope.launch(block = block)
+    }
+
+    /** The channels of a playlist address: downloaded, or read from a file imported earlier. */
+    private suspend fun readChannels(url: String): List<Channel> =
+        if (url.startsWith("local://")) withContext(Dispatchers.IO) {
+            M3uParser.parse(File(playlistDirectory, url.removePrefix("local://")).reader())
+                .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
+        } else repository.load(url)
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
@@ -254,20 +278,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPlaylistName(value: String) { _state.value = _state.value.copy(playlistName = value) }
     fun setError(value: String) { _state.value = _state.value.copy(error = value) }
-    fun importPlaylist(text: String) {
-        viewModelScope.launch {
+    fun importPlaylist(uri: Uri) {
+        startPlaylistJob {
             _state.value = _state.value.copy(loading = true, error = null)
             val name = _state.value.playlistName.trim().ifBlank { "Imported playlist ${_state.value.playlists.size + 1}" }
             runCatching {
-                // Parsing and writing a large file must not freeze the screen.
+                // Reading, parsing and writing a large file must not freeze the screen: all of it
+                // happens here, off the main thread (the file used to be read on the main thread).
                 withContext(Dispatchers.IO) {
-                    val channels = M3uParser.parse(text).also {
-                        require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }
-                    }
                     val fileName = "import-${System.currentTimeMillis()}.m3u"
                     playlistDirectory.mkdirs()
-                    File(playlistDirectory, fileName).writeText(text)
-                    Triple(channels, name, fileName)
+                    val file = File(playlistDirectory, fileName)
+                    val input = getApplication<Application>().contentResolver.openInputStream(uri)
+                        ?: error("Unable to open the selected M3U file")
+                    // Copied to the app's own file first, then read from there line by line.
+                    try {
+                        input.use { source -> file.outputStream().use { source.copyTo(it) } }
+                        val channels = M3uParser.parse(file.reader()).also {
+                            require(it.isNotEmpty()) { "The selected file contains no playable M3U channels" }
+                        }
+                        Triple(channels, name, fileName)
+                    } catch (e: Throwable) {
+                        file.delete()
+                        throw e
+                    }
                 }
             }
                 .onSuccess { (channels, name, fileName) ->
@@ -278,10 +312,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         tab = "Live TV", playlistName = name, playlistUrl = localUrl, playlists = updated
                     )
                     preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
+                    // Remembered as the active playlist, so the app reopens on it.
+                    preferences.savePlaylist(localUrl)
                     dao.clear()
                     dao.insertAll(channels.map { ChannelEntity.from(it) })
                 }
-                .onFailure { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist") }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to import playlist")
+                }
         }
     }
     fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
@@ -300,6 +339,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updated = _state.value.playlists.filterNot { it.url == entry.url }
         val wasActive = entry.url == _state.value.playlistUrl
         val nothingLeft = updated.isEmpty()
+        // A load still on its way would bring the channels of a removed playlist back.
+        if (nothingLeft) playlistJob?.cancel()
         _state.value = if (nothingLeft) {
             // No playlist left: drop its channels too, so the app goes back to the welcome screen.
             _state.value.copy(
@@ -329,30 +370,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             loadPlaylist(entry.url)
             return
         }
-        viewModelScope.launch {
+        startPlaylistJob {
             _state.value = _state.value.copy(loading = true, error = null)
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    M3uParser.parse(File(playlistDirectory, entry.url.removePrefix("local://")).readText())
-                        .also { require(it.isNotEmpty()) { "The saved M3U file contains no playable channels" } }
-                }
-            }.onSuccess { channels ->
+            runCatching { readChannels(entry.url) }.onSuccess { channels ->
                 _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
+                // Remembered as the active playlist, so the app reopens on it.
+                preferences.savePlaylist(entry.url)
                 dao.clear()
                 dao.insertAll(channels.map { ChannelEntity.from(it) })
             }.onFailure { e ->
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
             }
         }
     }
     fun loadEpg(silent: Boolean = false) {
         val url = _state.value.epgUrl
-        viewModelScope.launch {
+        epgJob?.cancel()
+        epgJob = viewModelScope.launch {
             runCatching { epgRepository.load(url) }.onSuccess { items ->
                 _state.value = _state.value.copy(programs = items)
+                epgLoadedAt = System.currentTimeMillis()
                 preferences.saveEpg(url)
-            }.onFailure { e -> if (!silent) _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG") }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                if (!silent) _state.value = _state.value.copy(error = e.message ?: "Unable to load EPG")
+            }
         }
+    }
+    /**
+     * Called whenever the app comes back on screen. The guide holds only the next 24 hours, and a
+     * TV keeps the app in memory for days, so a guide loaded long ago is quietly loaded again.
+     */
+    fun refreshEpgIfStale() {
+        if (_state.value.epgUrl.isBlank() || epgJob?.isActive == true) return
+        if (System.currentTimeMillis() - epgLoadedAt < EpgMaxAgeMillis) return
+        loadEpg(silent = true)
+    }
+    private companion object {
+        const val EpgMaxAgeMillis = 6L * 60 * 60 * 1000
     }
     fun setSearchText(value: String) { _state.value = _state.value.copy(searchText = value) }
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
@@ -544,16 +600,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** [openLive]: a playlist that was just added opens on Live TV once its channels are in. */
     fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false) {
         val url = (urlOverride ?: _state.value.playlistUrl).trim()
-        viewModelScope.launch {
+        startPlaylistJob {
             _state.value = _state.value.copy(loading = true, error = null)
-            runCatching { repository.load(url) }.onSuccess { channels ->
+            // An imported file is read again from the app's copy (it is the active playlist after a restart too).
+            runCatching { readChannels(url) }.onSuccess { channels ->
                 _state.value = _state.value.copy(channels = channels, loading = false, selected = channels.firstOrNull())
                 moveOldFavorites(channels)
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
                 dao.clear()
                 dao.insertAll(channels.map { ChannelEntity.from(it) })
-            }.onFailure { e -> _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist") }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
+            }
         }
     }
 }
