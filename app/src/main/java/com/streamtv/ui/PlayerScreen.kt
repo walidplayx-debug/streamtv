@@ -480,7 +480,7 @@ fun PlayerScreen(
                     Text("Ch", color = PlayerMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     // The number in the red of the logo's S: a touch of colour in the bar.
                     Text((currentChannelIndex + 1).toString(), color = Color(0xFFE8452F), fontSize = 30.sp,
-                        lineHeight = 32.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum", maxLines = 1, softWrap = false)
+                        lineHeight = 32.sp, fontWeight = FontWeight.Bold, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"), maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.width(14.dp))
                 Box(Modifier.width(1.dp).height(46.dp).background(PlayerWhite.copy(alpha = .22f)))
