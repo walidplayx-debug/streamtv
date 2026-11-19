@@ -1205,6 +1205,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
     val (pressed, press) = rememberPress(onClick)
     // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
+    // A numbered family (beIN, SSC...): its own colour and the number large, not a row of look-alike logos.
+    val family = remember(channel.name) { com.streamtv.data.channelFamily(channel.name) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
         // The focused tile grows and sits above its neighbours.
@@ -1212,6 +1214,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(when {
+                family != null && focused -> listOf(Color(family.accent), Color(family.color))
+                family != null -> listOf(Color(family.color), Color(family.color))
                 light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
                 light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
                 focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
@@ -1245,7 +1249,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
-        ChannelLogo(
+        if (family != null) FamilyFace(channel, family, Modifier.fillMaxSize()) else ChannelLogo(
             // Without a logo, a labelled tile's face shows the name its siblings share (the label
             // under it says which one): "ITV1" over "North West", not the same category on every tile.
             if (mark != null) sharedName(channel.name, mark) else channel.name, channel.logo,
@@ -1260,14 +1264,49 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
         )
         // The same channel in another quality: a small badge in the star's corner. When the channel
         // is a favourite the badge glides down to make room for the star above it.
-        if (quality != null) {
+        // A family tile always says its quality (it tells beIN 1 4K from beIN 1 HD).
+        val badge = if (family != null) channelQuality(channel.name).ifBlank { null } else quality
+        if (badge != null) {
             val badgeTop by androidx.compose.animation.core.animateDpAsState(
                 if (favorite) 27.dp else 8.dp, spring(dampingRatio = .8f, stiffness = 380f), label = "badge"
             )
-            QualityBadge(quality, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
+            QualityBadge(badge, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
         }
-        if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
+        if (mark != null && family == null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
+    }
+}
+
+/**
+ * The face of a numbered family's tile: the provider's logo small on a light plate in the corner,
+ * the channel's number large (or a short word, "NEWS"), and "SPORTS" small under the logo.
+ */
+@Composable
+private fun FamilyFace(channel: Channel, family: com.streamtv.data.ChannelFamily, modifier: Modifier = Modifier) {
+    Box(modifier.padding(start = 8.dp, end = 9.dp, top = 7.dp, bottom = 5.dp)) {
+        Box(
+            Modifier.align(Alignment.TopStart).size(width = 42.dp, height = 18.dp)
+                .clip(RoundedCornerShape(4.dp)).background(White.copy(alpha = .94f))
+        ) {
+            ChannelLogo(channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 8.sp, corner = 4.dp, logoPadding = 1.dp)
+        }
+        if (family.label.isNotEmpty()) {
+            Text(
+                family.label, Modifier.align(Alignment.BottomStart).padding(bottom = 3.dp),
+                color = White.copy(alpha = .72f), fontSize = 8.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
+            )
+        }
+        if (family.big.isNotEmpty()) {
+            Text(
+                family.big, Modifier.align(Alignment.BottomEnd),
+                color = White, fontSize = if (family.big.length <= 2) 36.sp else 15.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, softWrap = false,
+                style = androidx.compose.ui.text.TextStyle(
+                    lineHeight = if (family.big.length <= 2) 36.sp else 16.sp,
+                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                )
+            )
+        }
     }
 }
 

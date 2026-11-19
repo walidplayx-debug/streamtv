@@ -97,3 +97,32 @@ fun tidyCase(name: String): String {
 }
 
 private val shortWords = setOf("ONE", "TWO", "SKY", "FOX", "MAX", "NET", "BOX", "HIT", "POP", "AIR", "SAT", "KID", "FUN", "GOLD")
+
+/**
+ * A family of numbered channels shown with a tile of its own: the family's colour, the provider's
+ * logo small in a corner, and the channel's number large ("3"), or a short word for one without a
+ * number ("NEWS"). [color] and [accent] are ARGB.
+ */
+data class ChannelFamily(val key: String, val color: Long, val accent: Long, val big: String, val label: String)
+
+private class FamilyRule(val key: String, val pattern: Regex, val color: Long, val accent: Long)
+
+private val familyRules = listOf(
+    FamilyRule("bein", Regex("""(?i)\bbein\b"""), 0xFF3C3489, 0xFF534AB7),
+    FamilyRule("ssc", Regex("""(?i)\bssc\b"""), 0xFF0F6E56, 0xFF1D9E75),
+    FamilyRule("adsports", Regex("""(?i)\b(?:ad|abu\s?dhabi)\s+sports?\b"""), 0xFF0C447C, 0xFF185FA5),
+    FamilyRule("alkass", Regex("""(?i)\bal\s?kass\b"""), 0xFF791F1F, 0xFFA32D2D)
+)
+private val familyFiller = setOf("sport", "sports", "tv", "channel", "ch", "live", "max", "ar", "en", "fr")
+
+/** The family a channel belongs to, worked out from its name; null for every other channel. */
+fun channelFamily(name: String): ChannelFamily? {
+    val rule = familyRules.firstOrNull { it.pattern.containsMatchIn(name) } ?: return null
+    val bare = qualityToken.replace(rule.pattern.replace(listPrefix.replace(name, ""), " "), " ")
+    val words = bare.split(Regex("""[^\p{L}\p{N}+]+""")).filter { it.isNotBlank() }
+    val number = words.firstOrNull { it.length <= 2 && it.all(Char::isDigit) }
+    val word = words.firstOrNull { w -> w.any(Char::isLetter) && w.lowercase() !in familyFiller }
+    val big = number ?: word?.uppercase()?.take(7).orEmpty()
+    val label = if (Regex("""(?i)\bsports?\b""").containsMatchIn(name) && number != null) "SPORTS" else ""
+    return ChannelFamily(rule.key, rule.color, rule.accent, big, label)
+}
