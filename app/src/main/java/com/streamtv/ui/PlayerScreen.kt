@@ -129,6 +129,8 @@ fun PlayerScreen(
     var failed by remember { mutableStateOf(false) }
     var autoRetries by remember { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
+    // The channel playing, as a State the side list reads live (see ChannelListPage).
+    val playingNow = rememberUpdatedState(channel)
     var infoBarTick by remember { mutableIntStateOf(0) }
     val playerFocusRequester = remember { FocusRequester() }
     val retryFocusRequester = remember { FocusRequester() }
@@ -601,7 +603,7 @@ fun PlayerScreen(
                         }
                     } else {
                         val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
-                        ChannelListPage(page, channel, takeFocus = !listPaged, onClose = { overlayState = OverlayState.None }) { item ->
+                        ChannelListPage(page, playingNow, takeFocus = !listPaged, onClose = { overlayState = OverlayState.None }) { item ->
                             onSelect(item, page, title)
                         }
                     }
@@ -658,7 +660,11 @@ private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String
 
 /** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
 @Composable
-private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
+private fun ChannelListPage(items: List<Channel>, playingNow: State<Channel>, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
+    // Read through a State, not a copy: the page sits in an animated container that keeps the
+    // content it was opened with, so a plain parameter went stale once another channel was
+    // picked and no row was marked as playing any more.
+    val playing = playingNow.value
     val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
     val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
