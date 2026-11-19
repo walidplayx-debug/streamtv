@@ -1278,18 +1278,18 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
 }
 
 /**
- * The face of a numbered family's tile: the provider's logo small on a light plate in the corner,
- * the channel's number large (or a short word, "NEWS"), and "SPORTS" small under the logo.
+ * The face of a numbered family's tile: the provider's logo on the start side, the channel's
+ * number large (or a short word, "NEWS"), and "SPORTS" small under the logo.
  */
 @Composable
 private fun FamilyFace(channel: Channel, family: com.streamtv.data.ChannelFamily, modifier: Modifier = Modifier) {
     Box(modifier.padding(start = 8.dp, end = 9.dp, top = 7.dp, bottom = 5.dp)) {
-        Box(
-            Modifier.align(Alignment.TopStart).size(width = 42.dp, height = 18.dp)
-                .clip(RoundedCornerShape(4.dp)).background(White.copy(alpha = .94f))
-        ) {
-            ChannelLogo(channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 8.sp, corner = 4.dp, logoPadding = 1.dp)
-        }
+        // The provider's logo, larger, in the middle of the start side, straight on the colour.
+        ChannelLogo(
+            channel.name, channel.logo,
+            Modifier.align(Alignment.CenterStart).padding(bottom = 6.dp).fillMaxWidth(.62f).height(24.dp),
+            fontSize = 9.sp, corner = 3.dp, logoPadding = 0.dp
+        )
         if (family.label.isNotEmpty()) {
             Text(
                 family.label, Modifier.align(Alignment.BottomStart).padding(bottom = 3.dp),
