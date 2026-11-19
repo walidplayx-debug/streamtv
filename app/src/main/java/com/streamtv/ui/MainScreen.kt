@@ -1205,8 +1205,6 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
     val (pressed, press) = rememberPress(onClick)
     // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
-    // A numbered family (beIN, SSC...): its own colour and the number large, not a row of look-alike logos.
-    val family = remember(channel.name) { com.streamtv.data.channelFamily(channel.name) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
     Box(
         // The focused tile grows and sits above its neighbours.
@@ -1214,8 +1212,6 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(when {
-                family != null && focused -> listOf(Color(family.accent), Color(family.color))
-                family != null -> listOf(Color(family.color), Color(family.color))
                 light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
                 light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
                 focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
@@ -1249,7 +1245,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
-        if (family != null) FamilyFace(channel, family, Modifier.fillMaxSize()) else ChannelLogo(
+        ChannelLogo(
             // Without a logo, a labelled tile's face shows the name its siblings share (the label
             // under it says which one): "ITV1" over "North West", not the same category on every tile.
             if (mark != null) sharedName(channel.name, mark) else channel.name, channel.logo,
@@ -1264,49 +1260,14 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
         )
         // The same channel in another quality: a small badge in the star's corner. When the channel
         // is a favourite the badge glides down to make room for the star above it.
-        // A family tile always says its quality (it tells beIN 1 4K from beIN 1 HD).
-        val badge = if (family != null) channelQuality(channel.name).ifBlank { null } else quality
-        if (badge != null) {
+        if (quality != null) {
             val badgeTop by androidx.compose.animation.core.animateDpAsState(
                 if (favorite) 27.dp else 8.dp, spring(dampingRatio = .8f, stiffness = 380f), label = "badge"
             )
-            QualityBadge(badge, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
+            QualityBadge(quality, Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 7.dp))
         }
-        if (mark != null && family == null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
+        if (mark != null) TileLabel(mark, light, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp).height(18.dp))
         if (favorite) FavoriteStar(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 7.dp).size(17.dp))
-    }
-}
-
-/**
- * The face of a numbered family's tile: the provider's logo on the start side, the channel's
- * number large (or a short word, "NEWS"), and "SPORTS" small under the logo.
- */
-@Composable
-private fun FamilyFace(channel: Channel, family: com.streamtv.data.ChannelFamily, modifier: Modifier = Modifier) {
-    Box(modifier.padding(start = 8.dp, end = 9.dp, top = 7.dp, bottom = 5.dp)) {
-        // The provider's logo, larger, in the middle of the start side, straight on the colour.
-        ChannelLogo(
-            channel.name, channel.logo,
-            Modifier.align(Alignment.CenterStart).padding(bottom = 6.dp).fillMaxWidth(.62f).height(24.dp),
-            fontSize = 9.sp, corner = 3.dp, logoPadding = 0.dp
-        )
-        if (family.label.isNotEmpty()) {
-            Text(
-                family.label, Modifier.align(Alignment.BottomStart).padding(bottom = 3.dp),
-                color = White.copy(alpha = .72f), fontSize = 8.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold, maxLines = 1
-            )
-        }
-        if (family.big.isNotEmpty()) {
-            Text(
-                family.big, Modifier.align(Alignment.BottomEnd),
-                color = White, fontSize = if (family.big.length <= 2) 36.sp else 15.sp, fontWeight = FontWeight.Bold,
-                maxLines = 1, softWrap = false,
-                style = androidx.compose.ui.text.TextStyle(
-                    lineHeight = if (family.big.length <= 2) 36.sp else 16.sp,
-                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
-                )
-            )
-        }
     }
 }
 
@@ -1598,7 +1559,7 @@ private fun SettingsContent(
                             color = White.copy(alpha = .86f), fontSize = 14.sp, maxLines = 1
                         )
                     }
-                    state.error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
+                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
                         Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -1634,7 +1595,7 @@ private fun SettingsContent(
                         WhiteButton("Set guide address") { onEntry("epg") }
                         if (state.epgUrl.isNotBlank()) WhiteButton("Reload TV guide") { model.loadEpg() }
                     }
-                    state.error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
+                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
@@ -1767,17 +1728,13 @@ private fun FocusRow(
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     val scale by animateFloatAsState(if (lifted) 1.06f else if (pressed) .97f else if (focused) 1.025f else 1f, spring(stiffness = 430f), label = "rowScale")
-    // Rows closer together than before (about half as many again fit on screen).
-    Row(modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(15.dp))
+    Row(modifier.fillMaxWidth().padding(vertical = 4.dp).scale(scale).clip(RoundedCornerShape(15.dp))
         .border(if (lifted) 2.dp else 0.dp, if (lifted) White.copy(alpha = .85f) else Color.Transparent, RoundedCornerShape(15.dp))
         .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(if (selected) White.copy(alpha = .10f) else Color.Transparent))
         .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus?.invoke() }.clickable(onClick = press)
-        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        .padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
         if (leading != null) { leading(); Spacer(Modifier.width(11.dp)) }
-        // One weight in every state: a bolder focused row got wider and cut its own name short.
-        // A name in capitals ("VIP | LA LIGA") reads as words ("VIP | La Liga").
-        Text(com.streamtv.data.tidyCase(t(title)), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(8.dp))
+        Text(t(title), Modifier.weight(1f), color = if (focused || selected) White else White.copy(alpha = .58f), fontSize = 19.sp, fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (alert) AlertBadge(size = 22.dp) else Text(trailing, color = if (focused) White.copy(alpha = .85f) else Muted, fontSize = 16.sp)
     }
 }

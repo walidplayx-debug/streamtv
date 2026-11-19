@@ -8,9 +8,7 @@ import java.util.concurrent.TimeUnit
 import java.io.BufferedInputStream
 
 class EpgRepository {
-    // As for playlists: no limit on the whole (large) guide, only on a server that stalls.
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).build()
     suspend fun load(url: String): List<EpgProgram> = withContext(Dispatchers.IO) {
         require(url.startsWith("http://") || url.startsWith("https://")) { "Enter a valid XMLTV URL" }
         val request = Request.Builder().url(url).header("User-Agent", "streamtv/1.0").build()

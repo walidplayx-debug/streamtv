@@ -16,14 +16,10 @@ interface ChannelDao {
     suspend fun insertAll(items: List<ChannelEntity>)
     @Query("DELETE FROM channels")
     suspend fun clear()
-    /**
-     * Replace the cached playlist atomically, so a reader never sees a half-written list. Rows are
-     * made and written a thousand at a time: a whole big playlist turned into rows at once, beside
-     * the channels themselves, ran the TV out of memory.
-     */
+    /** Replace the cached playlist atomically, so observers never see a half-written list. */
     @Transaction
-    suspend fun replaceAll(channels: List<Channel>) {
+    suspend fun replaceAll(items: List<ChannelEntity>) {
         clear()
-        channels.asSequence().chunked(1000).forEach { chunk -> insertAll(chunk.map { ChannelEntity.from(it) }) }
+        insertAll(items)
     }
 }

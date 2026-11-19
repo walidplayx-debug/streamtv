@@ -23,7 +23,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -129,8 +129,6 @@ fun PlayerScreen(
     var failed by remember { mutableStateOf(false) }
     var autoRetries by remember { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
-    // The channel playing, as a State the side list reads live (see ChannelListPage).
-    val playingNow = rememberUpdatedState(channel)
     var infoBarTick by remember { mutableIntStateOf(0) }
     val playerFocusRequester = remember { FocusRequester() }
     val retryFocusRequester = remember { FocusRequester() }
@@ -603,7 +601,7 @@ fun PlayerScreen(
                         }
                     } else {
                         val page = lists.firstOrNull { it.first == title }?.second.orEmpty()
-                        ChannelListPage(page, playingNow, takeFocus = !listPaged, onClose = { overlayState = OverlayState.None }) { item ->
+                        ChannelListPage(page, channel, takeFocus = !listPaged, onClose = { overlayState = OverlayState.None }) { item ->
                             onSelect(item, page, title)
                         }
                     }
@@ -660,11 +658,7 @@ private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String
 
 /** One list of the side panel. Opens scrolled to, and focused on, the playing channel. */
 @Composable
-private fun ChannelListPage(items: List<Channel>, playingNow: State<Channel>, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
-    // Read through a State, not a copy: the page sits in an animated container that keeps the
-    // content it was opened with, so a plain parameter went stale once another channel was
-    // picked and no row was marked as playing any more.
-    val playing = playingNow.value
+private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: Boolean, onClose: () -> Unit, onPick: (Channel) -> Unit) {
     val playingIndex = remember(items) { items.indexOfFirst { it.key == playing.key } }
     val anchorKey = remember(items) { (items.getOrNull(playingIndex) ?: items.firstOrNull())?.key }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (playingIndex - 2).coerceAtLeast(0))
@@ -673,10 +667,6 @@ private fun ChannelListPage(items: List<Channel>, playingNow: State<Channel>, ta
     // flags can briefly disagree while Compose dispatches focus loss/gain callbacks.
     var focusedKey by remember(items) { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { if (takeFocus) anchor.requestFocusSafely() }
-    // Tidy rows: the tag most names of this list share ("AR - ") is left out, and the category
-    // line too when every channel here has the same one (it is the list's own name, above).
-    val prefix = remember(items) { com.streamtv.data.sharedListPrefix(items.map { it.name }) }
-    val oneGroup = remember(items) { items.map { it.group }.distinct().size <= 1 }
     // CH+ / CH− (Page up / down) jump eight rows at a time; held, at a calm fixed pace.
     val rowFocus = remember(items) { HashMap<String, FocusRequester>() }
     val pageScope = rememberCoroutineScope()
@@ -710,7 +700,7 @@ private fun ChannelListPage(items: List<Channel>, playingNow: State<Channel>, ta
         // Compact rows: about half as many again fit on screen, with the same logo, name, group and quality.
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        itemsIndexed(items, key = { _, it -> it.key }) { index, item ->
+        items(items, key = { it.key }) { item ->
             val isPlaying = item.key == playing.key
             val focused = focusedKey == item.key
             // The "now playing" mark fades out instead of snapping off when another channel is picked.
@@ -720,73 +710,61 @@ private fun ChannelListPage(items: List<Channel>, playingNow: State<Channel>, ta
                 spring(dampingRatio = .78f, stiffness = 420f),
                 label = "channelItemScale"
             )
-            // A merged list ("Sports") gathers several of the provider's groups: the group is a
-            // small heading where it changes, once, instead of a line under every channel.
-            val heading = !oneGroup && (index == 0 || items[index - 1].group != item.group)
-            Column {
-                if (heading) Text(
-                    com.streamtv.data.tidyCase(item.group),
-                    Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, top = if (index == 0) 2.dp else 12.dp, bottom = 3.dp),
-                    color = Color.White.copy(alpha = .50f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
-                        .focusRequester(rowFocus.getOrPut(item.key) { FocusRequester() })
-                        .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
-                        // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
-                        .background(
-                            if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
-                            // The channel playing: a clear blue tint, seen over a bright picture too
-                            // (a faint white one vanished behind the see-through panel).
-                            else SolidColor(Color(0xFF6E8BD3).copy(alpha = .38f * playingMark))
-                        )
-                        .onFocusChanged { state ->
-                            if (state.isFocused) {
-                                focusedKey = item.key
-                            } else if (focusedKey == item.key) {
-                                // An older row's delayed focus-loss callback must not clear a
-                                // newer row that has already acquired focus.
-                                focusedKey = null
-                            }
+            Row(
+                (if (item.key == anchorKey) Modifier.focusRequester(anchor) else Modifier)
+                    .focusRequester(rowFocus.getOrPut(item.key) { FocusRequester() })
+                    .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
+                    // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
+                    .background(
+                        if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
+                        else SolidColor(Color.White.copy(alpha = .10f * playingMark))
+                    )
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            focusedKey = item.key
+                        } else if (focusedKey == item.key) {
+                            // An older row's delayed focus-loss callback must not clear a
+                            // newer row that has already acquired focus.
+                            focusedKey = null
                         }
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ChannelLogo(item.name, item.logo, Modifier.size(30.dp), fontSize = 11.sp, corner = 6.dp)
-                    Spacer(Modifier.width(10.dp))
-                    // The channel playing keeps a red dot before its name, focused or not: the
-                    // focus colour alone hid which row was playing.
-                    if (playingMark > 0f) {
-                        Box(
-                            Modifier.padding(end = 7.dp).size(7.dp).graphicsLayer { alpha = playingMark }
-                                .clip(CircleShape).background(Color(0xFFE8452F))
-                        )
                     }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                        Text(
-                            com.streamtv.data.shortChannelName(item.name, prefix),
-                            color = if (focused) Color.White else Color.White.copy(alpha = .80f),
-                            fontSize = 15.sp,
-                            lineHeight = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Start,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    val quality = channelQuality(item.name)
-                    if (quality.isNotBlank()) {
-                        Spacer(Modifier.width(8.dp))
-                        Box(
-                            Modifier.clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = if (focused) .16f else .10f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(quality, color = Color.White.copy(alpha = if (focused) .85f else .60f), fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (isPlaying) onClose() else onPick(item) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ChannelLogo(item.name, item.logo, Modifier.size(32.dp), fontSize = 12.sp, corner = 7.dp)
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                    Text(
+                        channelDisplayName(item.name),
+                        color = if (focused) Color.White else Color.White.copy(alpha = .80f),
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        item.group,
+                        color = Color.White.copy(alpha = if (focused) .72f else .46f),
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                val quality = channelQuality(item.name)
+                if (quality.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier.clip(RoundedCornerShape(6.dp))
+                            .background(Color.White.copy(alpha = if (focused) .16f else .10f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(quality, color = Color.White.copy(alpha = if (focused) .85f else .60f), fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
@@ -822,8 +800,8 @@ private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProg
     }
 }
 
-internal fun channelDisplayName(name: String): String = com.streamtv.data.tidyCase(
-    name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim())
+internal fun channelDisplayName(name: String): String =
+    name.replace(Regex("\\s*\\((?:\\d{3,4}p|4K|HD|SD)\\)\\s*", RegexOption.IGNORE_CASE), " ").trim()
 
 internal fun channelQuality(name: String): String =
-    Regex("\\b(\\d{3,4}p|[48]K|UHD|FHD|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()
+    Regex("\\b(\\d{3,4}p|4K|HD|SD)\\b", RegexOption.IGNORE_CASE).find(name)?.value?.uppercase().orEmpty()
