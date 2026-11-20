@@ -52,6 +52,14 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs release/app.apk
           ls -l release/app.apk
           test "$(stat -c %s release/app.apk)" -gt 1000000
+      - name: Upload test APK (fix branches only)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stv-xtream-fix-apk
+          path: release/app.apk
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish release
         if: github.ref == 'refs/heads/main'
         env:
