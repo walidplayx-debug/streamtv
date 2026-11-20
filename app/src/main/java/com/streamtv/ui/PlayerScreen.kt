@@ -59,6 +59,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
+import androidx.media3.common.Tracks
+import android.util.Log
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -127,6 +130,7 @@ fun PlayerScreen(
     val player = remember { Players.create(context) }
     var buffering by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
+    var audioWarning by remember { mutableStateOf(false) }
     var autoRetries by remember { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
     var infoBarTick by remember { mutableIntStateOf(0) }
@@ -238,11 +242,20 @@ fun PlayerScreen(
         showInfoBar()
     }
 
+    // Keep the warning brief and clear it automatically; it is deliberately separate from stream errors.
+    LaunchedEffect(audioWarning) {
+        if (audioWarning) {
+            delay(3500)
+            audioWarning = false
+        }
+    }
+
     // A channel change (and the first channel): the same player takes the new stream at its live
     // point; a retry still pending for the previous channel is dropped.
     LaunchedEffect(channel.url) {
         retryJob[0]?.cancel()
         failed = false
+        audioWarning = false
         buffering = true
         autoRetries = 0
         player.stop()
@@ -256,15 +269,33 @@ fun PlayerScreen(
     val restartNow by rememberUpdatedState(newValue = { restart() })
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) {
+                val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+                val formats = audioGroups.flatMap { group -> (0 until group.length).map { index ->
+                    val format = group.getTrackFormat(index)
+                    "${format.sampleMimeType ?: "unknown"}/${format.codecs ?: "unknown"}${if (group.isTrackSelected(index)) " [selected]" else ""}"
+                } }
+                Log.i("STV-Audio", "${channel.name}: ${if (formats.isEmpty()) "no audio tracks" else formats.joinToString()}")
+                if (player.playbackState == Player.STATE_READY && audioGroups.isEmpty()) audioWarning = true
+            }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> buffering = true
-                    Player.STATE_READY -> { buffering = false; failed = false; autoRetries = 0 }
+                    Player.STATE_READY -> {
+                        buffering = false; failed = false; autoRetries = 0
+                        val hasAudio = player.currentTracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }
+                        if (!hasAudio) audioWarning = true
+                    }
                     Player.STATE_ENDED -> streamProblem()
                     else -> Unit
                 }
             }
-            override fun onPlayerError(error: PlaybackException) = streamProblem()
+            override fun onPlayerError(error: PlaybackException) {
+                Log.e("STV-Audio", "${channel.name}: playback error ${error.errorCodeName}: ${error.message}", error)
+                val causeText = generateSequence<Throwable>(error) { it.cause }.joinToString(" ") { it.javaClass.simpleName + ": " + (it.message ?: "") }
+                if (causeText.contains("audio", ignoreCase = true) || causeText.contains("decoder", ignoreCase = true)) audioWarning = true
+                streamProblem()
+            }
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener); player.release() }
@@ -294,6 +325,18 @@ fun PlayerScreen(
     }
     // A stream that buffers forever is treated like a broken one.
     LaunchedEffect(player, channel.url, buffering, failed, autoRetries) {
+        if (audioWarning) {
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = 22.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xE6222428))
+                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Text(audioWarningText(LocalAppLanguage.current), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+
         if (buffering && !failed) {
             delay(StallMillis)
             onStreamProblem()
@@ -790,6 +833,20 @@ private fun CardButton(label: String, modifier: Modifier = Modifier, onClick: ()
     ) {
         Text(t(label), color = if (focused) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
+}
+
+
+private fun audioWarningText(language: String): String = when (language) {
+    "ar" -> "لا يوجد صوت من المصدر"
+    "fr" -> "Aucun son provenant de la source"
+    "es" -> "No hay audio de la fuente"
+    "ru" -> "В источнике нет звука"
+    "zh" -> "信号源没有音频"
+    "tr" -> "Kaynakta ses yok"
+    "de" -> "Kein Ton von der Quelle"
+    "pt" -> "Sem áudio da fonte"
+    "nl" -> "Geen geluid van de bron"
+    else -> "No audio from source"
 }
 
 private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
