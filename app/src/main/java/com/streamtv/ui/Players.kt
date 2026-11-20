@@ -48,6 +48,7 @@ object Players {
         // The device's own decoders first; FFmpeg (Dolby AC3 / E-AC3, DTS, TrueHD...) only for a sound
         // the device cannot play, which otherwise left the picture silent.
         val renderers = DefaultRenderersFactory(app)
+            .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         // Audio focus: the sound steps aside while the remote's voice search or the assistant speaks.
         val audio = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
