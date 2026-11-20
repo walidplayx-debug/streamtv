@@ -22,4 +22,21 @@ interface ChannelDao {
         clear()
         insertAll(items)
     }
+
+    /**
+     * Replaces a large playlist without first allocating a second full-size list of entities.
+     * Room inserts bounded batches; the source Channel list remains the only full in-memory copy.
+     */
+    @Transaction
+    suspend fun replaceAllChannels(channels: List<Channel>, batchSize: Int = 400) {
+        clear()
+        var start = 0
+        while (start < channels.size) {
+            val end = minOf(start + batchSize, channels.size)
+            val batch = ArrayList<ChannelEntity>(end - start)
+            for (index in start until end) batch.add(ChannelEntity.from(channels[index]))
+            insertAll(batch)
+            start = end
+        }
+    }
 }
