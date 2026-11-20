@@ -17,9 +17,9 @@ data class XtreamLogin(val base: String, val username: String, val password: Str
             if (!parsed.encodedPath.trimEnd('/').endsWith("/get.php")) return null
             val username = parsed.queryParameter("username")?.takeIf(String::isNotBlank) ?: return null
             val password = parsed.queryParameter("password")?.takeIf(String::isNotBlank) ?: return null
-            val port = if (parsed.port != HttpUrl.defaultPort(parsed.scheme)) ":\u0024{parsed.port}" else ""
+            val port = if (parsed.port != HttpUrl.defaultPort(parsed.scheme)) ":${parsed.port}" else ""
             val path = parsed.encodedPath.trimEnd('/').removeSuffix("/get.php")
-            return XtreamLogin("\u0024{parsed.scheme}://\u0024{parsed.host}\u0024port\u0024path", username, password)
+            return XtreamLogin("${parsed.scheme}://${parsed.host}$port$path", username, password)
         }
     }
 }
@@ -77,12 +77,12 @@ class XtreamApi(private val client: OkHttpClient) {
 
     private fun streamUrl(login: XtreamLogin, type: String, id: String, extension: String): String {
         fun path(value: String) = java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20")
-        return "\u0024{login.base}/\u0024type/\u0024{path(login.username)}/\u0024{path(login.password)}/\u0024id.\u0024extension"
+        return "${login.base}/$type/${path(login.username)}/${path(login.password)}/$id.$extension"
     }
 
     private fun apiUrl(login: XtreamLogin, action: String): String {
         fun enc(value: String) = URLEncoder.encode(value, "UTF-8")
-        return "\u0024{login.base}/player_api.php?username=\u0024{enc(login.username)}&password=\u0024{enc(login.password)}&action=\u0024action"
+        return "${login.base}/player_api.php?username=${enc(login.username)}&password=${enc(login.password)}&action=$action"
     }
 
     private fun categories(login: XtreamLogin, action: String): Map<String, String> {
