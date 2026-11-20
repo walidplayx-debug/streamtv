@@ -242,13 +242,8 @@ fun PlayerScreen(
         showInfoBar()
     }
 
-    // Keep the warning brief and clear it automatically; it is deliberately separate from stream errors.
-    LaunchedEffect(audioWarning) {
-        if (audioWarning) {
-            delay(3500)
-            audioWarning = false
-        }
-    }
+    // Keep the audio warning visible for the whole channel session.
+    // It is cleared only when channel.url changes below.
 
     // A channel change (and the first channel): the same player takes the new stream at its live
     // point; a retry still pending for the previous channel is dropped.
