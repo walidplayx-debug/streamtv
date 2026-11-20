@@ -6,7 +6,7 @@ concurrency:
   cancel-in-progress: true
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/xtream-api-memory-20261120']
   workflow_dispatch:
 permissions:
   contents: write
@@ -53,6 +53,7 @@ jobs:
           ls -l release/app.apk
           test "$(stat -c %s release/app.apk)" -gt 1000000
       - name: Publish release
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
