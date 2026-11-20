@@ -325,18 +325,6 @@ fun PlayerScreen(
     }
     // A stream that buffers forever is treated like a broken one.
     LaunchedEffect(player, channel.url, buffering, failed, autoRetries) {
-        if (audioWarning) {
-            Box(
-                Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = 22.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xE6222428))
-                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 9.dp)
-            ) {
-                Text(audioWarningText(LocalAppLanguage.current), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-
         if (buffering && !failed) {
             delay(StallMillis)
             onStreamProblem()
@@ -486,6 +474,18 @@ fun PlayerScreen(
             },
             update = { it.player = player }
         )
+
+        if (audioWarning) {
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = 22.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xE6222428))
+                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Text(audioWarningText(LocalAppLanguage.current), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        }
 
         if (buffering && !failed) {
             CircularProgressIndicator(
