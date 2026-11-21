@@ -124,7 +124,40 @@ object Palettes {
         lightTileFocused = listOf(Color(0xFFF4EDE0), Color(0xFFD6C8AE))
     )
 
-    val all = listOf(Default, Sparrow)
+    /**
+     * Made for watching TV in a dim room. Deep midnight indigo instead of pure black: softer on the
+     * eyes over a long evening and lets pictures and logos stand out. One warm coral, like a cinema
+     * marquee, marks only what has focus, so it is easy to find from the sofa. Cool page, warm
+     * focus: opposite sides of the colour wheel, so focus never blends into the page.
+     */
+    val Midnight = StvPalette(
+        id = "midnight", name = "Midnight",
+        ink = Color(0xFF07060F), text = Color(0xFFF5F3FF), muted = Color(0xFFA9A5C7), accent = Color(0xFFFF8A6B), glass = Color(0xFF262342),
+        focus = listOf(Color(0xFFE0563A), Color(0xFFB8402A)),
+        press = listOf(Color(0xFFFFB199), Color(0xFFFF8A6B)),
+        backdrop = listOf(Color(0xFF1B1838), Color(0xFF120F26), Color(0xFF0A0816)),
+        glassFill = listOf(Color(0xB32C2950), Color(0xB315132A)),
+        tileFocused = listOf(Color(0xFF4A4580), Color(0xFF312D5C)),
+        tile = listOf(Color(0xFF2E2B52), Color(0xFF1F1C3A)),
+        listFocus = listOf(Color(0xFFD24E34), Color(0xFFA93A26)),
+        welcomeTop = Color(0xFF2A2456),
+        swatch = listOf(Color(0xFF0A0816), Color(0xFF2E2B52), Color(0xFF4A4580), Color(0xFFE0563A), Color(0xFFFFB199)),
+        panel = Color(0xF01A1830),
+        faces = listOf(
+            listOf(Color(0xFF3A3570), Color(0xFF27234C), Color(0xFF17142E)),
+            listOf(Color(0xFF4A2D5C), Color(0xFF33203F), Color(0xFF1E1326)),
+            listOf(Color(0xFF1F4552), Color(0xFF163139), Color(0xFF0D1D22)),
+            listOf(Color(0xFF353A55), Color(0xFF25283C), Color(0xFF161825))
+        ),
+        lit = Color(0xF2FFF4EE), onLit = Color(0xFF15132A),
+        number = Color(0xFFFF8A6B),
+        overlayMuted = Color(0xFFBDB9D6),
+        seek = Color(0xFFFF6B4A),
+        lightTile = listOf(Color(0xFFD9D6EA), Color(0xFFABA6CB)),
+        lightTileFocused = listOf(Color(0xFFE8E6F5), Color(0xFFBDB8DA))
+    )
+
+    val all = listOf(Default, Midnight, Sparrow)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }
