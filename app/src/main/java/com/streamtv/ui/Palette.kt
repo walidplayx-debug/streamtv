@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.streamtv.R
 
 /**
  * The app's colours for one theme. A theme changes colours only: every screen keeps its layout,
@@ -63,7 +64,11 @@ class StvPalette(
     val seek: Color = Color(0xE6FFFFFF),
     /** The pale tile behind dark logos: resting, then focused (top to bottom). */
     val lightTile: List<Color> = listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5)),
-    val lightTileFocused: List<Color> = listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
+    val lightTileFocused: List<Color> = listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8)),
+    /** The STV wordmark drawn for this theme. */
+    val wordmark: Int = R.drawable.stv_wordmark,
+    /** A soft band of light that keeps sweeping across the focused tile, like light on glass. */
+    val sheen: Boolean = false
 ) {
     val focusBrush: Brush get() = Brush.verticalGradient(focus)
     val pressBrush: Brush get() = Brush.verticalGradient(press)
@@ -120,7 +125,42 @@ object Palettes {
         lightTileFocused = listOf(Color(0xFFF2F2F7), Color(0xFFD1D1D6))
     )
 
-    val all = listOf(Default, Cupertino)
+    /**
+     * Apple's newer look, "liquid glass": the controls are clear glass over a deep blue-violet
+     * page, so the page shows through them; the focused one is brighter glass with a band of
+     * light sweeping across it. One cool accent (cyan) for choices, white for everything you read.
+     * White text keeps at least 4.6:1 on every glass, focused or not.
+     */
+    val Glass = StvPalette(
+        id = "glass", name = "Glass",
+        ink = Color(0xFF05060D), text = Color(0xFFFFFFFF), muted = Color(0xFFA6ACC8), accent = Color(0xFF64D2FF), glass = Color(0xFF2B3158),
+        focus = listOf(Color(0x5CFFFFFF), Color(0x38FFFFFF)),
+        press = listOf(Color(0x8CFFFFFF), Color(0x5CFFFFFF)),
+        backdrop = listOf(Color(0xFF22305C), Color(0xFF161A3A), Color(0xFF08080F)),
+        glassFill = listOf(Color(0x29FFFFFF), Color(0x12FFFFFF)),
+        tileFocused = listOf(Color(0x4DFFFFFF), Color(0x29FFFFFF)),
+        tile = listOf(Color(0x24FFFFFF), Color(0x12FFFFFF)),
+        listFocus = listOf(Color(0x5CFFFFFF), Color(0x38FFFFFF)),
+        welcomeTop = Color(0xFF2A3A70),
+        swatch = listOf(Color(0xFF08080F), Color(0xFF22305C), Color(0xFF8A93B8), Color(0xFF64D2FF), Color(0xFFFFFFFF)),
+        panel = Color(0xD91A1F3D),
+        faces = listOf(
+            listOf(Color(0xFF2E3F7A), Color(0xFF22305C), Color(0xFF161E3D)),
+            listOf(Color(0xFF3E3070), Color(0xFF2C2252), Color(0xFF1B1534)),
+            listOf(Color(0xFF1E5068), Color(0xFF163B4E), Color(0xFF0E2533)),
+            listOf(Color(0xFF3A4466), Color(0xFF2A3150), Color(0xFF1A1F33))
+        ),
+        lit = Color(0xEBFFFFFF), onLit = Color(0xFF0E1130),
+        number = Color(0xFF64D2FF),
+        overlayMuted = Color(0xFFC3C8DC),
+        seek = Color(0xFFFFFFFF),
+        lightTile = listOf(Color(0xFFEEF2FF), Color(0xFFC9D2EC)),
+        lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFDCE3F7)),
+        wordmark = R.drawable.stv_wordmark_glass,
+        sheen = true
+    )
+
+    val all = listOf(Default, Cupertino, Glass)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }

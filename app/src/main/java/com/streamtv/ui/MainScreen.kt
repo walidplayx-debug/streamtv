@@ -11,6 +11,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -421,7 +427,7 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
         }
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterEnd) {
             // Quiet in the corner: a little smaller and dimmed, so the eye goes to the content.
-            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(20.dp).graphicsLayer { alpha = .6f })
+            Image(painterResource(ActivePalette.current.wordmark), contentDescription = "STV", modifier = Modifier.height(20.dp).graphicsLayer { alpha = .6f })
         }
     }
 }
@@ -1064,7 +1070,7 @@ private fun WelcomeScreen(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV", modifier = Modifier.height(66.dp))
+            Image(painterResource(ActivePalette.current.wordmark), contentDescription = "STV", modifier = Modifier.height(66.dp))
             Spacer(Modifier.height(26.dp))
             Text(t("Welcome"), color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -1254,6 +1260,13 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
     // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
+    // Glass themes: light keeps sweeping across the focused tile. Only the focused tile runs it.
+    val sheenOn = ActivePalette.current.sheen && focused
+    val sheen = if (sheenOn) {
+        rememberInfiniteTransition(label = "sheen").animateFloat(
+            -0.6f, 1.6f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "sheenPos"
+        ).value
+    } else 0f
     Box(
         // The focused tile grows and sits above its neighbours.
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)
@@ -1265,6 +1278,17 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
                 focused -> ActivePalette.current.tileFocused
                 else -> ActivePalette.current.tile
             }))
+            .drawWithContent {
+                drawContent()
+                if (sheenOn) {
+                    val x = size.width * sheen
+                    val band = size.width * .35f
+                    drawRect(Brush.linearGradient(
+                        listOf(Color.Transparent, Color.White.copy(alpha = .22f), Color.Transparent),
+                        start = Offset(x - band, 0f), end = Offset(x + band, size.height)
+                    ))
+                }
+            }
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged {
@@ -1880,7 +1904,7 @@ fun StartCover(state: TvState) {
                     pulse.animateTo(.55f, tween(900, easing = FastOutSlowInEasing))
                 }
             }
-            Image(painterResource(R.drawable.stv_wordmark), contentDescription = "STV",
+            Image(painterResource(ActivePalette.current.wordmark), contentDescription = "STV",
                 modifier = Modifier.height(66.dp).graphicsLayer { alpha = pulse.value })
         }
     }
