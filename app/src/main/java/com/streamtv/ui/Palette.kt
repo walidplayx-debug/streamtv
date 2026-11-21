@@ -88,76 +88,39 @@ object Palettes {
     )
 
     /**
-     * Taken from a photo of a sparrow on a branch: dark umber and olive for the pages (most of the
-     * screen), warm brown for the tiles, and the wing's ochre for focus (the small, bright part).
-     * White text stays at least 3.4:1 on every focus colour, as in the default theme.
+     * Apple's own look for a TV: true black pages with the dark system greys stepping up for each
+     * layer (1C1C1E, 2C2C2E, 3A3A3C), white labels with grey secondary text, and one colour only,
+     * the system blue, for what has focus and what is chosen. Pop-ups use the light platter with
+     * dark text, as on Apple TV. Everything else stays neutral, so the pictures bring the colour.
      */
-    val Sparrow = StvPalette(
-        id = "sparrow", name = "Sparrow",
-        ink = Color(0xFF14150E), text = Color(0xFFF4EFE6), muted = Color(0xFFB8AF9E), accent = Color(0xFFE8B978), glass = Color(0xFF3A3527),
-        focus = listOf(Color(0xFFA57744), Color(0xFF7E5629)),
-        press = listOf(Color(0xFFE3C08A), Color(0xFFC79B5E)),
-        // 60 %: the olive of the background behind the bird, clearly green-brown, not black.
-        backdrop = listOf(Color(0xFF3D4229), Color(0xFF2C2C1D), Color(0xFF1C1812)),
-        glassFill = listOf(Color(0xB34A4632), Color(0xB32A281C)),
-        // 30 %: the warm brown of the back and wings.
-        tileFocused = listOf(Color(0xFF8C6A42), Color(0xFF634A2E)),
-        tile = listOf(Color(0xFF5A4632), Color(0xFF3E3022)),
-        // 10 %: the wing's ochre, only on what has focus.
-        listFocus = listOf(Color(0xFF9C7040), Color(0xFF7A5530)),
-        welcomeTop = Color(0xFF4A5233),
-        swatch = listOf(Color(0xFF2B2625), Color(0xFF98A96C), Color(0xFF9BA1B0), Color(0xFFD2A15F), Color(0xFFF4EFE6)),
-        panel = Color(0xF02E2A1F),
-        // Brown back, olive ground, blue-grey head, rust buds.
+    val Cupertino = StvPalette(
+        id = "cupertino", name = "Cupertino",
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF98989D), accent = Color(0xFF0A84FF), glass = Color(0xFF1C1C1E),
+        focus = listOf(Color(0xFF0A84FF), Color(0xFF0071E3)),
+        press = listOf(Color(0xFF64B5FF), Color(0xFF409CFF)),
+        backdrop = listOf(Color(0xFF1C1C1E), Color(0xFF0B0B0C), Color(0xFF000000)),
+        glassFill = listOf(Color(0xB32C2C2E), Color(0xB31C1C1E)),
+        tileFocused = listOf(Color(0xFF48484A), Color(0xFF3A3A3C)),
+        tile = listOf(Color(0xFF2C2C2E), Color(0xFF1C1C1E)),
+        listFocus = listOf(Color(0xFF0A84FF), Color(0xFF0071E3)),
+        welcomeTop = Color(0xFF1C1C1E),
+        swatch = listOf(Color(0xFF000000), Color(0xFF1C1C1E), Color(0xFF3A3A3C), Color(0xFF0A84FF), Color(0xFFF2F2F7)),
+        panel = Color(0xF01C1C1E),
         faces = listOf(
-            listOf(Color(0xFF5A4632), Color(0xFF3E3022), Color(0xFF2A2018)),
-            listOf(Color(0xFF4A5233), Color(0xFF353B24), Color(0xFF22261A)),
-            listOf(Color(0xFF4E5560), Color(0xFF373C45), Color(0xFF24272E)),
-            listOf(Color(0xFF5E3A2E), Color(0xFF43281F), Color(0xFF2B1A14))
+            listOf(Color(0xFF3A3A3C), Color(0xFF2C2C2E), Color(0xFF1C1C1E)),
+            listOf(Color(0xFF2A3A55), Color(0xFF1D2A40), Color(0xFF121B2B)),
+            listOf(Color(0xFF48484A), Color(0xFF353537), Color(0xFF232325)),
+            listOf(Color(0xFF33325A), Color(0xFF242342), Color(0xFF17162B))
         ),
-        // The pale throat for the light pill, with the dark umber of the wing stripes on it.
-        lit = Color(0xF2F4EFE6), onLit = Color(0xFF2B2118),
-        number = Color(0xFFE8B978),
-        overlayMuted = Color(0xFFC2B8A6),
-        seek = Color(0xFFE8B978),
-        lightTile = listOf(Color(0xFFE6DDCC), Color(0xFFC4B59C)),
-        lightTileFocused = listOf(Color(0xFFF4EDE0), Color(0xFFD6C8AE))
+        lit = Color(0xF2F2F2F7), onLit = Color(0xFF1C1C1E),
+        number = Color(0xFF0A84FF),
+        overlayMuted = Color(0xFFAEAEB2),
+        seek = Color(0xFFFFFFFF),
+        lightTile = listOf(Color(0xFFE5E5EA), Color(0xFFC7C7CC)),
+        lightTileFocused = listOf(Color(0xFFF2F2F7), Color(0xFFD1D1D6))
     )
 
-    /**
-     * Made for watching TV in a dim room. Deep midnight indigo instead of pure black: softer on the
-     * eyes over a long evening and lets pictures and logos stand out. One warm coral, like a cinema
-     * marquee, marks only what has focus, so it is easy to find from the sofa. Cool page, warm
-     * focus: opposite sides of the colour wheel, so focus never blends into the page.
-     */
-    val Midnight = StvPalette(
-        id = "midnight", name = "Midnight",
-        ink = Color(0xFF07060F), text = Color(0xFFF5F3FF), muted = Color(0xFFA9A5C7), accent = Color(0xFFFF8A6B), glass = Color(0xFF262342),
-        focus = listOf(Color(0xFFE0563A), Color(0xFFB8402A)),
-        press = listOf(Color(0xFFFFB199), Color(0xFFFF8A6B)),
-        backdrop = listOf(Color(0xFF1B1838), Color(0xFF120F26), Color(0xFF0A0816)),
-        glassFill = listOf(Color(0xB32C2950), Color(0xB315132A)),
-        tileFocused = listOf(Color(0xFF4A4580), Color(0xFF312D5C)),
-        tile = listOf(Color(0xFF2E2B52), Color(0xFF1F1C3A)),
-        listFocus = listOf(Color(0xFFD24E34), Color(0xFFA93A26)),
-        welcomeTop = Color(0xFF2A2456),
-        swatch = listOf(Color(0xFF0A0816), Color(0xFF2E2B52), Color(0xFF4A4580), Color(0xFFE0563A), Color(0xFFFFB199)),
-        panel = Color(0xF01A1830),
-        faces = listOf(
-            listOf(Color(0xFF3A3570), Color(0xFF27234C), Color(0xFF17142E)),
-            listOf(Color(0xFF4A2D5C), Color(0xFF33203F), Color(0xFF1E1326)),
-            listOf(Color(0xFF1F4552), Color(0xFF163139), Color(0xFF0D1D22)),
-            listOf(Color(0xFF353A55), Color(0xFF25283C), Color(0xFF161825))
-        ),
-        lit = Color(0xF2FFF4EE), onLit = Color(0xFF15132A),
-        number = Color(0xFFFF8A6B),
-        overlayMuted = Color(0xFFBDB9D6),
-        seek = Color(0xFFFF6B4A),
-        lightTile = listOf(Color(0xFFD9D6EA), Color(0xFFABA6CB)),
-        lightTileFocused = listOf(Color(0xFFE8E6F5), Color(0xFFBDB8DA))
-    )
-
-    val all = listOf(Default, Midnight, Sparrow)
+    val all = listOf(Default, Cupertino)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }
