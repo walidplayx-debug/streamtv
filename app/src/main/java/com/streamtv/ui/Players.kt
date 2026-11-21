@@ -65,6 +65,29 @@ object Players {
      *  network is far quicker than decoding up to the exact frame. */
     fun createVod(context: Context): ExoPlayer = create(context).apply { setSeekParameters(SeekParameters.CLOSEST_SYNC) }
 
+    /**
+     * A small silent player for the picture above the bar while choosing a place: pictures only
+     * (no sound, no subtitles), low resolution, a short buffer, and seeks to the nearest keyframe.
+     */
+    fun createPreview(context: Context): ExoPlayer {
+        val app = context.applicationContext
+        val selector = DefaultTrackSelector(app).apply {
+            setParameters(
+                buildUponParameters().setMaxVideoSizeSd()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            )
+        }
+        val buffers = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(/* min = */ 1_000, /* max = */ 2_000, /* forPlayback = */ 250, /* afterRebuffer = */ 500)
+            .build()
+        return ExoPlayer.Builder(app)
+            .setTrackSelector(selector)
+            .setLoadControl(buffers)
+            .build()
+            .apply { setSeekParameters(SeekParameters.CLOSEST_SYNC); volume = 0f; playWhenReady = false }
+    }
+
     /** What players say they are when the playlist names nothing: accepted by most IPTV servers. */
     private const val DefaultAgent = "VLC/3.0.20 LibVLC/3.0.20"
 
