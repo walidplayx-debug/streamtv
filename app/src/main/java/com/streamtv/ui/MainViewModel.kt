@@ -200,7 +200,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.lastChannelId.collect { id ->
                 lastChannelId = id
                 val last = _state.value.channels.firstOrNull { it.id == id }
-                if (last != null) _state.value = _state.value.copy(selected = last)
+                // Never swap out what is playing: a movie open on screen stays the movie.
+                if (last != null && !_state.value.playing) _state.value = _state.value.copy(selected = last)
             }
         }
     }

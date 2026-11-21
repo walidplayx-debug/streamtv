@@ -1,6 +1,7 @@
 package com.streamtv.ui
 
 import android.os.SystemClock
+import android.view.TextureView
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -86,8 +87,10 @@ import kotlinx.coroutines.delay
 private val VodWhite = Color.White
 private val VodMuted = Color(0xFFB5B5BA)
 private const val ControlsMillis = 4_500L
-/** The chosen place is played this long after the last left/right press. */
-private const val ScrubSettleMillis = 500L
+/** The preview follows the chosen place after this pause, so a held key does not flood it with seeks. */
+private const val PreviewSeekMillis = 120L
+/** The preview player is kept this long after choosing ends, ready for the next time. */
+private const val PreviewKeepMillis = 15_000L
 /** While left/right is held, the place moves one step this often. */
 private const val HoldStepMillis = 80L
 /** A press within this time of the last one, in the same direction, keeps the run (and its speed). */
@@ -132,9 +135,9 @@ internal fun scrubStep(steps: Int, durationMillis: Long): Long {
  * bottom, the title, a few round buttons and a full-width bar with the time under the playhead and
  * the time left at the end. Up and down never change the title, and nothing opens a channel list.
  *
- * Keys: left/right move the place on the bar (the place is played once the presses stop; the step
- * grows while they keep coming or the key is held); OK pauses or plays, or plays the chosen place at
- * once. With the controls showing, up goes to the buttons (left/right pick, OK presses) and down
+ * Keys: left/right choose a place on the bar, with a small picture of that place above it, while
+ * the title goes on playing behind (the step grows while the presses keep coming or the key is
+ * held); OK plays the chosen place, otherwise OK pauses or plays. With the controls showing, up goes to the buttons (left/right pick, OK presses) and down
  * back to the bar. Back drops a place being chosen, then hides the controls, then leaves.
  */
 @Composable
@@ -171,8 +174,17 @@ fun VodPlayerScreen(
     val focus = remember { FocusRequester() }
     // The place being chosen with left/right, before it is played; null when not choosing.
     var scrubTarget by remember { mutableStateOf<Long?>(null) }
-    var scrubTick by remember { mutableIntStateOf(0) }
     val run = remember { ScrubRun() }
+    // The small picture above the bar while choosing a place. Made when first needed; if the device
+    // or the server cannot give a second picture, only the time is shown.
+    var preview by remember { mutableStateOf<ExoPlayer?>(null) }
+    var previewShown by remember { mutableStateOf(false) }
+    var previewFailed by remember { mutableStateOf(false) }
+    fun dropPreview() {
+        preview?.release()
+        preview = null
+        previewShown = false
+    }
     // Subtitles carried inside the file. The one in the app's language is picked by itself.
     var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
     var subtitlesOff by remember { mutableStateOf(false) }
@@ -184,8 +196,7 @@ fun VodPlayerScreen(
             .setPreferredTextLanguage(appLanguage).setPreferredAudioLanguage(appLanguage).build()
     }
     // The sound button only when there is a choice, the subtitles button only when there are some.
-    val buttons = listOf("favorite") +
-        (if (audios.size > 1) listOf("audio") else emptyList()) +
+    val buttons = (if (audios.size > 1) listOf("audio") else emptyList()) +
         (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList())
     val audioCode = audios.firstOrNull { it.selected }?.code ?: ""
     fun nextAudio() {
@@ -221,7 +232,7 @@ fun VodPlayerScreen(
         val end = if (length > 0) (length - 1_000L).coerceAtLeast(0L) else Long.MAX_VALUE
         return target.coerceIn(0L, end)
     }
-    /** Plays the chosen place now. */
+    /** Plays the chosen place now (OK). Until then the title goes on playing behind the preview. */
     fun commitScrub() {
         val target = scrubTarget ?: return
         scrubTarget = null
@@ -246,7 +257,16 @@ fun VodPlayerScreen(
         run.steps++
         val step = scrubStep(run.steps, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
-        scrubTick++
+        if (preview == null && !previewFailed) {
+            preview = Players.createPreview(context).apply {
+                addListener(object : Player.Listener {
+                    override fun onRenderedFirstFrame() { previewShown = true }
+                    override fun onPlayerError(error: PlaybackException) { previewFailed = true; dropPreview() }
+                })
+                setMediaSource(Players.stream(context, channel.url), scrubTarget ?: 0L)
+                prepare()
+            }
+        }
         show()
     }
     fun togglePlay() {
@@ -255,7 +275,6 @@ fun VodPlayerScreen(
     }
     fun press(name: String) {
         when (name) {
-            "favorite" -> { onFavorite(); show() }
             "subtitles" -> { nextSubtitle(); show() }
             "audio" -> { if (audios.size > 1) nextAudio(); show() }
         }
@@ -287,7 +306,7 @@ fun VodPlayerScreen(
             }
         }
         player.addListener(listener)
-        onDispose { save(); player.removeListener(listener); player.release() }
+        onDispose { save(); player.removeListener(listener); player.release(); dropPreview() }
     }
     // Home (or anything that takes the app off screen) stops the title completely: no download,
     // no decoder held. The place is kept; coming back, the title is ready again, paused there.
@@ -300,6 +319,7 @@ fun VodPlayerScreen(
                     save()
                     stoppedInBackground[0] = true
                     scrubTarget = null
+                    dropPreview()
                     player.playWhenReady = false
                     player.stop()
                 }
@@ -327,11 +347,15 @@ fun VodPlayerScreen(
             }
         }
     }
-    // Once the presses stop, the chosen place is played.
-    LaunchedEffect(scrubTick) {
-        if (scrubTarget != null) {
-            delay(ScrubSettleMillis)
-            commitScrub()
+    // The preview follows the chosen place; once choosing ends it is let go after a while.
+    LaunchedEffect(scrubTarget) {
+        val target = scrubTarget
+        if (target != null) {
+            delay(PreviewSeekMillis)
+            preview?.seekTo(target)
+        } else if (preview != null) {
+            delay(PreviewKeepMillis)
+            dropPreview()
         }
     }
     // The controls step away on their own while the title plays.
@@ -383,7 +407,7 @@ fun VodPlayerScreen(
                             }
                             true
                         }
-                        Key.DirectionUp -> { if (controls && !failed && scrubTarget == null) row = 1; show(); true }
+                        Key.DirectionUp -> { if (controls && !failed && scrubTarget == null && buttons.isNotEmpty()) row = 1; show(); true }
                         Key.DirectionDown -> { if (controls) row = 0; show(); true }
                         Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> {
                             if (held) return@onPreviewKeyEvent true
@@ -460,20 +484,24 @@ fun VodPlayerScreen(
                             channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
                         )
-                        Spacer(Modifier.height(14.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            buttons.forEachIndexed { index, name ->
-                                VodIconButton(
-                                    name, favorite = favorite, subtitlesOn = chosenSubtitle >= 0,
-                                    selected = row == 1 && button == index, audioCode = audioCode
-                                )
+                        if (buttons.isNotEmpty()) {
+                            Spacer(Modifier.height(14.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                buttons.forEachIndexed { index, name ->
+                                    VodIconButton(
+                                        name, subtitlesOn = chosenSubtitle >= 0,
+                                        selected = row == 1 && button == index, audioCode = audioCode
+                                    )
+                                }
                             }
                         }
                         Spacer(Modifier.height(16.dp))
                         TimeBar(
                             position = scrubTarget ?: position, duration = duration, playing = playing,
                             selected = row == 0, scrubbing = scrubTarget != null,
-                            jump = scrubTarget?.let { it - player.currentPosition }
+                            jump = scrubTarget?.let { it - player.currentPosition },
+                            preview = preview?.takeIf { scrubTarget != null },
+                            previewShown = previewShown
                         )
                     }
                 }
@@ -494,10 +522,28 @@ private fun CompositionLocalProviderLtr(content: @Composable () -> Unit) {
  * with the play/pause mark beside it; the time left sits at the end of the bar.
  */
 @Composable
-private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean, jump: Long?) {
+private fun TimeBar(
+    position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean, jump: Long?,
+    preview: ExoPlayer? = null, previewShown: Boolean = false
+) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val lift by animateFloatAsState(if (selected || scrubbing) 1f else 0f, spring(stiffness = 500f), label = "bar")
     Column(Modifier.fillMaxWidth()) {
+        // The preview floats above the bar, centred on the playhead; it takes no room of its own,
+        // so nothing moves when it appears.
+        if (preview != null) {
+            Layout(
+                modifier = Modifier.fillMaxWidth(),
+                content = { ScrubPreview(preview, previewShown) }
+            ) { measurables, constraints ->
+                val box = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0))
+                val width = constraints.maxWidth
+                layout(width, 0) {
+                    val x = ((width * fraction).toInt() - box.width / 2).coerceIn(0, (width - box.width).coerceAtLeast(0))
+                    box.place(x, -box.height - 12.dp.roundToPx())
+                }
+            }
+        }
         Canvas(Modifier.fillMaxWidth().height(20.dp)) {
             val y = size.height / 2f
             val thick = 5.dp.toPx() + 2.dp.toPx() * lift
@@ -557,6 +603,29 @@ private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: 
     }
 }
 
+/** The picture at the chosen place, from the silent preview player. */
+@Composable
+private fun ScrubPreview(preview: ExoPlayer, shown: Boolean) {
+    Box(
+        Modifier.width(320.dp).height(180.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black)
+            .border(1.5.dp, Color(0x66FFFFFF), RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { TextureView(it).also { view -> preview.setVideoTextureView(view) } },
+            update = { view -> preview.setVideoTextureView(view) },
+            onRelease = { view -> preview.clearVideoTextureView(view) }
+        )
+        if (!shown) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                color = VodWhite.copy(alpha = .85f), trackColor = VodWhite.copy(alpha = .14f), strokeWidth = 2.5.dp
+            )
+        }
+    }
+}
+
 /** A ring with a pause mark while playing, or a play mark while paused. */
 @Composable
 private fun PlayStateIcon(playing: Boolean) {
@@ -577,9 +646,9 @@ private fun PlayStateIcon(playing: Boolean) {
     }
 }
 
-/** A round see-through button: the favourite star, the sound track, or the subtitles. */
+/** A round see-through button: the sound track or the subtitles. */
 @Composable
-private fun VodIconButton(name: String, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
+private fun VodIconButton(name: String, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
     val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
     Box(
         Modifier.size(46.dp).scale(scale).clip(CircleShape)
@@ -613,24 +682,7 @@ private fun VodIconButton(name: String, favorite: Boolean, subtitlesOn: Boolean,
                 drawLine(color, Offset(w * .26f, h * .36f), Offset(w * .74f, h * .36f), strokeWidth = stroke, cap = StrokeCap.Round)
                 drawLine(color, Offset(w * .26f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = stroke, cap = StrokeCap.Round)
             }
-            else -> Canvas(Modifier.size(18.dp)) {
-                val w = size.width
-                val h = size.height
-                val path = Path()
-                val outer = w * .48f
-                val inner = outer * .46f
-                for (i in 0 until 10) {
-                    val r = if (i % 2 == 0) outer else inner
-                    val angle = Math.toRadians(-90.0 + i * 36.0)
-                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
-                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                path.close()
-                // A favourite's star is filled in; otherwise only its outline shows.
-                if (favorite) drawPath(path, tint)
-                drawPath(path, tint, style = Stroke(width = w * .09f))
-            }
+            else -> Unit
         }
     }
 }
