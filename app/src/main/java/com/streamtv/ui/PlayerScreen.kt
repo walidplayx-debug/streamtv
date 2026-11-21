@@ -588,21 +588,33 @@ fun PlayerScreen(
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
                 } else if (current != null) {
-                    // The back, turned the right way round: now, its progress, and next.
+                    // The back, turned the right way round: now, its progress, and next. It reads in the
+                    // app's language: from the right in Arabic ("الآن" first, the time last, on the left),
+                    // from the left in the others.
+                    val language = LocalAppLanguage.current
+                    CompositionLocalProvider(LocalLayoutDirection provides if (language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr) {
                     Row(card.graphicsLayer { rotationX = 180f }, verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                            GuideLine(t("Now"), current.title, guideTimes(current), bright = true)
+                        // The two words in one column as wide as the longer one, right beside the titles.
+                        Column(Modifier.width(IntrinsicSize.Max)) {
+                            GuideLabel(t("Now"), bright = true, height = 24.dp)
+                            Spacer(Modifier.height(13.dp))
+                            if (upcoming != null) GuideLabel(t("Next"), bright = false, height = 22.dp)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            GuideTitle(current.title, guideTimes(current), bright = true, height = 24.dp)
                             Spacer(Modifier.height(5.dp))
                             val done = ((System.currentTimeMillis() - current.startEpochMillis).toFloat() /
                                 (current.endEpochMillis - current.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
-                            Box(Modifier.padding(start = 54.dp).fillMaxWidth().height(3.dp).clip(CircleShape).background(PlayerWhite.copy(alpha = .20f))) {
+                            Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(PlayerWhite.copy(alpha = .20f))) {
                                 Box(Modifier.fillMaxWidth(done).height(3.dp).clip(CircleShape).background(PlayerAccent))
                             }
-                            Spacer(Modifier.height(6.dp))
-                            upcoming?.let { GuideLine(t("Next"), it.title, guideClock(it.startEpochMillis), bright = false) }
+                            Spacer(Modifier.height(5.dp))
+                            upcoming?.let { GuideTitle(it.title, guideClock(it.startEpochMillis), bright = false, height = 22.dp) }
                         }
                         Spacer(Modifier.width(14.dp))
                         ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
+                    }
                     }
                 }
             }
@@ -884,18 +896,27 @@ private fun audioWarningText(language: String): String = when (language) {
     else -> "No audio from source"
 }
 
-/** One line of the guide flap: "Now" or "Next", the programme's name and its time. */
+/** "Now" or "Next" on the back of the info bar, at the height of its line. */
 @Composable
-private fun GuideLine(label: String, title: String, time: String, bright: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.width(54.dp), color = if (bright) PlayerAccent else PlayerMuted.copy(alpha = .8f),
-            fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+private fun GuideLabel(label: String, bright: Boolean, height: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.height(height), contentAlignment = Alignment.CenterStart) {
+        Text(label, color = if (bright) PlayerAccent else PlayerMuted, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** A programme on the back of the info bar: its name (bright for now, dimmer for next) and its time. */
+@Composable
+private fun GuideTitle(title: String, time: String, bright: Boolean, height: androidx.compose.ui.unit.Dp) {
+    Row(Modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), color = PlayerWhite.copy(alpha = if (bright) 1f else .55f),
-            fontSize = if (bright) 15.sp else 14.sp, fontWeight = if (bright) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = if (bright) 16.sp else 15.sp, fontWeight = if (bright) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(12.dp))
-        Text(time, color = PlayerMuted.copy(alpha = if (bright) 1f else .7f), fontSize = 13.sp, maxLines = 1,
-            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+        // Times keep Western digits and their own left-to-right order, as on the clock.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text(time, color = PlayerMuted.copy(alpha = if (bright) 1f else .75f), fontSize = 14.sp, maxLines = 1,
+                style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+        }
     }
 }
 
