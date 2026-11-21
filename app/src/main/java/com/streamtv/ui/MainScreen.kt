@@ -107,7 +107,7 @@ import java.util.Date
 import java.util.Locale
 
 private val Ink get() = ActivePalette.current.ink
-private val White = Color(0xFFFFFFFF)
+private val White get() = ActivePalette.current.text
 private val Muted get() = ActivePalette.current.muted
 private val Accent get() = ActivePalette.current.accent
 private val Glass get() = ActivePalette.current.glass

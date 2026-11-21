@@ -7,6 +7,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
@@ -59,6 +60,10 @@ object Players {
             .setLoadControl(buffers)
             .build()
     }
+
+    /** A player for movies and episodes: a seek lands on the nearest keyframe, which over the
+     *  network is far quicker than decoding up to the exact frame. */
+    fun createVod(context: Context): ExoPlayer = create(context).apply { setSeekParameters(SeekParameters.CLOSEST_SYNC) }
 
     /** What players say they are when the playlist names nothing: accepted by most IPTV servers. */
     private const val DefaultAgent = "VLC/3.0.20 LibVLC/3.0.20"

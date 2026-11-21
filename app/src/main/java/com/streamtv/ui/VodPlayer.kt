@@ -87,11 +87,11 @@ private val VodWhite = Color.White
 private val VodMuted = Color(0xFFB5B5BA)
 private const val ControlsMillis = 4_500L
 /** The chosen place is played this long after the last left/right press. */
-private const val ScrubSettleMillis = 650L
+private const val ScrubSettleMillis = 500L
 /** While left/right is held, the place moves one step this often. */
-private const val HoldStepMillis = 110L
+private const val HoldStepMillis = 80L
 /** A press within this time of the last one, in the same direction, keeps the run (and its speed). */
-private const val RunGapMillis = 900L
+private const val RunGapMillis = 1_200L
 
 /** Light text over the picture keeps a soft shadow, so it reads on bright scenes too. */
 private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f))
@@ -111,19 +111,19 @@ private class ScrubRun {
 }
 
 /**
- * How far one left/right step moves. The first presses move 10 s; as the presses keep coming (or
- * the key is held) the step grows to 20 s, 1 min, 2 min and 5 min, so a long hold crosses a whole
- * film in a few seconds. A short title never moves more than a twentieth of its length per step.
+ * How far one left/right step moves, by the number of steps in the run: 10 s for the first two,
+ * then 30 s, 1 min, 2 min and 5 min, so a held key crosses a whole film in a second or two.
+ * A short title never moves more than a fifteenth of its length per step.
  */
-internal fun scrubStep(steps: Int, heldMillis: Long, durationMillis: Long): Long {
+internal fun scrubStep(steps: Int, durationMillis: Long): Long {
     val step = when {
-        steps <= 3 && heldMillis < 1_500L -> 10_000L
-        heldMillis < 3_000L -> 20_000L
-        heldMillis < 5_000L -> 60_000L
-        heldMillis < 8_000L -> 120_000L
+        steps <= 2 -> 10_000L
+        steps <= 4 -> 30_000L
+        steps <= 8 -> 60_000L
+        steps <= 16 -> 120_000L
         else -> 300_000L
     }
-    val cap = if (durationMillis > 0) (durationMillis / 20).coerceAtLeast(10_000L) else step
+    val cap = if (durationMillis > 0) (durationMillis / 15).coerceAtLeast(10_000L) else step
     return step.coerceAtMost(cap)
 }
 
@@ -150,7 +150,7 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val savePosition by rememberUpdatedState(onPosition)
     val player = remember(channel.url) {
-        Players.create(context).apply {
+        Players.createVod(context).apply {
             setMediaSource(Players.stream(context, channel.url), startAt.coerceAtLeast(0L))
             prepare()
             playWhenReady = true
@@ -244,7 +244,7 @@ fun VodPlayerScreen(
         if (held && now - run.lastStep < HoldStepMillis) return
         run.lastStep = now
         run.steps++
-        val step = scrubStep(run.steps, now - run.started, knownLength())
+        val step = scrubStep(run.steps, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
         scrubTick++
         show()
@@ -472,7 +472,8 @@ fun VodPlayerScreen(
                         Spacer(Modifier.height(16.dp))
                         TimeBar(
                             position = scrubTarget ?: position, duration = duration, playing = playing,
-                            selected = row == 0, scrubbing = scrubTarget != null
+                            selected = row == 0, scrubbing = scrubTarget != null,
+                            jump = scrubTarget?.let { it - player.currentPosition }
                         )
                     }
                 }
@@ -493,7 +494,7 @@ private fun CompositionLocalProviderLtr(content: @Composable () -> Unit) {
  * with the play/pause mark beside it; the time left sits at the end of the bar.
  */
 @Composable
-private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean) {
+private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean, jump: Long?) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val lift by animateFloatAsState(if (selected || scrubbing) 1f else 0f, spring(stiffness = 500f), label = "bar")
     Column(Modifier.fillMaxWidth()) {
@@ -521,6 +522,13 @@ private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: 
             content = {
                 Text(formatTime(position), color = VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
                 PlayStateIcon(playing)
+                // While choosing a place: how far it is from where the title is now.
+                Text(
+                    jump?.let { (if (it < 0) "−" else "+") + formatTime(kotlin.math.abs(it)) } ?: "",
+                    Modifier.clip(CircleShape).background(if (jump != null) Color(0x40FFFFFF) else Color.Transparent)
+                        .padding(horizontal = if (jump != null) 10.dp else 0.dp, vertical = 2.dp),
+                    color = VodWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                )
                 Text(
                     if (duration > 0) "-" + formatTime((duration - position).coerceAtLeast(0L)) else "--:--",
                     color = VodWhite.copy(alpha = .85f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle
@@ -530,16 +538,19 @@ private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: 
             val loose = constraints.copy(minWidth = 0, minHeight = 0)
             val time = measurables[0].measure(loose)
             val icon = measurables[1].measure(loose)
-            val left = measurables[2].measure(loose)
+            val chip = measurables[2].measure(loose)
+            val left = measurables[3].measure(loose)
             val width = constraints.maxWidth
-            val height = maxOf(time.height, icon.height, left.height)
+            val height = maxOf(time.height, icon.height, chip.height, left.height)
             val gap = 8.dp.roundToPx()
             layout(width, height) {
                 // The time is centred under the playhead, but never runs into the time left.
-                val lastX = (width - left.width - 3 * gap - icon.width - time.width).coerceAtLeast(0)
+                val chipSpace = if (chip.width > 0) chip.width + gap else 0
+                val lastX = (width - left.width - 3 * gap - icon.width - time.width - chipSpace).coerceAtLeast(0)
                 val x = ((width * fraction).toInt() - time.width / 2).coerceIn(0, lastX)
                 time.place(x, (height - time.height) / 2)
                 icon.place(x + time.width + gap, (height - icon.height) / 2)
+                chip.place(x + time.width + 2 * gap + icon.width, (height - chip.height) / 2)
                 left.place(width - left.width, (height - left.height) / 2)
             }
         }

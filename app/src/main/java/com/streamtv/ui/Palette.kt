@@ -18,6 +18,8 @@ class StvPalette(
     val name: String,
     /** The deepest tone: page edges, scrims, dark text on light buttons. */
     val ink: Color,
+    /** Main text and light marks. */
+    val text: Color,
     /** Secondary text. */
     val muted: Color,
     /** Check marks, "Active" labels and other small highlights. */
@@ -52,7 +54,7 @@ object Palettes {
     /** The original look; stays the default. */
     val Default = StvPalette(
         id = "default", name = "Default",
-        ink = Color(0xFF000000), muted = Color(0xFF99999E), accent = Color(0xFFD5DADF), glass = Color(0xFF29292C),
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF99999E), accent = Color(0xFFD5DADF), glass = Color(0xFF29292C),
         focus = listOf(Color(0xFF8290A6), Color(0xFF647187)),
         press = listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)),
         backdrop = listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)),
@@ -64,32 +66,49 @@ object Palettes {
         swatch = listOf(Color(0xFF0B0C0F), Color(0xFF252A33), Color(0xFF647187), Color(0xFF8290A6), Color(0xFFD5DADF))
     )
 
-    /** Deep navy to bright cyan: #03045E #0077B6 #00B4D8 #90E0EF #CAF0F8. */
+    /*
+     * The two card themes share their colours out by role rather than tinting everything:
+     * the darkest card colour, deepened toward a near-neutral black, is the page (most of the
+     * screen); the middle colours are the surfaces and the focus (some of it); the light colours
+     * are only the small highlights, the secondary text and the press (a little of it).
+     */
+
+    /** Card: #03045E #0077B6 #00B4D8 #90E0EF #CAF0F8. */
     val Ocean = StvPalette(
         id = "ocean", name = "Ocean",
-        ink = Color(0xFF01031F), muted = Color(0xFF8FB4CC), accent = Color(0xFF90E0EF), glass = Color(0xFF10265A),
-        focus = listOf(Color(0xFF0A8CCB), Color(0xFF0068A3)),
+        // Page: #03045E fading into a soft black, so the blue is a glow at the top, not a wash.
+        ink = Color(0xFF05060D), text = Color(0xFFF3FBFD), muted = Color(0xFF8FB0BE), accent = Color(0xFF90E0EF),
+        glass = Color(0xFF161C30),
+        // Focus: #0077B6 lifted toward #00B4D8.
+        focus = listOf(Color(0xFF0A9BD0), Color(0xFF0077B6)),
+        // Press: the two light card colours.
         press = listOf(Color(0xFFCAF0F8), Color(0xFF90E0EF)),
-        backdrop = listOf(Color(0xFF0A1F4D), Color(0xFF05123A), Color(0xFF020826)),
-        glassFill = listOf(Color(0xB3132B62), Color(0xB3061436)),
-        tileFocused = listOf(Color(0xFF0B5592), Color(0xFF07346E)),
-        tile = listOf(Color(0xFF0E2553), Color(0xFF081739)),
-        listFocus = listOf(Color(0xFF0A8CCB), Color(0xFF0068A3)),
-        welcomeTop = Color(0xFF0A1A46),
+        backdrop = listOf(Color(0xFF0C1442), Color(0xFF080B1F), Color(0xFF05060D)),
+        glassFill = listOf(Color(0xB3172040), Color(0xB30A0E1E)),
+        // Tiles: neutral slate at rest; the card's navy and blue when focused.
+        tileFocused = listOf(Color(0xFF0077B6), Color(0xFF03045E)),
+        tile = listOf(Color(0xFF1A2036), Color(0xFF10142A)),
+        listFocus = listOf(Color(0xFF0A9BD0), Color(0xFF0077B6)),
+        welcomeTop = Color(0xFF0C1442),
         swatch = listOf(Color(0xFF03045E), Color(0xFF0077B6), Color(0xFF00B4D8), Color(0xFF90E0EF), Color(0xFFCAF0F8))
     )
 
-    /** Cool slate and frost: #1B3043 #4C738D #A6C4CD #D5E6EE #F6F8FA. */
+    /** Card: #1B3043 #4C738D #A6C4CD #D5E6EE #F6F8FA. */
     val Winter = StvPalette(
         id = "winter", name = "Winter",
-        ink = Color(0xFF0A131B), muted = Color(0xFF9DB4C2), accent = Color(0xFFD5E6EE), glass = Color(0xFF233A4E),
-        focus = listOf(Color(0xFF5F88A3), Color(0xFF4C738D)),
+        // Page: Night Teal into a cool charcoal. Text: Snow. Secondary text: Arctic. Marks: Mist Blue.
+        ink = Color(0xFF0B1117), text = Color(0xFFF6F8FA), muted = Color(0xFFA6C4CD), accent = Color(0xFFD5E6EE),
+        glass = Color(0xFF1E2C3A),
+        // Focus: Steel Blue.
+        focus = listOf(Color(0xFF5C849E), Color(0xFF4C738D)),
+        // Press: Snow into Mist Blue.
         press = listOf(Color(0xFFF6F8FA), Color(0xFFD5E6EE)),
-        backdrop = listOf(Color(0xFF1B3043), Color(0xFF13222F), Color(0xFF0A131B)),
-        glassFill = listOf(Color(0xB32A4359), Color(0xB3132230)),
-        tileFocused = listOf(Color(0xFF4C738D), Color(0xFF2E4B62)),
-        tile = listOf(Color(0xFF213A4F), Color(0xFF152738)),
-        listFocus = listOf(Color(0xFF5F88A3), Color(0xFF4C738D)),
+        backdrop = listOf(Color(0xFF1B3043), Color(0xFF121D28), Color(0xFF0B1117)),
+        glassFill = listOf(Color(0xB3243749), Color(0xB3101922)),
+        // Tiles: charcoal at rest; Steel Blue into Night Teal when focused.
+        tileFocused = listOf(Color(0xFF4C738D), Color(0xFF1B3043)),
+        tile = listOf(Color(0xFF202B36), Color(0xFF151D26)),
+        listFocus = listOf(Color(0xFF5C849E), Color(0xFF4C738D)),
         welcomeTop = Color(0xFF1B3043),
         swatch = listOf(Color(0xFF1B3043), Color(0xFF4C738D), Color(0xFFA6C4CD), Color(0xFFD5E6EE), Color(0xFFF6F8FA))
     )

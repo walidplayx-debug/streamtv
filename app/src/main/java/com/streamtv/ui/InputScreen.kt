@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private val EntryInk get() = ActivePalette.current.ink
-private val EntryWhite = Color(0xFFFFFFFF)
+private val EntryWhite get() = ActivePalette.current.text
 private val EntryMuted get() = ActivePalette.current.muted
 private val EntryGlass get() = ActivePalette.current.glass
 
