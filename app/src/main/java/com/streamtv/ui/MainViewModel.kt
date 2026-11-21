@@ -15,6 +15,7 @@ import com.streamtv.data.ChannelKind
 import com.streamtv.data.kind
 import com.streamtv.data.hasFavorite
 import com.streamtv.data.LogoIndex
+import com.streamtv.data.XtreamAccount
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -59,8 +60,6 @@ data class TvState(
     val ready: Boolean = false,
     /** Interface language: "en", "fr" or "ar". */
     val language: String = "en",
-    /** Colour theme key: "default", "ocean" or "winter". */
-    val theme: String = "default",
     /** How the Live TV side list divides channels: "provider", "language", "country" or "genre". */
     val groupMode: String = "provider",
     /** The side list's order chosen by the user, and the entries hidden, per grouping mode. */
@@ -72,6 +71,8 @@ data class TvState(
     val locked: Set<String> = emptySet(),
     /** Names the viewer gave to channels (key -> name). */
     val names: Map<String, String> = emptyMap(),
+    /** Logos picked by the viewer (by channel key). */
+    val logos: Map<String, String> = emptyMap(),
     val pinSet: Boolean = false,
     val pin: PinPrompt? = null,
     val pinError: Boolean = false,
@@ -85,6 +86,13 @@ data class TvState(
     val logoVersion: Int = 0
 )
 
+/** A channel with the viewer's own name and logo, where they chose one. */
+private fun personal(channel: Channel, names: Map<String, String>, picked: Map<String, String>): Channel {
+    val name = names[channel.key]
+    val logo = picked[channel.key]
+    return if (name == null && logo == null) channel else channel.copy(name = name ?: channel.name, logo = logo ?: channel.logo)
+}
+
 /**
  * Applies the viewer's hidden channels and custom names to a list, and fills in logos from the
  * public index for channels the playlist gives none, remembering the last result.
@@ -93,15 +101,16 @@ private class ChannelView {
     private var list: List<Channel>? = null
     private var hidden: Set<String>? = null
     private var names: Map<String, String>? = null
+    private var picked: Map<String, String>? = null
     private var logos: Int = -1
     private var result: List<Channel> = emptyList()
-    fun of(source: List<Channel>, hidden: Set<String>, names: Map<String, String>, logos: Int): List<Channel> {
-        if (source === this.list && hidden === this.hidden && names === this.names && logos == this.logos) return result
-        this.list = source; this.hidden = hidden; this.names = names; this.logos = logos
+    fun of(source: List<Channel>, hidden: Set<String>, names: Map<String, String>, picked: Map<String, String>, logos: Int): List<Channel> {
+        if (source === this.list && hidden === this.hidden && names === this.names && picked === this.picked && logos == this.logos) return result
+        this.list = source; this.hidden = hidden; this.names = names; this.picked = picked; this.logos = logos
         val list = LogoIndex.fill(source)
-        result = if (hidden.isEmpty() && names.isEmpty()) list else list.mapNotNull { channel ->
+        result = if (hidden.isEmpty() && names.isEmpty() && picked.isEmpty()) list else list.mapNotNull { channel ->
             val key = channel.key
-            if (key in hidden) null else names[key]?.let { channel.copy(name = it) } ?: channel
+            if (key in hidden) null else personal(channel, names, picked)
         }
         return result
     }
@@ -143,10 +152,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** What the screens see: the raw state with hidden channels removed and custom names applied. */
     val state: StateFlow<TvState> = _state.map { raw ->
         raw.copy(
-            channels = channelsView.of(raw.channels, raw.hidden, raw.names, raw.logoVersion),
-            queue = queueView.of(raw.queue, raw.hidden, raw.names, raw.logoVersion),
-            selected = raw.selected?.let { LogoIndex.fill(listOf(it)).first() }
-                ?.let { channel -> raw.names[channel.key]?.let { channel.copy(name = it) } ?: channel }
+            channels = channelsView.of(raw.channels, raw.hidden, raw.names, raw.logos, raw.logoVersion),
+            queue = queueView.of(raw.queue, raw.hidden, raw.names, raw.logos, raw.logoVersion),
+            selected = raw.selected?.let { LogoIndex.fill(listOf(it)).first() }?.let { personal(it, raw.names, raw.logos) }
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TvState())
     init {
@@ -157,6 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.hiddenKeys.collect { keys -> _state.value = _state.value.copy(hidden = keys) } }
         viewModelScope.launch { preferences.lockedKeys.collect { keys -> _state.value = _state.value.copy(locked = keys) } }
         viewModelScope.launch { preferences.channelNames.collect { names -> _state.value = _state.value.copy(names = names) } }
+        viewModelScope.launch { preferences.channelLogos.collect { logos -> _state.value = _state.value.copy(logos = logos) } }
         viewModelScope.launch { preferences.pin.collect { value -> pinCode = value; _state.value = _state.value.copy(pinSet = value.isNotBlank()) } }
     }
     init {
@@ -233,12 +242,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.language.collect { code -> _state.value = _state.value.copy(language = code) }
         }
         viewModelScope.launch {
-            preferences.theme.collect { id ->
-                ActivePalette.current = Palettes.of(id)
-                _state.value = _state.value.copy(theme = id)
-            }
-        }
-        viewModelScope.launch {
             preferences.groupMode.collect { mode -> _state.value = _state.value.copy(groupMode = mode) }
         }
         viewModelScope.launch {
@@ -272,10 +275,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(language = code)
         viewModelScope.launch { preferences.saveLanguage(code) }
     }
-    fun setTheme(id: String) {
-        ActivePalette.current = Palettes.of(id)
-        _state.value = _state.value.copy(theme = id)
-        viewModelScope.launch { preferences.saveTheme(id) }
+    /** A logo picked by the viewer for [channel]; null puts the playlist's own logo back. */
+    fun setChannelLogo(channel: Channel, url: String?) {
+        val logos = if (url.isNullOrBlank()) _state.value.logos - channel.key else _state.value.logos + (channel.key to url.trim())
+        _state.value = _state.value.copy(logos = logos)
+        viewModelScope.launch { preferences.saveChannelLogos(logos) }
     }
     private fun rememberWatched(channel: Channel) {
         if (channel.kind() != ChannelKind.Live) {
@@ -616,11 +620,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(loading = true, error = null)
             // An imported file is read again from the app's copy (it is the active playlist after a restart too).
             runCatching { readChannels(url) }.onSuccess { channels ->
-                _state.value = _state.value.copy(channels = channels, loading = false, selected = channels.firstOrNull())
+                // A reload while something plays leaves it playing.
+                val keep = _state.value.playing
+                _state.value = _state.value.copy(channels = channels, loading = false, selected = if (keep) _state.value.selected else channels.firstOrNull())
                 moveOldFavorites(channels)
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
                 dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                // An Xtream account carries its own TV guide: used when no guide was set, as the big apps do.
+                val account = XtreamAccount.from(url)
+                if (account != null && _state.value.epgUrl.isBlank()) {
+                    _state.value = _state.value.copy(epgUrl = account.guideUrl)
+                    loadEpg(silent = true)
+                }
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")

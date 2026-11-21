@@ -360,3 +360,111 @@ private fun EntryButton(
         )
     }
 }
+
+/**
+ * "Search logo" from the channel card: the channel's name in a field (changed with the TV keyboard),
+ * then up to ten logos found for it, in two rows. OK on one makes it the channel's logo.
+ */
+@Composable
+fun LogoSearchScreen(
+    name: String,
+    /** The viewer picked a logo before: "Original logo" puts the playlist's own back. */
+    hasPicked: Boolean,
+    onPick: (String) -> Unit,
+    onRestore: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var value by remember { mutableStateOf(name) }
+    var results by remember { mutableStateOf<List<String>>(emptyList()) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var round by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val field = remember { FocusRequester() }
+    val searchButton = remember { FocusRequester() }
+    val firstResult = remember { FocusRequester() }
+    BackHandler { keyboard?.hide(); onCancel() }
+    LaunchedEffect(Unit) {
+        repeat(20) {
+            if (runCatching { field.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    LaunchedEffect(round) {
+        if (round == 0) return@LaunchedEffect
+        status = "Searching…"
+        results = emptyList()
+        val found = com.streamtv.data.LogoSearch.search(value)
+        results = found
+        status = if (found.isEmpty()) "No logos found" else null
+        // The first logo takes focus, so the remote is right on the choices.
+        if (found.isNotEmpty()) repeat(20) {
+            if (runCatching { firstResult.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        } else runCatching { searchButton.requestFocus() }
+    }
+    fun search() {
+        keyboard?.hide()
+        if (value.isNotBlank()) round++
+    }
+    Box(Modifier.fillMaxSize().background(EntryInk), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // The same soft card as the other entry screens, in the top part of the screen.
+            Column(
+                Modifier.width(560.dp).clip(RoundedCornerShape(28.dp))
+                    .background(EntryWhite.copy(alpha = .05f))
+                    .border(1.dp, EntryWhite.copy(alpha = .06f), RoundedCornerShape(28.dp))
+                    .padding(horizontal = 24.dp, vertical = 22.dp)
+            ) {
+                Text(t("Search logo"), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Spacer(Modifier.height(12.dp))
+                EntryField(
+                    value = value, hint = "Channel name",
+                    onValueChange = { value = it },
+                    modifier = Modifier.fillMaxWidth().focusRequester(field),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { search() }, onDone = { search() })
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    EntryButton("Search", primary = true, modifier = Modifier.focusRequester(searchButton)) { search() }
+                    if (hasPicked) EntryButton("Original logo") { keyboard?.hide(); onRestore() }
+                    EntryButton("Cancel") { keyboard?.hide(); onCancel() }
+                    status?.let { Text(t(it), color = EntryMuted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+            Spacer(Modifier.height(26.dp))
+            results.chunked(5).forEachIndexed { rowIndex, row ->
+                if (rowIndex > 0) Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    row.forEachIndexed { index, url ->
+                        LogoChoice(
+                            url,
+                            if (rowIndex == 0 && index == 0) Modifier.focusRequester(firstResult) else Modifier
+                        ) { onPick(url) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One logo to pick: on a mid-grey plate, so dark and light logos both show. */
+@Composable
+private fun LogoChoice(url: String, modifier: Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.08f else 1f, spring(stiffness = 430f), label = "logoChoice")
+    Box(
+        modifier.width(150.dp).height(96.dp).scale(scale).clip(RoundedCornerShape(14.dp))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF4A505C), Color(0xFF2F343D))))
+            .border(if (focused) 2.dp else 1.dp, EntryWhite.copy(alpha = if (focused) .9f else .10f), RoundedCornerShape(14.dp))
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        coil.compose.AsyncImage(
+            model = url, contentDescription = null, modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+        )
+    }
+}

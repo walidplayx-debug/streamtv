@@ -63,6 +63,27 @@ object LogoIndex {
         return byName[name]?.let { byId[it] }
     }
 
+    /**
+     * Logos of channels whose name matches [query], best first: the same name, then names that start
+     * with it, then names that contain it. Empty when the index is not loaded.
+     */
+    fun search(query: String, limit: Int): List<String> {
+        val q = normalize(query)
+        if (q.length < 2) return emptyList()
+        val scored = ArrayList<Pair<Int, String>>()
+        for ((name, id) in byName) {
+            val score = when {
+                name == q -> 0
+                name.startsWith(q) -> 1
+                name.length >= 3 && q.startsWith(name) -> 2
+                name.contains(q) -> 3
+                else -> continue
+            }
+            byId[id]?.let { scored += score to it }
+        }
+        return scored.sortedBy { it.first }.map { it.second }.distinct().take(limit)
+    }
+
     private val bracketed = Regex("""[(\[].*?[)\]]""")
     private val quality = Regex("""\b(hd|fhd|uhd|sd|4k|8k|hevc|h265|h264|backup|\d{3,4}p)\b""")
 

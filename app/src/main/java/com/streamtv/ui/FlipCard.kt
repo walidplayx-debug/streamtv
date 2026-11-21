@@ -498,8 +498,8 @@ private fun ChannelOptionsFront(
     row("Hide channel", "hide", "hide")
     row(if (locked) "Unlock channel" else "Lock channel", "lock", "lock")
     row("Rename", "edit", "rename")
-    // Type a channel's number to jump straight to it.
-    row("Go to number", "number", "goto")
+    // Find another logo for the channel and pick one.
+    row("Search logo", "logo", "logo")
 }
 
 @Composable
@@ -584,6 +584,14 @@ private fun OptionIcon(kind: String, tint: Color, modifier: Modifier = Modifier)
                 drawLine(tint, Offset(w * .7f, h * .1f), Offset(w * .62f, h * .9f), strokeWidth = s, cap = StrokeCap.Round)
                 drawLine(tint, Offset(w * .14f, h * .36f), Offset(w * .9f, h * .36f), strokeWidth = s, cap = StrokeCap.Round)
                 drawLine(tint, Offset(w * .1f, h * .64f), Offset(w * .86f, h * .64f), strokeWidth = s, cap = StrokeCap.Round)
+            }
+            "logo" -> {
+                // A picture: a frame with a hill and a sun.
+                drawRoundRect(tint, Offset(w * .08f, h * .16f), androidx.compose.ui.geometry.Size(w * .84f, h * .68f),
+                    androidx.compose.ui.geometry.CornerRadius(w * .12f), style = line)
+                val hill = Path().apply { moveTo(w * .16f, h * .76f); lineTo(w * .42f, h * .46f); lineTo(w * .6f, h * .64f); lineTo(w * .7f, h * .54f); lineTo(w * .84f, h * .76f) }
+                drawPath(hill, tint, style = line)
+                drawCircle(tint, radius = w * .07f, center = Offset(w * .68f, h * .36f))
             }
             "move" -> {
                 // Up and down arrows.

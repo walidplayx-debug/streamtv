@@ -193,8 +193,9 @@ fun VodPlayerScreen(
     var audios by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
     val appLanguage = LocalAppLanguage.current
     LaunchedEffect(player, appLanguage) {
+        Players.preferSound(player, appLanguage)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setPreferredTextLanguage(appLanguage).setPreferredAudioLanguage(appLanguage).build()
+            .setPreferredTextLanguage(appLanguage).build()
     }
     // Beside the title: the sound button only when there is a choice, the subtitles button only when
     // the title has some, and the favourite star last.

@@ -128,6 +128,9 @@ fun PlayerScreen(
     // (below). A new player per channel, with the old one shut down on the main thread, held the
     // screen for a moment on every change: the bar's name trembled and zapping felt laggy.
     val player = remember { Players.create(context) }
+    // The sound in the app's language when a channel offers several (Arabic and English commentary, say).
+    val soundLanguage = LocalAppLanguage.current
+    LaunchedEffect(player, soundLanguage) { Players.preferSound(player, soundLanguage) }
     var buffering by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var audioWarning by remember { mutableStateOf(false) }

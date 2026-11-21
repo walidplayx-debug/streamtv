@@ -61,6 +61,21 @@ object Players {
             .build()
     }
 
+    /**
+     * The sound picked by itself, as the big apps do: the app's language first, then the TV's own,
+     * and the main sound before a commentary or an audio description. Among those, the player
+     * already takes the one with the most channels it can play (5.1 before stereo), decoded by the
+     * device or, for Dolby and DTS it cannot play, by FFmpeg.
+     */
+    fun preferSound(player: ExoPlayer, appLanguage: String) {
+        val device = java.util.Locale.getDefault().language
+        val languages = listOf(appLanguage, device).filter { it.isNotBlank() }.distinct()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setPreferredAudioLanguages(*languages.toTypedArray())
+            .setPreferredAudioRoleFlags(C.ROLE_FLAG_MAIN)
+            .build()
+    }
+
     /** A player for movies and episodes: a seek lands on the nearest keyframe, which over the
      *  network is far quicker than decoding up to the exact frame. */
     fun createVod(context: Context): ExoPlayer = create(context).apply { setSeekParameters(SeekParameters.CLOSEST_SYNC) }

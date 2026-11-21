@@ -31,7 +31,7 @@ fun translate(language: String, text: String): String = when (language) {
     "pt" -> Portuguese[text]
     "nl" -> Dutch[text]
     else -> null
-} ?: ThemeTexts[language]?.get(text) ?: text
+} ?: ExtraTexts[language]?.get(text) ?: text
 
 private val French = mapOf(
     // tabs and headings

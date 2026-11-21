@@ -27,7 +27,7 @@ class PlaylistPreferences(private val context: Context) {
     private val namesKey = stringPreferencesKey("channel_names")
     private val recentVodKey = stringPreferencesKey("recent_vod_keys")
     private val positionsKey = stringPreferencesKey("vod_positions")
-    private val themeKey = stringPreferencesKey("color_theme")
+    private val logosKey = stringPreferencesKey("channel_logos")
     val playlistUrl: Flow<String> = context.dataStore.data.map { it[playlistKey].orEmpty() }
     val epgUrl: Flow<String> = context.dataStore.data.map { it[epgKey].orEmpty() }
     val favoriteIds: Flow<Set<String>> = context.dataStore.data.map { it[favoritesKey] ?: emptySet() }
@@ -45,9 +45,6 @@ class PlaylistPreferences(private val context: Context) {
     private fun systemLanguage(): String =
         java.util.Locale.getDefault().language.takeIf { it in setOf("en", "fr", "ar", "es", "ru", "zh", "tr", "de", "pt", "nl") } ?: "en"
     suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
-    /** The colour theme's key ("default", "ocean", "winter"). */
-    val theme: Flow<String> = context.dataStore.data.map { it[themeKey] ?: "default" }
-    suspend fun saveTheme(id: String) { context.dataStore.edit { it[themeKey] = id } }
     val groupMode: Flow<String> = context.dataStore.data.map { it[groupModeKey] ?: "provider" }
     suspend fun saveGroupMode(mode: String) { context.dataStore.edit { it[groupModeKey] = mode } }
     // The side list's own order and hidden entries, one line per grouping mode: "mode<TAB>a<US>b<US>c".
@@ -74,6 +71,16 @@ class PlaylistPreferences(private val context: Context) {
     }
     suspend fun saveChannelNames(names: Map<String, String>) {
         context.dataStore.edit { it[namesKey] = names.entries.joinToString("\n") { (key, name) -> key + "\t" + name } }
+    }
+    /** Logos chosen by the viewer, one "key<TAB>address" per line. */
+    val channelLogos: Flow<Map<String, String>> = context.dataStore.data.map { prefs ->
+        prefs[logosKey].orEmpty().split("\n").mapNotNull { line ->
+            val cut = line.lastIndexOf('\t')
+            if (cut <= 0) null else line.substring(0, cut) to line.substring(cut + 1)
+        }.toMap()
+    }.distinctUntilChanged()
+    suspend fun saveChannelLogos(logos: Map<String, String>) {
+        context.dataStore.edit { it[logosKey] = logos.entries.joinToString("\n") { (key, url) -> key + "\t" + url } }
     }
     suspend fun saveLastChannel(id: String) { context.dataStore.edit { it[lastChannelKey] = id } }
     /** Movies and episodes watched, newest first; kept apart from the channels' history. */

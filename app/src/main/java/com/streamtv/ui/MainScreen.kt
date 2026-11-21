@@ -163,6 +163,17 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // back of the card instead; with a PIN, the card asks for the PIN and nothing else.
     var question by remember { mutableStateOf<CardQuestion?>(null) }
     var renaming by remember { mutableStateOf<Channel?>(null) }
+    // "Search logo" from the channel card: a screen of its own, like renaming.
+    var logoFor by remember { mutableStateOf<Channel?>(null) }
+    logoFor?.let { target ->
+        LogoSearchScreen(
+            name = target.name, hasPicked = target.key in state.logos,
+            onPick = { url -> model.setChannelLogo(target, url); logoFor = null },
+            onRestore = { model.setChannelLogo(target, null); logoFor = null },
+            onCancel = { logoFor = null }
+        )
+        return
+    }
     renaming?.let { target ->
         SingleFieldScreen(
             title = "Rename channel", hint = "Channel name", initial = target.name, pin = false, error = null, saveLabel = "Save",
@@ -183,6 +194,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         // it open too, so the star can be seen filling in. Everything else closes it.
         if (option != "lock" && option != "hide" && option != "favorite" && option != "goto") optionsFor = null
         when (option) {
+            "logo" -> logoFor = target
             "goto" -> { numberError = null; numberAsk = "" }
             "favorite" -> model.toggleFavorite(target)
             "history" -> model.removeFromHistory(target)
@@ -1487,7 +1499,7 @@ private fun SettingsContent(
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
         // coming back into the list (from the page or the tabs) lands on the open section, so
         // passing over the list never opens another one by accident.
-        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Theme", "Parental control", "About")
+        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
         // The list scrolls instead of squeezing: on a short screen the last row ("About") was
@@ -1610,12 +1622,6 @@ private fun SettingsContent(
                         }
                     }
                 }
-                // Colours only: every screen keeps its layout.
-                "Theme" -> {
-                    for (palette in Palettes.all) {
-                        ThemeBox(palette, state.theme == palette.id) { model.setTheme(palette.id) }
-                    }
-                }
                 // Compact rows, each one reachable with the remote; the action sits on its own row.
                 "Parental control" -> {
                     SettingItem("PIN", if (state.pinSet) "Set" else "Not set", if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
@@ -1663,31 +1669,6 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
         ) {
             Text(t("Remove"), color = if (removeFocused) White else Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
-    }
-}
-
-/** One colour theme: its name, its colours as dots, and a check mark when chosen. */
-@Composable
-private fun ThemeBox(palette: StvPalette, chosen: Boolean, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val (pressed, press) = rememberPress(onClick)
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp).height(60.dp).clip(RoundedCornerShape(14.dp))
-            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = if (chosen) .12f else .05f)))
-            .border(1.dp, White.copy(alpha = if (focused) .4f else if (chosen) .2f else .07f), RoundedCornerShape(14.dp))
-            .onFocusChanged { focused = it.isFocused }.clickable(onClick = press)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(t(palette.name), Modifier.weight(1f), color = if (focused || chosen) White else White.copy(alpha = .7f), fontSize = 17.sp,
-            fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            for (color in palette.swatch) {
-                Box(Modifier.size(20.dp).clip(CircleShape).background(color).border(1.dp, White.copy(alpha = .25f), CircleShape))
-            }
-        }
-        Spacer(Modifier.width(14.dp))
-        Text(if (chosen) "✓" else " ", Modifier.width(18.dp), color = if (focused) White else Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 
