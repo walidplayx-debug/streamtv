@@ -21,7 +21,15 @@ object M3uParser {
      */
     fun parse(reader: java.io.Reader): List<Channel> = reader.buffered().useLines { parse(it) }
 
+    /**
+     * The TV guide the last playlist read names in its first line ("#EXTM3U url-tvg=…" or
+     * "x-tvg-url=…"; the first address when it lists several), or null.
+     */
+    @Volatile var lastGuideUrl: String? = null
+        private set
+
     private fun parse(source: Sequence<String>): List<Channel> {
+        lastGuideUrl = null
         // A byte-order mark may start the first line; it is not whitespace, so trim() keeps it.
         val lines = source.map { it.removePrefix("\uFEFF").trim().removeSuffix("\r") }.iterator()
         val result = mutableListOf<Channel>()
@@ -33,6 +41,13 @@ object M3uParser {
         while (lines.hasNext()) {
             val line = lines.next()
             when {
+                line.startsWith("#EXTM3U", true) -> {
+                    val header = attribute.findAll(line).associate { m ->
+                        m.groupValues[1].lowercase() to (m.groupValues[2].ifEmpty { m.groupValues[3].ifEmpty { m.groupValues[4] } })
+                    }
+                    lastGuideUrl = (header["url-tvg"] ?: header["x-tvg-url"])
+                        ?.split(',')?.map { it.trim() }?.firstOrNull { it.startsWith("http") }
+                }
                 line.startsWith("#EXTINF", true) -> { info = line; options.clear() }
                 line.startsWith("#EXTVLCOPT", true) -> {
                     val option = line.substringAfter(':')

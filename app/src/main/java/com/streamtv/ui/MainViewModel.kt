@@ -627,10 +627,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
                 preferences.savePlaylist(url)
                 dao.replaceAll(channels.map { ChannelEntity.from(it) })
-                // An Xtream account carries its own TV guide: used when no guide was set, as the big apps do.
-                val account = XtreamAccount.from(url)
-                if (account != null && _state.value.epgUrl.isBlank()) {
-                    _state.value = _state.value.copy(epgUrl = account.guideUrl)
+                // A guide that comes with the playlist (an Xtream account's own, or the one an M3U names
+                // in its first line) is used when no guide was set, as the big apps do.
+                val guide = XtreamAccount.from(url)?.guideUrl ?: M3uParser.lastGuideUrl
+                if (guide != null && _state.value.epgUrl.isBlank()) {
+                    _state.value = _state.value.copy(epgUrl = guide)
                     loadEpg(silent = true)
                 }
             }.onFailure { e ->

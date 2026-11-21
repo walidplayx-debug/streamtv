@@ -141,6 +141,8 @@ fun PlayerScreen(
     val retryFocusRequester = remember { FocusRequester() }
     val currentChannelIndex = channels.indexOfFirst { it.key == channel.key }.coerceAtLeast(0)
     val current = playerProgram(channel, programs)
+    // The programme after the current one, for the guide flap under the info bar.
+    val upcoming = remember(channel.key, programs, current) { current?.let { nextProgram(it, programs) } }
 
     // The lists the side panel can page through with left/right: only the list the channel was
     // opened from, Favorites and Last watched. Fewer pages, no going round in circles.
@@ -520,14 +522,15 @@ fun PlayerScreen(
         // The info bar never coexists with the channel list and never changes size.
         if (overlayState != OverlayState.ChannelList) AnimatedVisibility(
             visible = overlayState == OverlayState.InfoBar,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).fillMaxWidth(.65f).height(80.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (current != null) 18.dp else 32.dp).fillMaxWidth(.65f),
             enter = fadeIn(animationSpec = tween(260)) +
                 slideInVertically(animationSpec = spring(dampingRatio = .82f, stiffness = 360f)) { it / 2 },
             exit = fadeOut(animationSpec = tween(220)) +
                 slideOutVertically(animationSpec = tween(220)) { it / 3 }
         ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(
-                Modifier.fillMaxSize()
+                Modifier.fillMaxWidth().height(80.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
                     .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
@@ -552,7 +555,8 @@ fun PlayerScreen(
                     Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOf(current?.title ?: channel.group, channelQuality(channel.name))
+                        // The programme itself is in the flap below; here, the channel's group and quality.
+                        listOf(channel.group, channelQuality(channel.name))
                             .filter { it.isNotBlank() }.joinToString("  ·  "),
                         color = PlayerMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
@@ -568,6 +572,36 @@ fun PlayerScreen(
                 }
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
+            }
+            // The guide flap: hinged on the bar's lower edge, it turns down from behind the bar (a
+            // flip on the horizontal axis), with what is on now in bright letters and what comes
+            // next under it, dimmer.
+            if (current != null) {
+                val flip = remember(channel.key) { Animatable(-90f) }
+                LaunchedEffect(channel.key) {
+                    flip.snapTo(-90f)
+                    delay(240)
+                    flip.animateTo(0f, spring(dampingRatio = .62f, stiffness = 240f))
+                }
+                val density = androidx.compose.ui.platform.LocalDensity.current.density
+                Column(
+                    Modifier.fillMaxWidth(.94f)
+                        .graphicsLayer {
+                            rotationX = flip.value
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+                            cameraDistance = 14f * density
+                            alpha = if (flip.value < -85f) 0f else 1f
+                        }
+                        .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                        .background(Color(0xEE15161A))
+                        .border(1.dp, PlayerWhite.copy(alpha = .10f), RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                        .padding(horizontal = 20.dp, vertical = 9.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    GuideLine(t("Now"), current.title, guideTimes(current), bright = true)
+                    upcoming?.let { GuideLine(t("Next"), it.title, guideClock(it.startEpochMillis), bright = false) }
+                }
+            }
             }
         }
 
@@ -846,6 +880,34 @@ private fun audioWarningText(language: String): String = when (language) {
     "nl" -> "Geen geluid van de bron"
     else -> "No audio from source"
 }
+
+/** One line of the guide flap: "Now" or "Next", the programme's name and its time. */
+@Composable
+private fun GuideLine(label: String, title: String, time: String, bright: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.width(54.dp), color = if (bright) PlayerAccent else PlayerMuted.copy(alpha = .8f),
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(title, Modifier.weight(1f), color = PlayerWhite.copy(alpha = if (bright) 1f else .55f),
+            fontSize = if (bright) 15.sp else 14.sp, fontWeight = if (bright) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(12.dp))
+        Text(time, color = PlayerMuted.copy(alpha = if (bright) 1f else .7f), fontSize = 13.sp, maxLines = 1,
+            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"))
+    }
+}
+
+/** 24-hour clock with Western digits, like the clock on the main screen. */
+private fun guideClock(millis: Long): String =
+    java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(millis))
+
+private fun guideTimes(program: EpgProgram): String =
+    guideClock(program.startEpochMillis) + " – " + guideClock(program.endEpochMillis)
+
+/** The first programme on the same channel that starts once [current] ends. */
+private fun nextProgram(current: EpgProgram, programs: List<EpgProgram>): EpgProgram? =
+    programs.asSequence()
+        .filter { it.channelId == current.channelId && it.startEpochMillis >= current.endEpochMillis - 60_000L && it !== current }
+        .minByOrNull { it.startEpochMillis }
 
 private fun playerProgram(channel: Channel, programs: List<EpgProgram>): EpgProgram? {
     val now = System.currentTimeMillis()
