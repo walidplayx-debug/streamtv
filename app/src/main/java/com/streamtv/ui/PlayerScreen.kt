@@ -754,7 +754,7 @@ private fun ChannelListPage(items: List<Channel>, playing: Channel, takeFocus: B
                     .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
                     // A calm blue-grey for the focused row (as elsewhere in the app), not a bright white one.
                     .background(
-                        if (focused) Brush.verticalGradient(listOf(Color(0xFF7C889D), Color(0xFF5F6B80)))
+                        if (focused) Brush.verticalGradient(ActivePalette.current.listFocus)
                         else SolidColor(Color.White.copy(alpha = .10f * playingMark))
                     )
                     .onFocusChanged { state ->

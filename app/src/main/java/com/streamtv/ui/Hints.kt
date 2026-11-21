@@ -107,7 +107,7 @@ fun HintOverlay() {
                 Text(t(text), color = Color.White.copy(alpha = .92f), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(14.dp))
                 Text(
-                    "OK", Modifier.clip(CircleShape).background(Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187))))
+                    "OK", Modifier.clip(CircleShape).background(ActivePalette.current.focusBrush)
                         .padding(horizontal = 14.dp, vertical = 5.dp),
                     color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
                 )

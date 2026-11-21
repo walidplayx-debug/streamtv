@@ -59,6 +59,8 @@ data class TvState(
     val ready: Boolean = false,
     /** Interface language: "en", "fr" or "ar". */
     val language: String = "en",
+    /** Colour theme key: "default", "ocean" or "winter". */
+    val theme: String = "default",
     /** How the Live TV side list divides channels: "provider", "language", "country" or "genre". */
     val groupMode: String = "provider",
     /** The side list's order chosen by the user, and the entries hidden, per grouping mode. */
@@ -230,6 +232,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.language.collect { code -> _state.value = _state.value.copy(language = code) }
         }
         viewModelScope.launch {
+            preferences.theme.collect { id ->
+                ActivePalette.current = Palettes.of(id)
+                _state.value = _state.value.copy(theme = id)
+            }
+        }
+        viewModelScope.launch {
             preferences.groupMode.collect { mode -> _state.value = _state.value.copy(groupMode = mode) }
         }
         viewModelScope.launch {
@@ -262,6 +270,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setLanguage(code: String) {
         _state.value = _state.value.copy(language = code)
         viewModelScope.launch { preferences.saveLanguage(code) }
+    }
+    fun setTheme(id: String) {
+        ActivePalette.current = Palettes.of(id)
+        _state.value = _state.value.copy(theme = id)
+        viewModelScope.launch { preferences.saveTheme(id) }
     }
     private fun rememberWatched(channel: Channel) {
         if (channel.kind() != ChannelKind.Live) {

@@ -78,7 +78,7 @@ fun AppUpdateSection() {
             )
         }
         if (status.isNotBlank()) {
-            Text(status, color = Color(0xFFD5DADF), fontSize = 16.sp)
+            Text(status, color = ActivePalette.current.accent, fontSize = 16.sp)
         }
         Spacer(Modifier.height(4.dp))
         val buttonLabel = when {
@@ -89,7 +89,7 @@ fun AppUpdateSection() {
         androidx.compose.foundation.layout.Box(
             Modifier.clip(RoundedCornerShape(50))
                 .background(
-                    if (focused) Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
+                    if (focused) ActivePalette.current.focusBrush
                     else SolidColor(Color.White.copy(alpha = .82f))
                 )
                 .onFocusChanged { focused = it.isFocused }
