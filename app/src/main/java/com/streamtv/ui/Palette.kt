@@ -95,30 +95,31 @@ object Palettes {
     /**
      * Apple's own look for a TV: true black pages with the dark system greys stepping up for each
      * layer (1C1C1E, 2C2C2E, 3A3A3C), white labels with grey secondary text, and one colour only,
-     * the system blue, for what has focus and what is chosen. Pop-ups use the light platter with
+     * the system green, for what has focus and what is chosen (a deeper green under white text,
+     * at least 3.8:1). Pop-ups use the light platter with
      * dark text, as on Apple TV. Everything else stays neutral, so the pictures bring the colour.
      */
     val Cupertino = StvPalette(
         id = "cupertino", name = "Cupertino",
-        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF98989D), accent = Color(0xFF0A84FF), glass = Color(0xFF1C1C1E),
-        focus = listOf(Color(0xFF0A84FF), Color(0xFF0071E3)),
-        press = listOf(Color(0xFF64B5FF), Color(0xFF409CFF)),
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF98989D), accent = Color(0xFF30D158), glass = Color(0xFF1C1C1E),
+        focus = listOf(Color(0xFF2A9645), Color(0xFF248A3D)),
+        press = listOf(Color(0xFF5FE07F), Color(0xFF30D158)),
         backdrop = listOf(Color(0xFF1C1C1E), Color(0xFF0B0B0C), Color(0xFF000000)),
         glassFill = listOf(Color(0xB32C2C2E), Color(0xB31C1C1E)),
         tileFocused = listOf(Color(0xFF48484A), Color(0xFF3A3A3C)),
         tile = listOf(Color(0xFF2C2C2E), Color(0xFF1C1C1E)),
-        listFocus = listOf(Color(0xFF0A84FF), Color(0xFF0071E3)),
+        listFocus = listOf(Color(0xFF2A9645), Color(0xFF248A3D)),
         welcomeTop = Color(0xFF1C1C1E),
-        swatch = listOf(Color(0xFF000000), Color(0xFF1C1C1E), Color(0xFF3A3A3C), Color(0xFF0A84FF), Color(0xFFF2F2F7)),
+        swatch = listOf(Color(0xFF000000), Color(0xFF1C1C1E), Color(0xFF3A3A3C), Color(0xFF30D158), Color(0xFFF2F2F7)),
         panel = Color(0xF01C1C1E),
         faces = listOf(
             listOf(Color(0xFF3A3A3C), Color(0xFF2C2C2E), Color(0xFF1C1C1E)),
-            listOf(Color(0xFF2A3A55), Color(0xFF1D2A40), Color(0xFF121B2B)),
+            listOf(Color(0xFF24402C), Color(0xFF1A2E20), Color(0xFF111D15)),
             listOf(Color(0xFF48484A), Color(0xFF353537), Color(0xFF232325)),
             listOf(Color(0xFF33325A), Color(0xFF242342), Color(0xFF17162B))
         ),
         lit = Color(0xF2F2F2F7), onLit = Color(0xFF1C1C1E),
-        number = Color(0xFF0A84FF),
+        number = Color(0xFF30D158),
         overlayMuted = Color(0xFFAEAEB2),
         seek = Color(0xFFFFFFFF),
         lightTile = listOf(Color(0xFFE5E5EA), Color(0xFFC7C7CC)),
