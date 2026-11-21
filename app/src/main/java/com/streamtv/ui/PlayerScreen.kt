@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val PlayerWhite = Color.White
-private val PlayerMuted = Color(0xFFB5B5BA)
+private val PlayerMuted get() = ActivePalette.current.overlayMuted
 private val PlayerGlass get() = ActivePalette.current.panel
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
@@ -89,7 +89,7 @@ private const val ListIdleMillis = 8000L
 private const val StallMillis = 15000L
 /** Pauses before each automatic reconnect, then the error card. */
 private val RetryPauses = longArrayOf(300, 1_000, 2_000, 3_000, 5_000, 8_000)
-private val PlayerAccent = Color(0xFFD5DADF)
+private val PlayerAccent get() = ActivePalette.current.accent
 
 private enum class OverlayState { None, InfoBar, ChannelList }
 
@@ -559,7 +559,7 @@ fun PlayerScreen(
                 ) {
                     Text("Ch", color = PlayerMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     // The number in the red of the logo's S: a touch of colour in the bar.
-                    Text((currentChannelIndex + 1).toString(), color = Color(0xFFE8452F), fontSize = 30.sp,
+                    Text((currentChannelIndex + 1).toString(), color = ActivePalette.current.number, fontSize = 30.sp,
                         lineHeight = 32.sp, fontWeight = FontWeight.Bold, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"), maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.width(14.dp))
@@ -726,7 +726,7 @@ private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String
                     .fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(16.dp))
                     .background(
                         when {
-                            focused -> Color(0xF2F2F2F7)
+                            focused -> ActivePalette.current.lit
                             isCurrent -> Color(0x1FFFFFFF)
                             else -> Color.Transparent
                         }
@@ -736,11 +736,11 @@ private fun ListPicker(lists: List<Pair<String, List<Channel>>>, current: String
                     .padding(horizontal = 14.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(t(name), Modifier.weight(1f), color = if (focused) Color(0xFF1C1C1E) else PlayerWhite, fontSize = 17.sp,
+                Text(t(name), Modifier.weight(1f), color = if (focused) ActivePalette.current.onLit else PlayerWhite, fontSize = 17.sp,
                     fontWeight = if (isCurrent || focused) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.width(10.dp))
-                Text(channels.size.toString(), color = if (focused) Color(0x991C1C1E) else Color(0x99FFFFFF), fontSize = 14.sp, maxLines = 1)
+                Text(channels.size.toString(), color = if (focused) ActivePalette.current.onLit.copy(alpha = .6f) else Color(0x99FFFFFF), fontSize = 14.sp, maxLines = 1)
             }
         }
     }
@@ -871,14 +871,14 @@ private fun CardButton(label: String, modifier: Modifier = Modifier, onClick: ()
     val scale by animateFloatAsState(if (focused) 1.04f else 1f, spring(stiffness = 430f), label = "cardButtonScale")
     Box(
         modifier.scale(scale).clip(CircleShape)
-            .background(if (focused) PlayerWhite else Color(0x29FFFFFF))
+            .background(if (focused) ActivePalette.current.lit else Color(0x29FFFFFF))
             .border(1.dp, PlayerGlassBorder, CircleShape)
             .onFocusChanged { focused = it.isFocused }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(t(label), color = if (focused) Color.Black else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(t(label), color = if (focused) ActivePalette.current.onLit else PlayerWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

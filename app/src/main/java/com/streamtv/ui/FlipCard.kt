@@ -71,7 +71,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import com.streamtv.data.Channel
 
 private val CardWhite = Color.White
-private val CardMuted = Color(0xFFB5B5BA)
+private val CardMuted get() = ActivePalette.current.overlayMuted
 private val CardGlass get() = ActivePalette.current.panel
 private val CardBorder = Color(0x33FFFFFF)
 private val CardWidth = 288.dp
@@ -392,7 +392,7 @@ private fun NumberBack(
     Spacer(Modifier.height(4.dp))
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(typed.ifEmpty { "–" }, color = Color(0xFFE8452F), fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(typed.ifEmpty { "–" }, color = ActivePalette.current.number, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Text(if (error != null) t(error) else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
             Spacer(Modifier.height(6.dp))
             for (row in listOf("123", "456", "789", "<0>")) {
@@ -439,13 +439,13 @@ private fun CardChoice(label: String, danger: Boolean, enabled: Boolean, modifie
     val background = when {
         danger && focused -> Color(0xFFB5544D)
         danger -> Color(0x33C0544D)
-        focused -> CardWhite
+        focused -> ActivePalette.current.lit
         else -> Color(0x1FFFFFFF)
     }
     val text = when {
         danger && focused -> CardWhite
         danger -> Color(0xFFEFA39B)
-        focused -> Color(0xFF1C1C1E)
+        focused -> ActivePalette.current.onLit
         else -> CardWhite
     }
     Box(
@@ -465,13 +465,13 @@ private fun PinKey(label: String, enabled: Boolean, modifier: Modifier = Modifie
     val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(stiffness = 430f), label = "pinKeyScale")
     Box(
         modifier.size(40.dp).scale(scale).clip(CircleShape)
-            .background(if (focused) CardWhite else Color(0x1FFFFFFF))
+            .background(if (focused) ActivePalette.current.lit else Color(0x1FFFFFFF))
             .focusProperties { canFocus = enabled }
             .onFocusChanged { focused = it.isFocused }
             .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = if (focused) Color(0xFF1C1C1E) else CardWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(label, color = if (focused) ActivePalette.current.onLit else CardWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -522,16 +522,16 @@ private fun OptionRow(label: String, icon: String, enabled: Boolean, settled: Bo
     )
     Row(
         modifier.fillMaxWidth().padding(vertical = 2.dp).scale(scale).clip(RoundedCornerShape(16.dp))
-            .background(if (focused) Color(0xF2F2F2F7) else Color.Transparent)
+            .background(if (focused) ActivePalette.current.lit else Color.Transparent)
             .focusProperties { canFocus = enabled }
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
             .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OptionIcon(icon, if (focused) Color(0xB31C1C1E) else if (icon == "starFilled") CardWhite else Color(0xB3FFFFFF), Modifier.size(20.dp))
+        OptionIcon(icon, if (focused) ActivePalette.current.onLit.copy(alpha = .7f) else if (icon == "starFilled") CardWhite else Color(0xB3FFFFFF), Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
-        Text(t(label), color = if (focused) Color(0xFF1C1C1E) else CardWhite, fontSize = 17.sp,
+        Text(t(label), color = if (focused) ActivePalette.current.onLit else CardWhite, fontSize = 17.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

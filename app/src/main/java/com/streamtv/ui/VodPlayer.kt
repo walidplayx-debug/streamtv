@@ -89,7 +89,7 @@ import com.streamtv.data.Channel
 import kotlinx.coroutines.delay
 
 private val VodWhite = Color.White
-private val VodMuted = Color(0xFFB5B5BA)
+private val VodMuted get() = ActivePalette.current.overlayMuted
 private const val ControlsMillis = 4_500L
 /** The preview follows the chosen place after this pause, so a held key does not flood it with seeks. */
 private const val PreviewSeekMillis = 120L
@@ -576,7 +576,7 @@ private fun TimeBar(
             drawRoundRect(Color(0x47FFFFFF), topLeft = Offset(0f, y - thick / 2f), size = Size(size.width, thick), cornerRadius = corner)
             val x = size.width * fraction
             if (x > 0f) {
-                drawRoundRect(Color(0xE6FFFFFF), topLeft = Offset(0f, y - thick / 2f), size = Size(x.coerceAtLeast(thick), thick), cornerRadius = corner)
+                drawRoundRect(ActivePalette.current.seek, topLeft = Offset(0f, y - thick / 2f), size = Size(x.coerceAtLeast(thick), thick), cornerRadius = corner)
             }
             if (lift > 0f) {
                 val w = 3.dp.toPx()
@@ -713,8 +713,8 @@ private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
         for (i in start until minOf(labels.size, start + 8)) {
             val on = i == chosen + 1
             val lit = i == focused
-            val fill by androidx.compose.animation.animateColorAsState(if (lit) Color(0xF2F2F2F7) else Color.Transparent, tween(140), label = "subtitleRow")
-            val ink = if (lit) Color(0xFF1C1C1E) else VodWhite
+            val fill by androidx.compose.animation.animateColorAsState(if (lit) ActivePalette.current.lit else Color.Transparent, tween(140), label = "subtitleRow")
+            val ink = if (lit) ActivePalette.current.onLit else VodWhite
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(fill).padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -730,11 +730,11 @@ private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
 @Composable
 private fun VodTextButton(label: String, selected: Boolean) {
     Box(
-        Modifier.clip(CircleShape).background(if (selected) VodWhite else Color(0x29FFFFFF))
+        Modifier.clip(CircleShape).background(if (selected) ActivePalette.current.lit else Color(0x29FFFFFF))
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = if (selected) Color.Black else VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = if (selected) ActivePalette.current.onLit else VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

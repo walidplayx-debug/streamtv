@@ -51,7 +51,19 @@ class StvPalette(
         listOf(Color(0xFF3A3430), Color(0xFF29231F), Color(0xFF171513)),
         listOf(Color(0xFF34343A), Color(0xFF25252B), Color(0xFF151519)),
         listOf(Color(0xFF303A39), Color(0xFF222B2A), Color(0xFF141A19))
-    )
+    ),
+    /** The light pill behind the focused row in pop-ups and players, and the text on it. */
+    val lit: Color = Color(0xF2F2F2F7),
+    val onLit: Color = Color(0xFF1C1C1E),
+    /** The big channel number in the player and the typed number. */
+    val number: Color = Color(0xFFE8452F),
+    /** Secondary text over video. */
+    val overlayMuted: Color = Color(0xFFB5B5BA),
+    /** The filled part of the film and episode time bar. */
+    val seek: Color = Color(0xE6FFFFFF),
+    /** The pale tile behind dark logos: resting, then focused (top to bottom). */
+    val lightTile: List<Color> = listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5)),
+    val lightTileFocused: List<Color> = listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
 ) {
     val focusBrush: Brush get() = Brush.verticalGradient(focus)
     val pressBrush: Brush get() = Brush.verticalGradient(press)
@@ -86,7 +98,7 @@ object Palettes {
         focus = listOf(Color(0xFFA57744), Color(0xFF7E5629)),
         press = listOf(Color(0xFFE3C08A), Color(0xFFC79B5E)),
         // 60 %: the olive of the background behind the bird, clearly green-brown, not black.
-        backdrop = listOf(Color(0xFF3B4129), Color(0xFF2A2E1D), Color(0xFF1A1C12)),
+        backdrop = listOf(Color(0xFF3D4229), Color(0xFF2C2C1D), Color(0xFF1C1812)),
         glassFill = listOf(Color(0xB34A4632), Color(0xB32A281C)),
         // 30 %: the warm brown of the back and wings.
         tileFocused = listOf(Color(0xFF8C6A42), Color(0xFF634A2E)),
@@ -102,7 +114,14 @@ object Palettes {
             listOf(Color(0xFF4A5233), Color(0xFF353B24), Color(0xFF22261A)),
             listOf(Color(0xFF4E5560), Color(0xFF373C45), Color(0xFF24272E)),
             listOf(Color(0xFF5E3A2E), Color(0xFF43281F), Color(0xFF2B1A14))
-        )
+        ),
+        // The pale throat for the light pill, with the dark umber of the wing stripes on it.
+        lit = Color(0xF2F4EFE6), onLit = Color(0xFF2B2118),
+        number = Color(0xFFE8B978),
+        overlayMuted = Color(0xFFC2B8A6),
+        seek = Color(0xFFE8B978),
+        lightTile = listOf(Color(0xFFE6DDCC), Color(0xFFC4B59C)),
+        lightTileFocused = listOf(Color(0xFFF4EDE0), Color(0xFFD6C8AE))
     )
 
     val all = listOf(Default, Sparrow)

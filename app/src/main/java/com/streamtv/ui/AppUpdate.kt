@@ -60,20 +60,20 @@ fun AppUpdateSection() {
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF1C1C1E))
+            .background(ActivePalette.current.panel)
             .padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("streamtv", color = Color.White, fontSize = 23.sp)
         Text(
             "Version ${BuildConfig.VERSION_NAME} · ${BuildConfig.VERSION_CODE}",
-            color = Color(0xFF99999E),
+            color = ActivePalette.current.muted,
             fontSize = 16.sp
         )
         if (downloaded != null) {
             Text(
                 "${translate(language, "Available version")}: ${downloaded!!.versionName} (${downloaded!!.versionCode})",
-                color = Color(0xFF99999E),
+                color = ActivePalette.current.muted,
                 fontSize = 15.sp
             )
         }

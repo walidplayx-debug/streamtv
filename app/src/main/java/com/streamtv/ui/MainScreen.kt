@@ -1260,8 +1260,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(when {
-                light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
-                light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
+                light && focused -> ActivePalette.current.lightTileFocused
+                light -> ActivePalette.current.lightTile
                 focused -> ActivePalette.current.tileFocused
                 else -> ActivePalette.current.tile
             }))
