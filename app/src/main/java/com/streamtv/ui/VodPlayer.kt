@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -195,9 +196,10 @@ fun VodPlayerScreen(
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setPreferredTextLanguage(appLanguage).setPreferredAudioLanguage(appLanguage).build()
     }
-    // The sound button only when there is a choice, the subtitles button only when there are some.
+    // Beside the title: the sound button only when there is a choice, the subtitles button only when
+    // the title has some, and the favourite star last.
     val buttons = (if (audios.size > 1) listOf("audio") else emptyList()) +
-        (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList())
+        (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList()) + "favorite"
     val audioCode = audios.firstOrNull { it.selected }?.code ?: ""
     fun nextAudio() {
         // One track after the other, back to the first.
@@ -276,6 +278,7 @@ fun VodPlayerScreen(
     fun press(name: String) {
         when (name) {
             "subtitles" -> { nextSubtitle(); show() }
+            "favorite" -> { onFavorite(); show() }
             "audio" -> { if (audios.size > 1) nextAudio(); show() }
         }
     }
@@ -480,22 +483,24 @@ fun VodPlayerScreen(
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .padding(start = 64.dp, end = 64.dp, bottom = 34.dp)
                     ) {
-                        Text(
-                            channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
-                        )
-                        if (buttons.isNotEmpty()) {
-                            Spacer(Modifier.height(14.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // The title on the left, the small buttons on the right, both just above the bar.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                channel.name, Modifier.weight(1f), color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 buttons.forEachIndexed { index, name ->
                                     VodIconButton(
-                                        name, subtitlesOn = chosenSubtitle >= 0,
+                                        name, favorite = favorite, subtitlesOn = chosenSubtitle >= 0,
+                                        subtitleLabel = if (chosenSubtitle >= 0) subtitles[chosenSubtitle].label else t("Off"),
                                         selected = row == 1 && button == index, audioCode = audioCode
                                     )
                                 }
                             }
                         }
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(4.dp))
                         TimeBar(
                             position = scrubTarget ?: position, duration = duration, playing = playing,
                             selected = row == 0, scrubbing = scrubTarget != null,
@@ -646,12 +651,18 @@ private fun PlayStateIcon(playing: Boolean) {
     }
 }
 
-/** A round see-through button: the sound track or the subtitles. */
+/**
+ * A small see-through button, all the same height: the sound track, the subtitles (a pill with the
+ * language shown, or "Off"; a press goes to the next one) and the favourite star.
+ */
 @Composable
-private fun VodIconButton(name: String, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
-    val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
+private fun VodIconButton(
+    name: String, favorite: Boolean, subtitlesOn: Boolean, subtitleLabel: String, selected: Boolean, audioCode: String = ""
+) {
+    val scale by animateFloatAsState(if (selected) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
+    val pill = name == "subtitles"
     Box(
-        Modifier.size(46.dp).scale(scale).clip(CircleShape)
+        (if (pill) Modifier.height(36.dp) else Modifier.size(36.dp)).scale(scale).clip(CircleShape)
             .background(if (selected) VodWhite else Color(0x38FFFFFF))
             .border(1.dp, if (selected) Color.Transparent else Color(0x29FFFFFF), CircleShape),
         contentAlignment = Alignment.Center
@@ -670,19 +681,41 @@ private fun VodIconButton(name: String, subtitlesOn: Boolean, selected: Boolean,
                 }
                 if (audioCode.isNotEmpty()) Text(audioCode, color = tint, fontSize = 8.sp, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
             }
-            // A speech bubble with two lines of text; dimmed while subtitles are off.
-            "subtitles" -> Canvas(Modifier.size(20.dp)) {
-                val color = tint.copy(alpha = if (subtitlesOn) 1f else .5f)
+            // A speech bubble with two lines of text (dimmed while off) and the language chosen.
+            "subtitles" -> Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Canvas(Modifier.size(18.dp)) {
+                    val color = tint.copy(alpha = if (subtitlesOn) 1f else .5f)
+                    val w = size.width
+                    val h = size.height
+                    val stroke = 1.6.dp.toPx()
+                    drawRoundRect(color, Offset(w * .08f, h * .14f), Size(w * .84f, h * .58f), CornerRadius(w * .14f), style = Stroke(width = stroke))
+                    val tail = Path().apply { moveTo(w * .3f, h * .72f); lineTo(w * .3f, h * .9f); lineTo(w * .48f, h * .72f) }
+                    drawPath(tail, color, style = Stroke(width = stroke))
+                    drawLine(color, Offset(w * .26f, h * .36f), Offset(w * .74f, h * .36f), strokeWidth = stroke, cap = StrokeCap.Round)
+                    drawLine(color, Offset(w * .26f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = stroke, cap = StrokeCap.Round)
+                }
+                Spacer(Modifier.width(7.dp))
+                Text(subtitleLabel, color = tint.copy(alpha = if (subtitlesOn) 1f else .7f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp))
+            }
+            else -> Canvas(Modifier.size(16.dp)) {
                 val w = size.width
                 val h = size.height
-                val stroke = 1.6.dp.toPx()
-                drawRoundRect(color, Offset(w * .08f, h * .14f), Size(w * .84f, h * .58f), CornerRadius(w * .14f), style = Stroke(width = stroke))
-                val tail = Path().apply { moveTo(w * .3f, h * .72f); lineTo(w * .3f, h * .9f); lineTo(w * .48f, h * .72f) }
-                drawPath(tail, color, style = Stroke(width = stroke))
-                drawLine(color, Offset(w * .26f, h * .36f), Offset(w * .74f, h * .36f), strokeWidth = stroke, cap = StrokeCap.Round)
-                drawLine(color, Offset(w * .26f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = stroke, cap = StrokeCap.Round)
+                val path = Path()
+                val outer = w * .48f
+                val inner = outer * .46f
+                for (i in 0 until 10) {
+                    val r = if (i % 2 == 0) outer else inner
+                    val angle = Math.toRadians(-90.0 + i * 36.0)
+                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
+                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                // A favourite's star is filled in; otherwise only its outline shows.
+                if (favorite) drawPath(path, tint)
+                drawPath(path, tint, style = Stroke(width = w * .09f))
             }
-            else -> Unit
         }
     }
 }
