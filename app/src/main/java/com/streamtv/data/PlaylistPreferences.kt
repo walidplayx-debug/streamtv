@@ -45,6 +45,9 @@ class PlaylistPreferences(private val context: Context) {
     private fun systemLanguage(): String =
         java.util.Locale.getDefault().language.takeIf { it in setOf("en", "fr", "ar", "es", "ru", "zh", "tr", "de", "pt", "nl") } ?: "en"
     suspend fun saveLanguage(code: String) { context.dataStore.edit { it[languageKey] = code } }
+    private val themeKey = stringPreferencesKey("color_theme")
+    val theme: Flow<String> = context.dataStore.data.map { it[themeKey] ?: "default" }.distinctUntilChanged()
+    suspend fun saveTheme(id: String) { context.dataStore.edit { it[themeKey] = id } }
     val groupMode: Flow<String> = context.dataStore.data.map { it[groupModeKey] ?: "provider" }
     suspend fun saveGroupMode(mode: String) { context.dataStore.edit { it[groupModeKey] = mode } }
     // The side list's own order and hidden entries, one line per grouping mode: "mode<TAB>a<US>b<US>c".

@@ -66,7 +66,26 @@ object Palettes {
         swatch = listOf(Color(0xFF0B0C0F), Color(0xFF252A33), Color(0xFF647187), Color(0xFF8290A6), Color(0xFFD5DADF))
     )
 
-    val all = listOf(Default)
+    /**
+     * Taken from a photo of a sparrow on a branch: dark umber and olive for the pages (most of the
+     * screen), warm brown for the tiles, and the wing's ochre for focus (the small, bright part).
+     * White text stays at least 3.4:1 on every focus colour, as in the default theme.
+     */
+    val Sparrow = StvPalette(
+        id = "sparrow", name = "Sparrow",
+        ink = Color(0xFF0E0C0A), text = Color(0xFFF4EFE6), muted = Color(0xFFA39C8E), accent = Color(0xFFE0B072), glass = Color(0xFF2A2622),
+        focus = listOf(Color(0xFFA57744), Color(0xFF7E5629)),
+        press = listOf(Color(0xFFE3C08A), Color(0xFFC79B5E)),
+        backdrop = listOf(Color(0xFF1F2117), Color(0xFF16150F), Color(0xFF0D0C09)),
+        glassFill = listOf(Color(0xB32E2C24), Color(0xB315140F)),
+        tileFocused = listOf(Color(0xFF5A4A36), Color(0xFF3A3024)),
+        tile = listOf(Color(0xFF2A2720), Color(0xFF1B1915)),
+        listFocus = listOf(Color(0xFF9C7040), Color(0xFF7A5530)),
+        welcomeTop = Color(0xFF1C1D14),
+        swatch = listOf(Color(0xFF2B2625), Color(0xFF98A96C), Color(0xFF9BA1B0), Color(0xFFD2A15F), Color(0xFFF4EFE6))
+    )
+
+    val all = listOf(Default, Sparrow)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }
