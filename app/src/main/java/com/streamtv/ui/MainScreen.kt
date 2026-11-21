@@ -1535,7 +1535,7 @@ private fun SettingsContent(
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
         // coming back into the list (from the page or the tabs) lands on the open section, so
         // passing over the list never opens another one by accident.
-        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Parental control", "About")
+        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Theme", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
         // The list scrolls instead of squeezing: on a short screen the last row ("About") was
@@ -1658,6 +1658,17 @@ private fun SettingsContent(
                         }
                     }
                 }
+                // One box per colour theme, its own colours as dots; choosing one repaints every screen.
+                "Theme" -> {
+                    for (pair in Palettes.all.chunked(2)) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            for (palette in pair) {
+                                ChoiceBox(t(palette.name), state.theme == palette.id, Modifier.weight(1f), palette.swatch) { model.setTheme(palette.id) }
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
                 // Compact rows, each one reachable with the remote; the action sits on its own row.
                 "Parental control" -> {
                     SettingItem("PIN", if (state.pinSet) "Set" else "Not set", if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
@@ -1710,7 +1721,7 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
 
 /** A box to pick one of several (a language): a check mark on the chosen one. */
 @Composable
-private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modifier, dots: List<Color> = emptyList(), onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     Row(
@@ -1723,6 +1734,9 @@ private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modif
     ) {
         Text(label, Modifier.weight(1f), color = if (focused || chosen) White else White.copy(alpha = .7f), fontSize = 17.sp,
             fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+        for (dot in dots) {
+            Box(Modifier.padding(end = 6.dp).size(14.dp).clip(CircleShape).background(dot).border(1.dp, White.copy(alpha = .25f), CircleShape))
+        }
         if (chosen) Text("✓", color = if (focused) White else Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
