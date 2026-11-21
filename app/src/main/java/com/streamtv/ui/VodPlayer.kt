@@ -10,6 +10,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,6 +57,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
@@ -101,9 +104,7 @@ private const val RunGapMillis = 1_200L
 private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f))
 
 /** One subtitle track found in the file. */
-private class TextTrack(val label: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
-/** A sound track: [code] is what its button shows ("AR", "EN", or its number). */
-private class AudioTrack(val code: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
+private class TextTrack(val label: String, val language: String?, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 
 /** Left/right presses in one direction, close together: the longer the run, the bigger the step. */
 private class ScrubRun {
@@ -189,36 +190,29 @@ fun VodPlayerScreen(
     // Subtitles carried inside the file. The one in the app's language is picked by itself.
     var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
     var subtitlesOff by remember { mutableStateOf(false) }
-    // Sound tracks (a dubbed and an original language, say). The app's language is picked by itself.
-    var audios by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
+    // The subtitles are set once per title: the app's language when the file has it, otherwise off.
+    val subtitlesDecided = remember(player) { booleanArrayOf(false) }
+    // The subtitles list above the CC box: open or not, and the row under the remote (0 is "Off").
+    var menuOpen by remember { mutableStateOf(false) }
+    var menuIndex by remember { mutableIntStateOf(0) }
     val appLanguage = LocalAppLanguage.current
     LaunchedEffect(player, appLanguage) {
         Players.preferSound(player, appLanguage)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setPreferredTextLanguage(appLanguage).build()
     }
-    // Beside the title: the sound button only when there is a choice, the subtitles button only when
-    // the title has some, and the favourite star last.
-    val buttons = (if (audios.size > 1) listOf("audio") else emptyList()) +
-        (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList()) + "favorite"
-    val audioCode = audios.firstOrNull { it.selected }?.code ?: ""
-    fun nextAudio() {
-        // One track after the other, back to the first.
-        val next = (audios.indexOfFirst { it.selected } + 1) % audios.size
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(audios[next].group, 0)).build()
-    }
+    // Beside the title, at the end of the bar: the CC box, only when the title has subtitles.
+    val buttons = if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList()
     val chosenSubtitle = if (subtitlesOff) -1 else subtitles.indexOfFirst { it.selected }
-    fun nextSubtitle() {
-        // Off -> first track -> second -> ... -> off.
-        val next = chosenSubtitle + 1
+    /** Shows subtitle track [index] of [list]; -1 turns subtitles off. */
+    fun chooseSubtitle(index: Int, list: List<TextTrack> = subtitles) {
         val params = player.trackSelectionParameters.buildUpon()
-        if (next >= subtitles.size) {
+        if (index !in list.indices) {
             params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             subtitlesOff = true
         } else {
             params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                .setOverrideForType(androidx.media3.common.TrackSelectionOverride(subtitles[next].group, 0))
+                .setOverrideForType(androidx.media3.common.TrackSelectionOverride(list[index].group, 0))
             subtitlesOff = false
         }
         player.trackSelectionParameters = params.build()
@@ -278,9 +272,7 @@ fun VodPlayerScreen(
     }
     fun press(name: String) {
         when (name) {
-            "subtitles" -> { nextSubtitle(); show() }
-            "favorite" -> { onFavorite(); show() }
-            "audio" -> { if (audios.size > 1) nextAudio(); show() }
+            "subtitles" -> { menuIndex = chosenSubtitle + 1; menuOpen = true; show() }
         }
     }
     fun leave() { save(); onExit() }
@@ -301,11 +293,13 @@ fun VodPlayerScreen(
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
                         ?: "${index + 1}"
-                    TextTrack(label, group.mediaTrackGroup, group.isSelected)
+                    TextTrack(label, language, group.mediaTrackGroup, group.isSelected)
                 }
-                audios = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO && it.isSupported }.mapIndexed { index, group ->
-                    val language = group.getTrackFormat(0).language?.takeIf { it.isNotBlank() && it != "und" }
-                    AudioTrack(language?.substringBefore('-')?.take(3)?.uppercase() ?: "${index + 1}", group.mediaTrackGroup, group.isSelected)
+                // First time the title's subtitles are known: the viewer's language on, or none at all.
+                val found = subtitles
+                if (!subtitlesDecided[0] && found.isNotEmpty()) {
+                    subtitlesDecided[0] = true
+                    chooseSubtitle(found.indexOfFirst { sameLanguage(it.language, appLanguage) }, found)
                 }
             }
         }
@@ -363,8 +357,8 @@ fun VodPlayerScreen(
         }
     }
     // The controls step away on their own while the title plays.
-    LaunchedEffect(controls, touch, playing) {
-        if (controls && playing && !failed && scrubTarget == null) {
+    LaunchedEffect(controls, touch, playing, menuOpen) {
+        if (controls && playing && !failed && scrubTarget == null && !menuOpen) {
             delay(ControlsMillis)
             controls = false
             row = 0
@@ -379,6 +373,7 @@ fun VodPlayerScreen(
     }
     BackHandler {
         when {
+            menuOpen -> { menuOpen = false; show() }
             scrubTarget != null -> { scrubTarget = null; show() }
             controls && !failed -> { controls = false; row = 0; button = 0 }
             else -> leave()
@@ -395,6 +390,19 @@ fun VodPlayerScreen(
                         return@onPreviewKeyEvent event.key != Key.Back
                     }
                     val held = event.nativeKeyEvent.repeatCount > 0
+                    // The subtitles list takes every key while open: up/down move, OK picks, Back closes.
+                    if (menuOpen) {
+                        when (event.key) {
+                            Key.Back -> return@onPreviewKeyEvent false
+                            Key.DirectionUp -> menuIndex = (menuIndex - 1).coerceAtLeast(0)
+                            Key.DirectionDown -> menuIndex = (menuIndex + 1).coerceAtMost(subtitles.size)
+                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect ->
+                                if (!held) { chooseSubtitle(menuIndex - 1); menuOpen = false }
+                            else -> Unit
+                        }
+                        show()
+                        return@onPreviewKeyEvent true
+                    }
                     when (event.key) {
                         Key.Back -> false
                         Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> { if (!held) togglePlay(); true }
@@ -484,22 +492,33 @@ fun VodPlayerScreen(
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .padding(start = 64.dp, end = 64.dp, bottom = 34.dp)
                     ) {
-                        // The title on the left, the small buttons on the right, both just above the bar.
+                        // The subtitles list rises above the CC box, at the end of the bar; it takes no
+                        // room of its own, so nothing moves when it opens.
+                        Layout(
+                            modifier = Modifier.fillMaxWidth(),
+                            content = {
+                                AnimatedVisibility(
+                                    visible = menuOpen,
+                                    enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = .82f, stiffness = 520f), initialScale = .9f, transformOrigin = TransformOrigin(1f, 1f)),
+                                    exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = .94f, transformOrigin = TransformOrigin(1f, 1f))
+                                ) {
+                                    SubtitleMenu(subtitles, chosenSubtitle, menuIndex)
+                                }
+                            }
+                        ) { measurables, constraints ->
+                            val menu = measurables.firstOrNull()?.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                            layout(constraints.maxWidth, 0) {
+                                menu?.place(constraints.maxWidth - menu.width, -menu.height - 10.dp.roundToPx())
+                            }
+                        }
+                        // The title on the left, the CC box on the right, both just above the bar.
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 channel.name, Modifier.weight(1f), color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
                             )
                             Spacer(Modifier.width(16.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                buttons.forEachIndexed { index, name ->
-                                    VodIconButton(
-                                        name, favorite = favorite, subtitlesOn = chosenSubtitle >= 0,
-                                        subtitleLabel = if (chosenSubtitle >= 0) subtitles[chosenSubtitle].label else t("Off"),
-                                        selected = row == 1 && button == index, audioCode = audioCode
-                                    )
-                                }
-                            }
+                            if (buttons.isNotEmpty()) CcButton(on = chosenSubtitle >= 0, selected = row == 1 || menuOpen)
                         }
                         Spacer(Modifier.height(4.dp))
                         TimeBar(
@@ -652,70 +671,57 @@ private fun PlayStateIcon(playing: Boolean) {
     }
 }
 
-/**
- * A small see-through button, all the same height: the sound track, the subtitles (a pill with the
- * language shown, or "Off"; a press goes to the next one) and the favourite star.
- */
+/** True when a track's language code ("ar", "ara", "ar-SA", "fre"...) is the app's language. */
+private fun sameLanguage(code: String?, app: String): Boolean {
+    val c = code?.lowercase()?.substringBefore('-')?.substringBefore('_')?.takeIf { it.isNotBlank() } ?: return false
+    if (c == app) return true
+    val iso3 = runCatching { java.util.Locale(app).isO3Language }.getOrNull()
+    val older = mapOf("fr" to "fre", "de" to "ger", "nl" to "dut", "zh" to "chi", "ar" to "arb")
+    return c == iso3 || c == older[app]
+}
+
+/** The CC box: filled while subtitles are on, outlined while off; it grows when selected. */
 @Composable
-private fun VodIconButton(
-    name: String, favorite: Boolean, subtitlesOn: Boolean, subtitleLabel: String, selected: Boolean, audioCode: String = ""
-) {
-    val scale by animateFloatAsState(if (selected) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
-    val pill = name == "subtitles"
+private fun CcButton(on: Boolean, selected: Boolean) {
+    val scale by animateFloatAsState(if (selected) 1.2f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "cc")
     Box(
-        (if (pill) Modifier.height(36.dp) else Modifier.size(36.dp)).scale(scale).clip(CircleShape)
-            .background(if (selected) VodWhite else Color(0x38FFFFFF))
-            .border(1.dp, if (selected) Color.Transparent else Color(0x29FFFFFF), CircleShape),
+        Modifier.scale(scale).clip(RoundedCornerShape(5.dp))
+            .background(if (selected) VodWhite else if (on) VodWhite.copy(alpha = .85f) else Color.Transparent)
+            .border(1.5.dp, VodWhite.copy(alpha = if (on || selected) 1f else .75f), RoundedCornerShape(5.dp))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
         contentAlignment = Alignment.Center
     ) {
-        val tint = if (selected) Color(0xFF1C1C1E) else VodWhite
-        when (name) {
-            // A sound wave, with the language being played under it: a press goes to the next one.
-            "audio" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Canvas(Modifier.size(width = 16.dp, height = 11.dp)) {
-                    val heights = floatArrayOf(.35f, .7f, 1f, .7f, .35f)
-                    val bar = size.width / 9f
-                    heights.forEachIndexed { i, f ->
-                        val h = size.height * f
-                        drawRoundRect(tint, Offset(bar * (2 * i), (size.height - h) / 2f), Size(bar, h), CornerRadius(bar / 2f))
-                    }
-                }
-                if (audioCode.isNotEmpty()) Text(audioCode, color = tint, fontSize = 8.sp, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
-            }
-            // A speech bubble with two lines of text (dimmed while off) and the language chosen.
-            "subtitles" -> Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Canvas(Modifier.size(18.dp)) {
-                    val color = tint.copy(alpha = if (subtitlesOn) 1f else .5f)
-                    val w = size.width
-                    val h = size.height
-                    val stroke = 1.6.dp.toPx()
-                    drawRoundRect(color, Offset(w * .08f, h * .14f), Size(w * .84f, h * .58f), CornerRadius(w * .14f), style = Stroke(width = stroke))
-                    val tail = Path().apply { moveTo(w * .3f, h * .72f); lineTo(w * .3f, h * .9f); lineTo(w * .48f, h * .72f) }
-                    drawPath(tail, color, style = Stroke(width = stroke))
-                    drawLine(color, Offset(w * .26f, h * .36f), Offset(w * .74f, h * .36f), strokeWidth = stroke, cap = StrokeCap.Round)
-                    drawLine(color, Offset(w * .26f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = stroke, cap = StrokeCap.Round)
-                }
-                Spacer(Modifier.width(7.dp))
-                Text(subtitleLabel, color = tint.copy(alpha = if (subtitlesOn) 1f else .7f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp))
-            }
-            else -> Canvas(Modifier.size(16.dp)) {
-                val w = size.width
-                val h = size.height
-                val path = Path()
-                val outer = w * .48f
-                val inner = outer * .46f
-                for (i in 0 until 10) {
-                    val r = if (i % 2 == 0) outer else inner
-                    val angle = Math.toRadians(-90.0 + i * 36.0)
-                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
-                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-                path.close()
-                // A favourite's star is filled in; otherwise only its outline shows.
-                if (favorite) drawPath(path, tint)
-                drawPath(path, tint, style = Stroke(width = w * .09f))
+        Text("CC", color = if (selected || on) Color.Black else VodWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * The subtitles list: "Off" and the languages in the file, a check mark on the one in use and a
+ * light row under the remote. Long lists show eight rows at a time around that row.
+ */
+@Composable
+private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
+    val labels = listOf(t("Off")) + tracks.map { it.label }
+    val start = (focused - 7).coerceAtLeast(0)
+    Column(
+        Modifier.width(260.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xF01C1C1E))
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
+            .padding(8.dp)
+    ) {
+        Text(t("Subtitles"), color = VodMuted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp))
+        for (i in start until minOf(labels.size, start + 8)) {
+            val on = i == chosen + 1
+            val lit = i == focused
+            val fill by androidx.compose.animation.animateColorAsState(if (lit) Color(0xF2F2F2F7) else Color.Transparent, tween(140), label = "subtitleRow")
+            val ink = if (lit) Color(0xFF1C1C1E) else VodWhite
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(fill).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(if (on) "✓" else "", Modifier.width(24.dp), color = ink, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(labels[i], color = ink, fontSize = 16.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
