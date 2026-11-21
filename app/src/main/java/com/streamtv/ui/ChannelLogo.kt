@@ -57,7 +57,7 @@ fun ChannelLogo(
     modifier: Modifier = Modifier,
     fontSize: TextUnit,
     corner: Dp = 10.dp,
-    placeholder: Brush = Brush.linearGradient(listOf(Color(0xFF3A3A3D), Color(0xFF242426))),
+    placeholder: Brush = Brush.linearGradient(ActivePalette.current.faces[2].take(2)),
     logoPadding: Dp = 0.dp,
     contentScale: ContentScale = ContentScale.Fit,
     /** When given, a channel without a logo shows its name under its category's colour instead of initials. */
@@ -120,7 +120,7 @@ fun ChannelLogo(
 @Composable
 private fun CategoryFace(name: String, @Suppress("UNUSED_PARAMETER") group: String, @Suppress("UNUSED_PARAMETER") compact: Boolean = false) {
     Box(
-        Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF30353F), Color(0xFF22262E)))).padding(6.dp),
+        Modifier.fillMaxSize().background(Brush.linearGradient(ActivePalette.current.faces[0].take(2))).padding(6.dp),
         contentAlignment = Alignment.Center
     ) {
         FittedName(cleanChannelName(name))

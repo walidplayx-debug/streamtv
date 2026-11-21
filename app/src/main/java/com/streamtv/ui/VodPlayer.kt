@@ -461,7 +461,7 @@ fun VodPlayerScreen(
             if (failed) {
                 Column(
                     Modifier.align(Alignment.Center).width(420.dp).clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xE61C1C1E)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
+                        .background(ActivePalette.current.panel).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(28.dp))
                         .padding(horizontal = 28.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -704,7 +704,7 @@ private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
     val labels = listOf(t("Off")) + tracks.map { it.label }
     val start = (focused - 7).coerceAtLeast(0)
     Column(
-        Modifier.width(260.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xF01C1C1E))
+        Modifier.width(260.dp).clip(RoundedCornerShape(22.dp)).background(ActivePalette.current.panel)
             .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
             .padding(8.dp)
     ) {

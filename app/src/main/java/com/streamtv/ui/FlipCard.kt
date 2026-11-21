@@ -72,7 +72,7 @@ import com.streamtv.data.Channel
 
 private val CardWhite = Color.White
 private val CardMuted = Color(0xFFB5B5BA)
-private val CardGlass = Color(0xF01C1C1E)
+private val CardGlass get() = ActivePalette.current.panel
 private val CardBorder = Color(0x33FFFFFF)
 private val CardWidth = 288.dp
 

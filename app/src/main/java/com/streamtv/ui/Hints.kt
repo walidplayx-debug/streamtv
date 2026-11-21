@@ -99,7 +99,7 @@ fun HintOverlay() {
             contentAlignment = Alignment.BottomCenter
         ) {
             Row(
-                Modifier.clip(CircleShape).background(Color(0xF0202329))
+                Modifier.clip(CircleShape).background(ActivePalette.current.panel)
                     .border(1.dp, Color.White.copy(alpha = .16f), CircleShape)
                     .padding(start = 22.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically

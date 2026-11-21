@@ -80,7 +80,7 @@ import kotlinx.coroutines.withContext
 
 private val PlayerWhite = Color.White
 private val PlayerMuted = Color(0xFFB5B5BA)
-private val PlayerGlass = Color(0xF01C1C1E)
+private val PlayerGlass get() = ActivePalette.current.panel
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
 /** With a guide, the info bar turns over to its back after this long. */
@@ -482,7 +482,7 @@ fun PlayerScreen(
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = 22.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xE6222428))
+                    .background(ActivePalette.current.panel)
                     .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
                     .padding(horizontal = 14.dp, vertical = 9.dp)
             ) {
@@ -502,7 +502,7 @@ fun PlayerScreen(
         if (showErrorCard) {
             Column(
                 Modifier.align(Alignment.Center).width(440.dp).clip(RoundedCornerShape(28.dp))
-                    .background(Color(0xE61C1C1E))
+                    .background(ActivePalette.current.panel)
                     .border(1.dp, PlayerGlassBorder, RoundedCornerShape(28.dp))
                     .padding(horizontal = 28.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally

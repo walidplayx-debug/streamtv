@@ -619,7 +619,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
             if (moving != null) {
                 Text(
                     t("↑↓ to move · OK to drop"), Modifier.align(Alignment.BottomCenter).clip(CircleShape)
-                        .background(Color(0xE61C1F26)).padding(horizontal = 14.dp, vertical = 7.dp),
+                        .background(ActivePalette.current.panel).padding(horizontal = 14.dp, vertical = 7.dp),
                     color = White.copy(alpha = .9f), fontSize = 13.sp
                 )
             }
@@ -1344,13 +1344,8 @@ private fun FavoriteStar(modifier: Modifier = Modifier) {
 }
 
 private fun channelGradient(name: String): List<Color> {
-    val palettes = listOf(
-        listOf(Color(0xFF30363B), Color(0xFF202428), Color(0xFF141719)),
-        listOf(Color(0xFF3A3430), Color(0xFF29231F), Color(0xFF171513)),
-        listOf(Color(0xFF34343A), Color(0xFF25252B), Color(0xFF151519)),
-        listOf(Color(0xFF303A39), Color(0xFF222B2A), Color(0xFF141A19))
-    )
-    return palettes[name.hashCode().ushr(1) % palettes.size]
+    val faces = ActivePalette.current.faces
+    return faces[name.hashCode().ushr(1) % faces.size]
 }
 
 @Composable
