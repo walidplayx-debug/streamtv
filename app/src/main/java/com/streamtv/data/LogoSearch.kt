@@ -68,6 +68,69 @@ object LogoSearch {
         return inner?.takeIf { it.startsWith("http") } ?: value
     }
 
+    /**
+     * The picture behind a pasted link. A link to a picture is kept as it is; a link to a page (a
+     * Google "share" link such as share.google/images/…, a Google result, any web page) is opened
+     * and the picture found in it: Google's "imgurl", even inside the consent page Google shows in
+     * Europe, then the page's preview picture, then Google's own small copy of the picture.
+     */
+    suspend fun pastedPicture(context: android.content.Context, text: String): String? {
+        val link = pasted(context, text) ?: return null
+        if (!link.startsWith("http")) return link
+        return withContext(Dispatchers.IO) { runCatching { pictureBehind(link) }.getOrNull() ?: link }
+    }
+
+    private val imgurlPattern = Regex("""imgurl=([^&"'\s\\]+)""")
+    private val ogImage = listOf(
+        Regex("""<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)""", RegexOption.IGNORE_CASE),
+        Regex("""<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image""", RegexOption.IGNORE_CASE)
+    )
+    private val googleThumb = Regex("""https://encrypted-tbn\d\.gstatic\.com/images\?q=tbn:[A-Za-z0-9_-]+""")
+
+    /** Google's "imgurl" in [text], undone from its (sometimes double) escaping. */
+    private fun imgurlIn(text: String): String? {
+        var value = imgurlPattern.find(text)?.groupValues?.get(1) ?: return null
+        repeat(3) {
+            if (value.startsWith("http") && !value.contains("%3A", true)) return value
+            value = runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
+        }
+        return value.takeIf { it.startsWith("http") }
+    }
+
+    private fun pictureBehind(link: String): String? {
+        imgurlIn(link)?.let { return it }
+        val connection = (URL(link).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", Browser)
+            setRequestProperty("Accept-Language", "ar,en;q=0.8")
+        }
+        try {
+            val code = connection.responseCode
+            val final = connection.url.toString()
+            imgurlIn(final)?.let { return it }
+            if (connection.contentType.orEmpty().startsWith("image/")) return final
+            if (code !in 200..299) return null
+            // Pages are read up to 2 MB: enough for the parts that name the picture.
+            val page = connection.inputStream.bufferedReader().use { reader ->
+                val buffer = CharArray(2 * 1024 * 1024)
+                var total = 0
+                while (total < buffer.size) {
+                    val read = reader.read(buffer, total, buffer.size - total)
+                    if (read < 0) break
+                    total += read
+                }
+                String(buffer, 0, total)
+            }.replace("\\u003d", "=").replace("\\u0026", "&").replace("\\x3d", "=").replace("\\x26", "&").replace("&amp;", "&")
+            imgurlIn(page)?.let { return it }
+            for (pattern in ogImage) pattern.find(page)?.groupValues?.get(1)?.takeIf { it.startsWith("http") }?.let { return it }
+            return googleThumb.find(page)?.value
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun get(url: String, agent: String, referer: String? = null): String? {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000

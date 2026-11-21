@@ -394,7 +394,8 @@ fun LogoSearchScreen(
         if (round == 0) return@LaunchedEffect
         results = emptyList()
         // A pasted picture address is shown as it is, ready to be picked with OK.
-        val link = com.streamtv.data.LogoSearch.pasted(context, value)
+        status = "Searching…"
+        val link = com.streamtv.data.LogoSearch.pastedPicture(context, value)
         status = if (link == null) "Searching…" else null
         val found = if (link != null) listOf(link) else com.streamtv.data.LogoSearch.search(value)
         results = found
