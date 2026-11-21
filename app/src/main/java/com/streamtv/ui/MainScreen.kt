@@ -718,7 +718,7 @@ private fun LibraryContent(
         val searchHint = if (kind == ChannelKind.Movie) "Search movies" else "Search series"
         if (liveMenu) {
             // The same list as Live TV: plain rows, section headings, the scroll bar on its edge.
-            Box(Modifier.width(250.dp).fillMaxHeight()) {
+            Box(Modifier.width(214.dp).fillMaxHeight()) {
                 LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     item { LibrarySearch(ui.search, searchHint, large = true) { ui.search = it } }
                     item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
@@ -735,7 +735,7 @@ private fun LibraryContent(
                 }
                 ScrollIndicator(menuState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp))
             }
-            Spacer(Modifier.width(30.dp))
+            Spacer(Modifier.width(22.dp))
         } else {
         // A floating card of dark glass that never goes away.
         Box(
@@ -772,7 +772,7 @@ private fun LibraryContent(
             if (shown.isEmpty()) {
                 Text(t(if (query.isNotEmpty()) "No results" else "Nothing here yet"), color = Muted, fontSize = 18.sp, modifier = Modifier.align(Alignment.Center))
             } else {
-                PosterGrid(shown, if (query.isNotEmpty()) "?$query" else section, state.favorites, restoreKey, onRestored) { ui.details = it }
+                PosterGrid(shown, if (query.isNotEmpty()) "?$query" else section, state.favorites, state.positions, restoreKey, onRestored) { ui.details = it }
             }
         }
     }
@@ -780,7 +780,8 @@ private fun LibraryContent(
 
 @Composable
 private fun PosterGrid(
-    titles: List<Channel>, listKey: String, favorites: Set<String>, restoreKey: String?, onRestored: () -> Unit, onOpen: (Channel) -> Unit
+    titles: List<Channel>, listKey: String, favorites: Set<String>, positions: Map<String, Pair<Long, Long>>,
+    restoreKey: String?, onRestored: () -> Unit, onOpen: (Channel) -> Unit
 ) {
     // Each list starts at its own top.
     key(listKey) {
@@ -790,22 +791,42 @@ private fun PosterGrid(
         RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
         var focusedKey by remember { mutableStateOf<String?>(null) }
         GlideToFocus(gridState, focusedKey)
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            LazyVerticalGrid(
-                // About 10% smaller posters than before.
-                columns = GridCells.FixedSize(106.dp),
-                state = gridState,
-                modifier = Modifier.fillMaxSize(),
-                // Free room under the last row, so every row can glide up to the focus height.
-                contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 16.dp, bottom = maxHeight),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                gridItems(titles, key = { it.key }) { item ->
-                    PosterCard(item, favorites.hasFavorite(item), if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier, { focusedKey = item.key }) { onOpen(item) }
-                }
+        Column(Modifier.fillMaxSize()) {
+            // The title under the remote, named once above the grid: the posters carry no names,
+            // so twice as many fit on the screen.
+            val current = remember(titles, focusedKey) { titles.firstOrNull { it.key == focusedKey } ?: titles.first() }
+            Row(Modifier.fillMaxWidth().height(38.dp).padding(start = 12.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(current.name, Modifier.weight(1f, fill = false), color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(12.dp))
+                val saved = positions[current.key]
+                val detail = t(current.group.ifBlank { "Other" }) +
+                    (saved?.let { "  ·  " + "${formatTime((it.second - it.first).coerceAtLeast(0L))} ${t("left")}" } ?: "")
+                Text(detail, Modifier.weight(1f), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${titles.size} ${t("titles")}", color = Muted, fontSize = 14.sp, maxLines = 1)
             }
-            ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                LazyVerticalGrid(
+                    // Six posters a row.
+                    columns = GridCells.Fixed(6),
+                    state = gridState,
+                    modifier = Modifier.fillMaxSize(),
+                    // Free room under the last row, so every row can glide up to the focus height.
+                    contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 16.dp, bottom = maxHeight),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    gridItems(titles, key = { it.key }) { item ->
+                        val saved = positions[item.key]
+                        PosterCard(
+                            item, favorites.hasFavorite(item), if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier,
+                            { focusedKey = item.key }, showTitle = false,
+                            progress = saved?.let { (it.first.toFloat() / it.second.coerceAtLeast(1L)).coerceIn(0f, 1f) }
+                        ) { onOpen(item) }
+                    }
+                }
+                ScrollIndicator(gridState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 12.dp))
+            }
         }
     }
 }
@@ -907,7 +928,7 @@ private fun TitleDetails(
                     .graphicsLayer { translationY = -(topHeight + gap) * lift; alpha = 1f - lift }
             ) {
                 Box(
-                    Modifier.width(124.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                    Modifier.width(150.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
                         .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
                 ) {
                     ChannelLogo(
@@ -919,15 +940,16 @@ private fun TitleDetails(
                 Column(Modifier.weight(1f).padding(top = 6.dp)) {
                     Text(item.name, color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 36.sp)
                     Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.clip(RoundedCornerShape(8.dp)).border(1.dp, White.copy(alpha = .35f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text(t(if (kind == ChannelKind.Movie) "Movie" else "Series"), color = White.copy(alpha = .85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    // Soft pills: what it is and where it belongs.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (label in listOf(t(if (kind == ChannelKind.Movie) "Movie" else "Series"), t(item.group.ifBlank { "Other" }))) {
+                            Box(
+                                Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Text(t(item.group.ifBlank { "Other" }), color = Muted, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     if (saved != null) {
                         Spacer(Modifier.height(16.dp))
@@ -979,9 +1001,16 @@ private fun TitleDetails(
 
 /** Poster-shaped card with the title underneath, for movies and series. */
 @Composable
-private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
+private fun PosterCard(
+    channel: Channel, favorite: Boolean, modifier: Modifier = Modifier, onFocus: () -> Unit = {},
+    /** The name under the poster; the grid names the focused title above itself instead. */
+    showTitle: Boolean = true,
+    /** How much was watched (0 to 1): a thin bar along the bottom of the poster. */
+    progress: Float? = null,
+    onClick: () -> Unit
+) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
+    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
     Column(
         modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
@@ -990,18 +1019,25 @@ private fun PosterCard(channel: Channel, favorite: Boolean, modifier: Modifier =
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
                 .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, White.copy(alpha = if (focused) .16f else .08f), RoundedCornerShape(12.dp))
+                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
                 channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,
                 placeholder = Brush.linearGradient(channelGradient(channel.name)), contentScale = ContentScale.Crop
             )
             if (favorite) Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = White, fontSize = 15.sp)
+            if (progress != null) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(White.copy(alpha = .25f))) {
+                    Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(White))
+                }
+            }
         }
-        Spacer(Modifier.height(7.dp))
-        Text(channel.name, color = if (focused) White else White.copy(alpha = .78f), fontSize = 14.sp,
-            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
+        if (showTitle) {
+            Spacer(Modifier.height(7.dp))
+            Text(channel.name, color = if (focused) White else White.copy(alpha = .78f), fontSize = 14.sp,
+                fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
+        }
     }
 }
 
