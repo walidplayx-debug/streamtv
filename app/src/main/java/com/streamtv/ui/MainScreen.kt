@@ -106,21 +106,21 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Ink = Color(0xFF000000)
+private val Ink get() = ActivePalette.current.ink
 private val White = Color(0xFFFFFFFF)
-private val Muted = Color(0xFF99999E)
-private val Accent = Color(0xFFD5DADF)
-private val Glass = Color(0xFF29292C)
+private val Muted get() = ActivePalette.current.muted
+private val Accent get() = ActivePalette.current.accent
+private val Glass get() = ActivePalette.current.glass
 
 /** Something destructive waiting for the viewer to say yes. */
 private class ConfirmRequest(val question: String, val subject: String, val confirmLabel: String, val action: () -> Unit)
 
 /** One focus colour for every control: the soft sky blue of the tab pills. */
-private val FocusBrush = Brush.verticalGradient(listOf(Color(0xFF8290A6), Color(0xFF647187)))
-private val PressBrush = Brush.verticalGradient(listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)))
-private val LibraryBackdrop = Brush.verticalGradient(listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)))
+private val FocusBrush get() = ActivePalette.current.focusBrush
+private val PressBrush get() = ActivePalette.current.pressBrush
+private val LibraryBackdrop get() = ActivePalette.current.backdropBrush
 /** Dark glass: see-through black with a lit edge, brighter where the light falls (top left). */
-private val GlassFill = Brush.verticalGradient(listOf(Color(0xB3262931), Color(0xB3131519)))
+private val GlassFill get() = ActivePalette.current.glassFillBrush
 private val GlassEdge = Brush.linearGradient(listOf(Color(0x5CFFFFFF), Color(0x0FFFFFFF), Color(0x14FFFFFF), Color(0x38FFFFFF)))
 
 /** A short "pressed" pulse so an OK press is felt even when nothing else changes on screen. */
@@ -1012,7 +1012,7 @@ private fun WelcomeScreen(
         }
     }
     Box(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF16161A), Ink))),
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(ActivePalette.current.welcomeTop, Ink))),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1214,8 +1214,8 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
             .background(Brush.linearGradient(when {
                 light && focused -> listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8))
                 light -> listOf(Color(0xFFC4CAD4), Color(0xFF8E96A5))
-                focused -> listOf(Color(0xFF465064), Color(0xFF2B3240))
-                else -> listOf(Color(0xFF252A33), Color(0xFF171B22))
+                focused -> ActivePalette.current.tileFocused
+                else -> ActivePalette.current.tile
             }))
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
@@ -1487,7 +1487,7 @@ private fun SettingsContent(
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
         // coming back into the list (from the page or the tabs) lands on the open section, so
         // passing over the list never opens another one by accident.
-        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Parental control", "About")
+        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Theme", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
         // The list scrolls instead of squeezing: on a short screen the last row ("About") was
@@ -1610,6 +1610,12 @@ private fun SettingsContent(
                         }
                     }
                 }
+                // Colours only: every screen keeps its layout.
+                "Theme" -> {
+                    for (palette in Palettes.all) {
+                        ThemeBox(palette, state.theme == palette.id) { model.setTheme(palette.id) }
+                    }
+                }
                 // Compact rows, each one reachable with the remote; the action sits on its own row.
                 "Parental control" -> {
                     SettingItem("PIN", if (state.pinSet) "Set" else "Not set", if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
@@ -1657,6 +1663,31 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
         ) {
             Text(t("Remove"), color = if (removeFocused) White else Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+/** One colour theme: its name, its colours as dots, and a check mark when chosen. */
+@Composable
+private fun ThemeBox(palette: StvPalette, chosen: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).height(60.dp).clip(RoundedCornerShape(14.dp))
+            .background(if (pressed) PressBrush else if (focused) FocusBrush else SolidColor(White.copy(alpha = if (chosen) .12f else .05f)))
+            .border(1.dp, White.copy(alpha = if (focused) .4f else if (chosen) .2f else .07f), RoundedCornerShape(14.dp))
+            .onFocusChanged { focused = it.isFocused }.clickable(onClick = press)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(t(palette.name), Modifier.weight(1f), color = if (focused || chosen) White else White.copy(alpha = .7f), fontSize = 17.sp,
+            fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            for (color in palette.swatch) {
+                Box(Modifier.size(20.dp).clip(CircleShape).background(color).border(1.dp, White.copy(alpha = .25f), CircleShape))
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(if (chosen) "✓" else " ", Modifier.width(18.dp), color = if (focused) White else Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 

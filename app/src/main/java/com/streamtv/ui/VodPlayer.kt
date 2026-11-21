@@ -1,5 +1,6 @@
 package com.streamtv.ui
 
+import android.os.SystemClock
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -8,8 +9,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,12 +46,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -60,6 +64,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -80,26 +85,57 @@ import kotlinx.coroutines.delay
 
 private val VodWhite = Color.White
 private val VodMuted = Color(0xFFB5B5BA)
-private const val SeekStepMillis = 10_000L
 private const val ControlsMillis = 4_500L
+/** The chosen place is played this long after the last left/right press. */
+private const val ScrubSettleMillis = 650L
+/** While left/right is held, the place moves one step this often. */
+private const val HoldStepMillis = 110L
+/** A press within this time of the last one, in the same direction, keeps the run (and its speed). */
+private const val RunGapMillis = 900L
 
-/** Glass like the live info bar: a dark see-through panel with a lit edge. */
-private val PanelFill = Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429)))
-private val PanelEdge = Brush.linearGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF), Color(0x1FFFFFFF), Color(0x47FFFFFF)))
+/** Light text over the picture keeps a soft shadow, so it reads on bright scenes too. */
+private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f))
 
 /** One subtitle track found in the file. */
 private class TextTrack(val label: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 /** A sound track: [code] is what its button shows ("AR", "EN", or its number). */
 private class AudioTrack(val code: String, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 
+/** Left/right presses in one direction, close together: the longer the run, the bigger the step. */
+private class ScrubRun {
+    var direction = 0
+    var started = 0L
+    var last = 0L
+    var lastStep = 0L
+    var steps = 0
+}
+
 /**
- * The movie and episode player: a progress bar with times, rewind / play-pause / forward, and the
- * favourite star. Up and down never change the title, and nothing opens a channel list.
+ * How far one left/right step moves. The first presses move 10 s; as the presses keep coming (or
+ * the key is held) the step grows to 20 s, 1 min, 2 min and 5 min, so a long hold crosses a whole
+ * film in a few seconds. A short title never moves more than a twentieth of its length per step.
+ */
+internal fun scrubStep(steps: Int, heldMillis: Long, durationMillis: Long): Long {
+    val step = when {
+        steps <= 3 && heldMillis < 1_500L -> 10_000L
+        heldMillis < 3_000L -> 20_000L
+        heldMillis < 5_000L -> 60_000L
+        heldMillis < 8_000L -> 120_000L
+        else -> 300_000L
+    }
+    val cap = if (durationMillis > 0) (durationMillis / 20).coerceAtLeast(10_000L) else step
+    return step.coerceAtMost(cap)
+}
+
+/**
+ * The movie and episode player, in the style of the Apple TV app: no panel, a dark fade at the
+ * bottom, the title, a few round buttons and a full-width bar with the time under the playhead and
+ * the time left at the end. Up and down never change the title, and nothing opens a channel list.
  *
- * Keys: with the controls hidden, left/right seek 10 s and OK pauses or plays; any key shows the
- * controls. With the controls showing, the progress bar is selected first (left/right seek), down
- * moves to the buttons (left/right pick, OK presses), up goes back to the bar. Back hides the
- * controls, and a second Back leaves the player.
+ * Keys: left/right move the place on the bar (the place is played once the presses stop; the step
+ * grows while they keep coming or the key is held); OK pauses or plays, or plays the chosen place at
+ * once. With the controls showing, up goes to the buttons (left/right pick, OK presses) and down
+ * back to the bar. Back drops a place being chosen, then hides the controls, then leaves.
  */
 @Composable
 fun VodPlayerScreen(
@@ -126,11 +162,17 @@ fun VodPlayerScreen(
     var buffering by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var controls by remember { mutableStateOf(true) }
-    // 0: the progress bar, 1: the buttons.
+    // 0: the progress bar, 1: the buttons above it.
     var row by remember { mutableIntStateOf(0) }
-    var button by remember { mutableIntStateOf(1) }
+    var button by remember { mutableIntStateOf(0) }
+    // On the error card: 0 is Back, 1 is Retry.
+    var failPick by remember { mutableIntStateOf(1) }
     var touch by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
+    // The place being chosen with left/right, before it is played; null when not choosing.
+    var scrubTarget by remember { mutableStateOf<Long?>(null) }
+    var scrubTick by remember { mutableIntStateOf(0) }
+    val run = remember { ScrubRun() }
     // Subtitles carried inside the file. The one in the app's language is picked by itself.
     var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
     var subtitlesOff by remember { mutableStateOf(false) }
@@ -142,7 +184,7 @@ fun VodPlayerScreen(
             .setPreferredTextLanguage(appLanguage).setPreferredAudioLanguage(appLanguage).build()
     }
     // The sound button only when there is a choice, the subtitles button only when there are some.
-    val buttons = listOf("back10", "play", "fwd10", "favorite") +
+    val buttons = listOf("favorite") +
         (if (audios.size > 1) listOf("audio") else emptyList()) +
         (if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList())
     val audioCode = audios.firstOrNull { it.selected }?.code ?: ""
@@ -173,11 +215,38 @@ fun VodPlayerScreen(
         if (length != C.TIME_UNSET && length > 0) savePosition(player.currentPosition, length)
     }
     fun show() { controls = true; touch++ }
-    fun seek(delta: Long) {
-        val length = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-        val target = (player.currentPosition + delta).coerceAtLeast(0L).let { if (length != null) it.coerceAtMost(length - 1_000L) else it }
+    fun knownLength(): Long = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+    fun clampPlace(target: Long): Long {
+        val length = knownLength()
+        val end = if (length > 0) (length - 1_000L).coerceAtLeast(0L) else Long.MAX_VALUE
+        return target.coerceIn(0L, end)
+    }
+    /** Plays the chosen place now. */
+    fun commitScrub() {
+        val target = scrubTarget ?: return
+        scrubTarget = null
         player.seekTo(target)
         position = target
+        show()
+    }
+    /** One left/right step; [held] is true for the repeats of a key being held down. */
+    fun scrub(forward: Boolean, held: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        val direction = if (forward) 1 else -1
+        if (run.direction != direction || now - run.last > RunGapMillis) {
+            run.direction = direction
+            run.started = now
+            run.steps = 0
+            run.lastStep = 0L
+        }
+        run.last = now
+        // A held key repeats very fast: one step every HoldStepMillis keeps the speed even.
+        if (held && now - run.lastStep < HoldStepMillis) return
+        run.lastStep = now
+        run.steps++
+        val step = scrubStep(run.steps, now - run.started, knownLength())
+        scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
+        scrubTick++
         show()
     }
     fun togglePlay() {
@@ -186,9 +255,6 @@ fun VodPlayerScreen(
     }
     fun press(name: String) {
         when (name) {
-            "back10" -> seek(-SeekStepMillis)
-            "fwd10" -> seek(SeekStepMillis)
-            "play" -> togglePlay()
             "favorite" -> { onFavorite(); show() }
             "subtitles" -> { nextSubtitle(); show() }
             "audio" -> { if (audios.size > 1) nextAudio(); show() }
@@ -204,7 +270,7 @@ fun VodPlayerScreen(
                 if (state == Player.STATE_ENDED) { savePosition(0L, 0L); controls = true }
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
-            override fun onPlayerError(error: PlaybackException) { failed = true; buffering = false; controls = true }
+            override fun onPlayerError(error: PlaybackException) { failed = true; buffering = false; controls = true; scrubTarget = null }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 subtitles = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isSupported }.mapIndexed { index, group ->
                     val format = group.getTrackFormat(0)
@@ -233,6 +299,7 @@ fun VodPlayerScreen(
                 Lifecycle.Event.ON_STOP -> {
                     save()
                     stoppedInBackground[0] = true
+                    scrubTarget = null
                     player.playWhenReady = false
                     player.stop()
                 }
@@ -254,19 +321,26 @@ fun VodPlayerScreen(
             var ticks = 0
             while (true) {
                 position = player.currentPosition
-                duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+                duration = knownLength()
                 if (++ticks % 60 == 0) save()
                 delay(500)
             }
         }
     }
+    // Once the presses stop, the chosen place is played.
+    LaunchedEffect(scrubTick) {
+        if (scrubTarget != null) {
+            delay(ScrubSettleMillis)
+            commitScrub()
+        }
+    }
     // The controls step away on their own while the title plays.
     LaunchedEffect(controls, touch, playing) {
-        if (controls && playing && !failed) {
+        if (controls && playing && !failed && scrubTarget == null) {
             delay(ControlsMillis)
             controls = false
             row = 0
-            button = 1
+            button = 0
         }
     }
     LaunchedEffect(Unit) {
@@ -276,7 +350,11 @@ fun VodPlayerScreen(
         }
     }
     BackHandler {
-        if (controls && !failed) { controls = false; row = 0; button = 1 } else leave()
+        when {
+            scrubTarget != null -> { scrubTarget = null; show() }
+            controls && !failed -> { controls = false; row = 0; button = 0 }
+            else -> leave()
+        }
     }
 
     CompositionLocalProviderLtr {
@@ -288,28 +366,30 @@ fun VodPlayerScreen(
                         // Back is handled on key down (BackHandler); let its release through untouched.
                         return@onPreviewKeyEvent event.key != Key.Back
                     }
+                    val held = event.nativeKeyEvent.repeatCount > 0
                     when (event.key) {
                         Key.Back -> false
-                        Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> { togglePlay(); true }
-                        Key.MediaFastForward -> { seek(SeekStepMillis * 3); true }
-                        Key.MediaRewind -> { seek(-SeekStepMillis * 3); true }
+                        Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> { if (!held) togglePlay(); true }
+                        Key.MediaFastForward -> { if (!failed) scrub(forward = true, held = held); true }
+                        Key.MediaRewind -> { if (!failed) scrub(forward = false, held = held); true }
                         // Never zap to another title.
                         Key.ChannelUp, Key.ChannelDown -> true
                         Key.DirectionLeft, Key.DirectionRight -> {
                             val forward = event.key == Key.DirectionRight
                             when {
-                                failed -> { if (controls) { row = 1; button = if (forward) 1 else 0 }; show() }
-                                !controls || row == 0 -> seek(if (forward) SeekStepMillis else -SeekStepMillis)
+                                failed -> { failPick = if (forward) 1 else 0; show() }
+                                !controls || row == 0 -> scrub(forward, held)
                                 else -> { button = (button + if (forward) 1 else -1).coerceIn(0, buttons.lastIndex); show() }
                             }
                             true
                         }
-                        Key.DirectionDown -> { if (controls) row = 1; show(); true }
-                        Key.DirectionUp -> { if (controls) row = 0; show(); true }
+                        Key.DirectionUp -> { if (controls && !failed && scrubTarget == null) row = 1; show(); true }
+                        Key.DirectionDown -> { if (controls) row = 0; show(); true }
                         Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect -> {
-                            if (event.nativeKeyEvent.repeatCount > 0) return@onPreviewKeyEvent true
+                            if (held) return@onPreviewKeyEvent true
                             when {
-                                failed -> if (button == 0) leave() else { failed = false; player.prepare(); player.play(); show() }
+                                failed -> if (failPick == 0) leave() else { failed = false; player.prepare(); player.play(); show() }
+                                scrubTarget != null -> commitScrub()
                                 !controls || row == 0 -> togglePlay()
                                 else -> press(buttons[button.coerceIn(0, buttons.lastIndex)])
                             }
@@ -354,35 +434,47 @@ fun VodPlayerScreen(
                     Text(channel.name, color = VodMuted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        VodTextButton(t("Back"), selected = button == 0)
-                        VodTextButton(t("Retry"), selected = button != 0)
+                        VodTextButton(t("Back"), selected = failPick == 0)
+                        VodTextButton(t("Retry"), selected = failPick != 0)
                     }
                 }
             }
 
-            // One glass panel, like the live info bar: the title, the bar and the buttons together.
+            // No panel: a dark fade at the bottom of the picture carries the title, the buttons and the bar.
             AnimatedVisibility(
                 visible = controls && !failed,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp).fillMaxWidth(.74f),
-                enter = fadeIn(tween(220)) + slideInVertically(spring(dampingRatio = .82f, stiffness = 360f)) { it / 3 },
-                exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 4 }
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(220)),
+                exit = fadeOut(tween(280))
             ) {
-                // Slim: the title and the buttons on one line, the bar under them.
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelFill)
-                        .border(1.dp, PanelEdge, RoundedCornerShape(24.dp))
-                        .padding(start = 22.dp, end = 18.dp, top = 10.dp, bottom = 10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(channel.name, Modifier.weight(1f), color = VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        buttons.forEachIndexed { index, name ->
-                            if (index > 0) Spacer(Modifier.width(10.dp))
-                            VodIconButton(name, playing = playing, favorite = favorite, subtitlesOn = chosenSubtitle >= 0, selected = row == 1 && button == index, audioCode = audioCode)
+                Box(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(.45f)
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66000000), Color(0xD9000000))))
+                    )
+                    Column(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .padding(start = 64.dp, end = 64.dp, bottom = 34.dp)
+                    ) {
+                        Text(
+                            channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            buttons.forEachIndexed { index, name ->
+                                VodIconButton(
+                                    name, favorite = favorite, subtitlesOn = chosenSubtitle >= 0,
+                                    selected = row == 1 && button == index, audioCode = audioCode
+                                )
+                            }
                         }
+                        Spacer(Modifier.height(16.dp))
+                        TimeBar(
+                            position = scrubTarget ?: position, duration = duration, playing = playing,
+                            selected = row == 0, scrubbing = scrubTarget != null
+                        )
                     }
-                    Spacer(Modifier.height(6.dp))
-                    ProgressBar(position, duration, selected = row == 0)
                 }
             }
         }
@@ -395,85 +487,138 @@ private fun CompositionLocalProviderLtr(content: @Composable () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, content = content)
 }
 
+/**
+ * A full-width bar: the watched part bright, the rest see-through, and a thin upright playhead while
+ * the bar is selected or a place is being chosen. The time sits under the playhead and follows it,
+ * with the play/pause mark beside it; the time left sits at the end of the bar.
+ */
 @Composable
-private fun ProgressBar(position: Long, duration: Long, selected: Boolean) {
+private fun TimeBar(position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val thumb by animateFloatAsState(if (selected) 1f else 0f, spring(stiffness = 500f), label = "thumb")
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(formatTime(position), color = VodWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(62.dp))
-        Box(Modifier.weight(1f).height(16.dp), contentAlignment = Alignment.CenterStart) {
-            Canvas(Modifier.fillMaxWidth().height(16.dp)) {
-                val y = size.height / 2f
-                val track = if (selected) 5.dp.toPx() else 3.dp.toPx()
-                drawLine(Color(0x40FFFFFF), Offset(0f, y), Offset(size.width, y), strokeWidth = track, cap = StrokeCap.Round)
-                drawLine(VodWhite, Offset(0f, y), Offset(size.width * fraction, y), strokeWidth = track, cap = StrokeCap.Round)
-                // The playhead grows in when the bar is selected (left/right seek).
-                drawCircle(VodWhite, radius = 2.dp.toPx() + 4.dp.toPx() * thumb, center = Offset(size.width * fraction, y))
+    val lift by animateFloatAsState(if (selected || scrubbing) 1f else 0f, spring(stiffness = 500f), label = "bar")
+    Column(Modifier.fillMaxWidth()) {
+        Canvas(Modifier.fillMaxWidth().height(20.dp)) {
+            val y = size.height / 2f
+            val thick = 5.dp.toPx() + 2.dp.toPx() * lift
+            val corner = CornerRadius(thick / 2f)
+            drawRoundRect(Color(0x47FFFFFF), topLeft = Offset(0f, y - thick / 2f), size = Size(size.width, thick), cornerRadius = corner)
+            val x = size.width * fraction
+            if (x > 0f) {
+                drawRoundRect(Color(0xE6FFFFFF), topLeft = Offset(0f, y - thick / 2f), size = Size(x.coerceAtLeast(thick), thick), cornerRadius = corner)
+            }
+            if (lift > 0f) {
+                val w = 3.dp.toPx()
+                val h = size.height * lift
+                drawRoundRect(
+                    VodWhite.copy(alpha = lift), topLeft = Offset((x - w / 2f).coerceIn(0f, size.width - w), y - h / 2f),
+                    size = Size(w, h), cornerRadius = CornerRadius(w / 2f)
+                )
             }
         }
-        Text(
-            if (duration > 0) "-" + formatTime((duration - position).coerceAtLeast(0L)) else "--:--",
-            color = VodMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-            modifier = Modifier.width(72.dp).padding(start = 12.dp)
-        )
+        Spacer(Modifier.height(6.dp))
+        Layout(
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                Text(formatTime(position), color = VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
+                PlayStateIcon(playing)
+                Text(
+                    if (duration > 0) "-" + formatTime((duration - position).coerceAtLeast(0L)) else "--:--",
+                    color = VodWhite.copy(alpha = .85f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle
+                )
+            }
+        ) { measurables, constraints ->
+            val loose = constraints.copy(minWidth = 0, minHeight = 0)
+            val time = measurables[0].measure(loose)
+            val icon = measurables[1].measure(loose)
+            val left = measurables[2].measure(loose)
+            val width = constraints.maxWidth
+            val height = maxOf(time.height, icon.height, left.height)
+            val gap = 8.dp.roundToPx()
+            layout(width, height) {
+                // The time is centred under the playhead, but never runs into the time left.
+                val lastX = (width - left.width - 3 * gap - icon.width - time.width).coerceAtLeast(0)
+                val x = ((width * fraction).toInt() - time.width / 2).coerceIn(0, lastX)
+                time.place(x, (height - time.height) / 2)
+                icon.place(x + time.width + gap, (height - icon.height) / 2)
+                left.place(width - left.width, (height - left.height) / 2)
+            }
+        }
     }
 }
 
+/** A ring with a pause mark while playing, or a play mark while paused. */
 @Composable
-private fun VodIconButton(name: String, playing: Boolean, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
+private fun PlayStateIcon(playing: Boolean) {
+    Canvas(Modifier.size(22.dp)) {
+        val w = size.width
+        val h = size.height
+        drawCircle(VodWhite, radius = w / 2f - 1.dp.toPx(), style = Stroke(width = 1.6.dp.toPx()))
+        if (playing) {
+            val barW = w * .1f
+            val barH = h * .36f
+            val top = (h - barH) / 2f
+            drawRoundRect(VodWhite, Offset(w * .5f - barW * 1.6f, top), Size(barW, barH), CornerRadius(barW / 2f))
+            drawRoundRect(VodWhite, Offset(w * .5f + barW * .6f, top), Size(barW, barH), CornerRadius(barW / 2f))
+        } else {
+            val path = Path().apply { moveTo(w * .41f, h * .3f); lineTo(w * .72f, h * .5f); lineTo(w * .41f, h * .7f); close() }
+            drawPath(path, VodWhite)
+        }
+    }
+}
+
+/** A round see-through button: the favourite star, the sound track, or the subtitles. */
+@Composable
+private fun VodIconButton(name: String, favorite: Boolean, subtitlesOn: Boolean, selected: Boolean, audioCode: String = "") {
     val scale by animateFloatAsState(if (selected) 1.12f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "vodButton")
-    val big = name == "play"
     Box(
-        Modifier.size(if (big) 40.dp else 34.dp).scale(scale).clip(CircleShape)
-            .background(if (selected) VodWhite else Color(0x24FFFFFF))
-            .border(1.dp, if (selected) Color.Transparent else Color(0x1FFFFFFF), CircleShape),
+        Modifier.size(46.dp).scale(scale).clip(CircleShape)
+            .background(if (selected) VodWhite else Color(0x38FFFFFF))
+            .border(1.dp, if (selected) Color.Transparent else Color(0x29FFFFFF), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         val tint = if (selected) Color(0xFF1C1C1E) else VodWhite
         when (name) {
-            "back10", "fwd10" -> Text(if (name == "back10") "−10" else "+10", color = tint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            // The sound being played, by its language: a press goes to the next one.
+            // A sound wave, with the language being played under it: a press goes to the next one.
             "audio" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("♪", color = tint, fontSize = 10.sp, lineHeight = 10.sp)
-                Text(audioCode, color = tint, fontSize = 9.sp, fontWeight = FontWeight.Bold, lineHeight = 10.sp)
-            }
-            // "CC" in a box; dimmed while subtitles are off.
-            "subtitles" -> Box(
-                Modifier.border(1.5.dp, tint.copy(alpha = if (subtitlesOn) 1f else .5f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp)
-            ) {
-                Text("CC", color = tint.copy(alpha = if (subtitlesOn) 1f else .5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            }
-            else -> Canvas(Modifier.size(if (big) 16.dp else 15.dp)) {
-                val w = size.width
-                val h = size.height
-                when {
-                    name == "play" && playing -> {
-                        drawRoundRect(tint, topLeft = Offset(w * .18f, h * .12f), size = androidx.compose.ui.geometry.Size(w * .22f, h * .76f),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * .05f))
-                        drawRoundRect(tint, topLeft = Offset(w * .6f, h * .12f), size = androidx.compose.ui.geometry.Size(w * .22f, h * .76f),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * .05f))
-                    }
-                    name == "play" -> {
-                        val path = Path().apply { moveTo(w * .24f, h * .1f); lineTo(w * .9f, h * .5f); lineTo(w * .24f, h * .9f); close() }
-                        drawPath(path, tint)
-                    }
-                    else -> {
-                        val path = Path()
-                        val outer = w * .48f
-                        val inner = outer * .46f
-                        for (i in 0 until 10) {
-                            val r = if (i % 2 == 0) outer else inner
-                            val angle = Math.toRadians(-90.0 + i * 36.0)
-                            val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
-                            val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
-                            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                        }
-                        path.close()
-                        // A favourite's star is filled in; otherwise only its outline shows.
-                        if (favorite) drawPath(path, tint)
-                        drawPath(path, tint, style = Stroke(width = w * .09f))
+                Canvas(Modifier.size(width = 16.dp, height = 11.dp)) {
+                    val heights = floatArrayOf(.35f, .7f, 1f, .7f, .35f)
+                    val bar = size.width / 9f
+                    heights.forEachIndexed { i, f ->
+                        val h = size.height * f
+                        drawRoundRect(tint, Offset(bar * (2 * i), (size.height - h) / 2f), Size(bar, h), CornerRadius(bar / 2f))
                     }
                 }
+                if (audioCode.isNotEmpty()) Text(audioCode, color = tint, fontSize = 8.sp, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
+            }
+            // A speech bubble with two lines of text; dimmed while subtitles are off.
+            "subtitles" -> Canvas(Modifier.size(20.dp)) {
+                val color = tint.copy(alpha = if (subtitlesOn) 1f else .5f)
+                val w = size.width
+                val h = size.height
+                val stroke = 1.6.dp.toPx()
+                drawRoundRect(color, Offset(w * .08f, h * .14f), Size(w * .84f, h * .58f), CornerRadius(w * .14f), style = Stroke(width = stroke))
+                val tail = Path().apply { moveTo(w * .3f, h * .72f); lineTo(w * .3f, h * .9f); lineTo(w * .48f, h * .72f) }
+                drawPath(tail, color, style = Stroke(width = stroke))
+                drawLine(color, Offset(w * .26f, h * .36f), Offset(w * .74f, h * .36f), strokeWidth = stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * .26f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = stroke, cap = StrokeCap.Round)
+            }
+            else -> Canvas(Modifier.size(18.dp)) {
+                val w = size.width
+                val h = size.height
+                val path = Path()
+                val outer = w * .48f
+                val inner = outer * .46f
+                for (i in 0 until 10) {
+                    val r = if (i % 2 == 0) outer else inner
+                    val angle = Math.toRadians(-90.0 + i * 36.0)
+                    val x = w / 2f + (r * kotlin.math.cos(angle)).toFloat()
+                    val y = h / 2f + (r * kotlin.math.sin(angle)).toFloat() + outer * .06f
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                // A favourite's star is filled in; otherwise only its outline shows.
+                if (favorite) drawPath(path, tint)
+                drawPath(path, tint, style = Stroke(width = w * .09f))
             }
         }
     }
