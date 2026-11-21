@@ -83,6 +83,8 @@ private val PlayerMuted = Color(0xFFB5B5BA)
 private val PlayerGlass = Color(0xF01C1C1E)
 private val PlayerGlassBorder = Color(0x33FFFFFF)
 private const val InfoBarMillis = 4000L
+/** With a guide, the info bar turns over to its back after this long. */
+private const val InfoBarFlipMillis = 1_800L
 private const val ListIdleMillis = 8000L
 private const val StallMillis = 15000L
 /** Pauses before each automatic reconnect, then the error card. */
@@ -334,7 +336,8 @@ fun PlayerScreen(
     LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
     LaunchedEffect(overlayState, infoBarTick) {
         if (overlayState == OverlayState.InfoBar) {
-            delay(InfoBarMillis)
+            // With a guide the bar turns over to show it, so it stays two seconds longer.
+            delay(if (current != null) InfoBarMillis + 2_000L else InfoBarMillis)
             if (overlayState == OverlayState.InfoBar) overlayState = OverlayState.None
         }
     }
@@ -519,24 +522,35 @@ fun PlayerScreen(
             }
         }
 
-        // The info bar never coexists with the channel list and never changes size.
+        // The info bar never coexists with the channel list and never changes size. With a guide,
+        // the bar turns over on its horizontal axis after a moment: its back shows what is on now
+        // (bright) and what comes next (dimmer), and it stays two seconds longer. Without a guide
+        // it never turns.
         if (overlayState != OverlayState.ChannelList) AnimatedVisibility(
             visible = overlayState == OverlayState.InfoBar,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (current != null) 18.dp else 32.dp).fillMaxWidth(.65f),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).fillMaxWidth(.65f).height(80.dp),
             enter = fadeIn(animationSpec = tween(260)) +
                 slideInVertically(animationSpec = spring(dampingRatio = .82f, stiffness = 360f)) { it / 2 },
             exit = fadeOut(animationSpec = tween(220)) +
                 slideOutVertically(animationSpec = tween(220)) { it / 3 }
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                Modifier.fillMaxWidth().height(80.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
-                    .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            val flip = remember(channel.key, infoBarTick) { Animatable(0f) }
+            LaunchedEffect(channel.key, infoBarTick, current != null) {
+                flip.snapTo(0f)
+                if (current != null) {
+                    delay(InfoBarFlipMillis)
+                    flip.animateTo(180f, tween(620))
+                }
+            }
+            val density = androidx.compose.ui.platform.LocalDensity.current.density
+            val card = Modifier.fillMaxSize()
+                .clip(RoundedCornerShape(28.dp))
+                .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
+                .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
+                .padding(horizontal = 20.dp)
+            Box(Modifier.fillMaxSize().graphicsLayer { rotationX = flip.value; cameraDistance = 16f * density }) {
+                if (flip.value <= 90f) {
+            Row(card, verticalAlignment = Alignment.CenterVertically) {
                 // "Ch" centred over the number; a longer number widens the column smoothly.
                 Column(
                     // Room for three digits, so the bar keeps still while zapping; only a fourth widens it.
@@ -573,35 +587,24 @@ fun PlayerScreen(
                 Spacer(Modifier.width(14.dp))
                 ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
             }
-            // The guide flap: hinged on the bar's lower edge, it turns down from behind the bar (a
-            // flip on the horizontal axis), with what is on now in bright letters and what comes
-            // next under it, dimmer.
-            if (current != null) {
-                val flip = remember(channel.key) { Animatable(-90f) }
-                LaunchedEffect(channel.key) {
-                    flip.snapTo(-90f)
-                    delay(240)
-                    flip.animateTo(0f, spring(dampingRatio = .62f, stiffness = 240f))
-                }
-                val density = androidx.compose.ui.platform.LocalDensity.current.density
-                Column(
-                    Modifier.fillMaxWidth(.94f)
-                        .graphicsLayer {
-                            rotationX = flip.value
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
-                            cameraDistance = 14f * density
-                            alpha = if (flip.value < -85f) 0f else 1f
+                } else if (current != null) {
+                    // The back, turned the right way round: now, its progress, and next.
+                    Row(card.graphicsLayer { rotationX = 180f }, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                            GuideLine(t("Now"), current.title, guideTimes(current), bright = true)
+                            Spacer(Modifier.height(5.dp))
+                            val done = ((System.currentTimeMillis() - current.startEpochMillis).toFloat() /
+                                (current.endEpochMillis - current.startEpochMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                            Box(Modifier.padding(start = 54.dp).fillMaxWidth().height(3.dp).clip(CircleShape).background(PlayerWhite.copy(alpha = .20f))) {
+                                Box(Modifier.fillMaxWidth(done).height(3.dp).clip(CircleShape).background(PlayerAccent))
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            upcoming?.let { GuideLine(t("Next"), it.title, guideClock(it.startEpochMillis), bright = false) }
                         }
-                        .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-                        .background(Color(0xEE15161A))
-                        .border(1.dp, PlayerWhite.copy(alpha = .10f), RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-                        .padding(horizontal = 20.dp, vertical = 9.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    GuideLine(t("Now"), current.title, guideTimes(current), bright = true)
-                    upcoming?.let { GuideLine(t("Next"), it.title, guideClock(it.startEpochMillis), bright = false) }
+                        Spacer(Modifier.width(14.dp))
+                        ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
+                    }
                 }
-            }
             }
         }
 
