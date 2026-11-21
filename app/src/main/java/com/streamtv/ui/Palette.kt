@@ -160,7 +160,40 @@ object Palettes {
         sheen = true
     )
 
-    val all = listOf(Default, Cupertino, Glass)
+    /**
+     * The streaming-service look: near-black pages and flat greys, so posters carry the colour,
+     * and one bold cinema red for focus, the time bar and the channel number. Pop-ups use the
+     * white button with black text. White text keeps at least 4.8:1 on the red.
+     */
+    val Crimson = StvPalette(
+        id = "crimson", name = "Crimson",
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFFB3B3B3), accent = Color(0xFFFF3B44), glass = Color(0xFF222222),
+        focus = listOf(Color(0xFFE50914), Color(0xFFB20710)),
+        press = listOf(Color(0xFFFF3D46), Color(0xFFE50914)),
+        backdrop = listOf(Color(0xFF181818), Color(0xFF141414), Color(0xFF0A0A0A)),
+        glassFill = listOf(Color(0xB3262626), Color(0xB3141414)),
+        tileFocused = listOf(Color(0xFF404040), Color(0xFF2A2A2A)),
+        tile = listOf(Color(0xFF2F2F2F), Color(0xFF181818)),
+        listFocus = listOf(Color(0xFFE50914), Color(0xFFB20710)),
+        welcomeTop = Color(0xFF2A0A0C),
+        swatch = listOf(Color(0xFF000000), Color(0xFF141414), Color(0xFF2F2F2F), Color(0xFFE50914), Color(0xFFFFFFFF)),
+        panel = Color(0xF0181818),
+        faces = listOf(
+            listOf(Color(0xFF3A3A3A), Color(0xFF262626), Color(0xFF161616)),
+            listOf(Color(0xFF4A1418), Color(0xFF320D10), Color(0xFF1C0709)),
+            listOf(Color(0xFF333333), Color(0xFF222222), Color(0xFF121212)),
+            listOf(Color(0xFF2E2A2A), Color(0xFF1F1C1C), Color(0xFF121010))
+        ),
+        lit = Color(0xFFFFFFFF), onLit = Color(0xFF000000),
+        number = Color(0xFFE50914),
+        overlayMuted = Color(0xFFB3B3B3),
+        seek = Color(0xFFE50914),
+        lightTile = listOf(Color(0xFFE5E5E5), Color(0xFFB3B3B3)),
+        lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFCCCCCC)),
+        wordmark = R.drawable.stv_wordmark_red
+    )
+
+    val all = listOf(Default, Cupertino, Glass, Crimson)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }
