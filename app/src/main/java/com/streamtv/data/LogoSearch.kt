@@ -46,6 +46,28 @@ object LogoSearch {
         }
     }
 
+    /**
+     * A picture address pasted in the search field (from a phone's remote app, say), or null when
+     * the text is a name to search. Google's result links ("…/imgres?imgurl=…") give the picture's
+     * own address; a picture pasted as data ("data:image/…;base64,…", what Google often copies for
+     * small pictures) is kept as a file in the app, so the logo still shows later.
+     */
+    fun pasted(context: android.content.Context, text: String): String? {
+        val value = text.trim()
+        if (value.startsWith("data:image/", true)) {
+            val bytes = runCatching { android.util.Base64.decode(value.substringAfter(','), android.util.Base64.DEFAULT) }.getOrNull()
+                ?: return null
+            val folder = java.io.File(context.filesDir, "logos").apply { mkdirs() }
+            val file = java.io.File(folder, "pasted-${value.hashCode().toUInt()}.img")
+            if (!file.isFile) file.writeBytes(bytes)
+            return android.net.Uri.fromFile(file).toString()
+        }
+        if (!value.startsWith("http://", true) && !value.startsWith("https://", true)) return null
+        val google = runCatching { android.net.Uri.parse(value) }.getOrNull()
+        val inner = google?.takeIf { it.path?.contains("imgres") == true }?.getQueryParameter("imgurl")
+        return inner?.takeIf { it.startsWith("http") } ?: value
+    }
+
     private fun get(url: String, agent: String, referer: String? = null): String? {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000

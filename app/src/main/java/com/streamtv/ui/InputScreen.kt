@@ -378,6 +378,7 @@ fun LogoSearchScreen(
     var results by remember { mutableStateOf<List<String>>(emptyList()) }
     var status by remember { mutableStateOf<String?>(null) }
     var round by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
     val field = remember { FocusRequester() }
     val searchButton = remember { FocusRequester() }
@@ -391,9 +392,11 @@ fun LogoSearchScreen(
     }
     LaunchedEffect(round) {
         if (round == 0) return@LaunchedEffect
-        status = "Searching…"
         results = emptyList()
-        val found = com.streamtv.data.LogoSearch.search(value)
+        // A pasted picture address is shown as it is, ready to be picked with OK.
+        val link = com.streamtv.data.LogoSearch.pasted(context, value)
+        status = if (link == null) "Searching…" else null
+        val found = if (link != null) listOf(link) else com.streamtv.data.LogoSearch.search(value)
         results = found
         status = if (found.isEmpty()) "No logos found" else null
         // The first logo takes focus, so the remote is right on the choices.
@@ -418,7 +421,7 @@ fun LogoSearchScreen(
                 Text(t("Search logo"), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 Spacer(Modifier.height(12.dp))
                 EntryField(
-                    value = value, hint = "Channel name",
+                    value = value, hint = "Channel name or picture link",
                     onValueChange = { value = it },
                     modifier = Modifier.fillMaxWidth().focusRequester(field),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
