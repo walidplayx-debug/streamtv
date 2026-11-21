@@ -10,25 +10,33 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Logo pictures for a channel name, for the viewer to pick one. Free sources that need no account
- * or key: the iptv-org channel logos already used by the app, then logo files on Wikimedia Commons
- * and Wikipedia (which also holds most TV logos that are not free to reuse elsewhere).
+ * Logo pictures for a channel name, for the viewer to pick one. An image search first (DuckDuckGo,
+ * whose pictures come from Bing, then Bing itself), as close to a Google image search as an app can
+ * get without a paid key; then the iptv-org channel logos and the logo files on Wikimedia Commons
+ * and Wikipedia. The image searches are read from their web pages, so a change on their side can
+ * stop them; the other sources still answer then.
  */
 object LogoSearch {
-    /** Sent with every request: Wikimedia refuses requests that do not say who is asking. */
+    /** Sent to Wikimedia, which refuses requests that do not say who is asking. */
     const val UserAgent = "STV-Android-App/1.0 (https://github.com/walidplayx-debug/streamtv)"
+    /** The search sites answer an ordinary browser. */
+    private const val Browser = "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
     suspend fun search(query: String, limit: Int = 10): List<String> = withContext(Dispatchers.IO) {
         val name = query.trim()
         if (name.length < 2) return@withContext emptyList()
         coroutineScope {
+            val images = async { runCatching { duckDuckGo("$name logo", limit) }.getOrDefault(emptyList()) }
+            val bing = async { runCatching { bing("$name logo", limit) }.getOrDefault(emptyList()) }
             val wikis = listOf("commons.wikimedia.org", "en.wikipedia.org", "ar.wikipedia.org").map { host ->
                 async { runCatching { wiki(host, name, limit) }.getOrDefault(emptyList()) }
             }
-            val index = LogoIndex.search(name, limit)
-            val found = LinkedHashSet<String>(index)
-            // Taken in turns from each site, so one site does not fill every place.
-            val lists = wikis.map { it.await() }
+            val found = LinkedHashSet<String>()
+            // The image search first; Bing only when DuckDuckGo gave nothing (they show the same pictures).
+            found += images.await().take(limit)
+            if (found.isEmpty()) found += bing.await().take(limit)
+            // Then the logo databases, taken in turns so one does not fill every place.
+            val lists = listOf(LogoIndex.search(name, limit)) + wikis.map { it.await() }
             var i = 0
             while (found.size < limit && lists.any { i < it.size }) {
                 for (list in lists) if (i < list.size && found.size < limit) found += list[i]
@@ -36,6 +44,53 @@ object LogoSearch {
             }
             found.toList()
         }
+    }
+
+    private fun get(url: String, agent: String, referer: String? = null): String? {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", agent)
+            setRequestProperty("Accept-Language", "ar,en;q=0.8")
+            referer?.let { setRequestProperty("Referer", it) }
+        }
+        return try {
+            if (connection.responseCode !in 200..299) null
+            else connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private val vqdPattern = Regex("""vqd=["']?([0-9A-Za-z_-]+)""")
+
+    /** DuckDuckGo images: a token from the search page, then the picture list as JSON. */
+    private fun duckDuckGo(query: String, limit: Int): List<String> {
+        val q = URLEncoder.encode(query, "UTF-8")
+        val page = get("https://duckduckgo.com/?q=$q&iax=images&ia=images", Browser) ?: return emptyList()
+        val vqd = vqdPattern.find(page)?.groupValues?.get(1) ?: return emptyList()
+        val json = get("https://duckduckgo.com/i.js?l=wt-wt&o=json&q=$q&vqd=$vqd&f=,,,,,&p=1", Browser, "https://duckduckgo.com/")
+            ?: return emptyList()
+        val results = JSONObject(json).optJSONArray("results") ?: return emptyList()
+        val found = ArrayList<String>()
+        for (i in 0 until results.length()) {
+            val item = results.optJSONObject(i) ?: continue
+            // The small copy on Bing's own servers: always reachable, unlike some original sites.
+            val picture = item.optString("thumbnail").ifBlank { item.optString("image") }
+            if (picture.startsWith("http")) found += picture
+            if (found.size >= limit) break
+        }
+        return found
+    }
+
+    private val bingThumb = Regex("""turl&quot;:&quot;(https?://[^&"]+)""")
+
+    /** Bing images: the small copies listed in the results page. */
+    private fun bing(query: String, limit: Int): List<String> {
+        val q = URLEncoder.encode(query, "UTF-8")
+        val page = get("https://www.bing.com/images/search?q=$q&form=HDRSC2&first=1", Browser) ?: return emptyList()
+        return bingThumb.findAll(page).map { it.groupValues[1] }.distinct().take(limit).toList()
     }
 
     /** Picture files whose name or text matches "<name> logo" on one wiki, as small PNG/JPEG previews. */
