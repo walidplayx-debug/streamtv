@@ -1143,50 +1143,61 @@ private fun SeriesDetails(
                 .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
+            // Compact, as on the film page: the poster with small round buttons under it (the
+            // focused one's name under them), and beside it the name, pills and story, so the
+            // seasons and episodes get the room.
+            var buttonLabel by remember(show.key) { mutableStateOf("") }
             Row {
-                Box(
-                    Modifier.width(120.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
-                ) {
-                    ChannelLogo(
-                        show.name, show.logo, Modifier.fillMaxSize(), fontSize = 24.sp, corner = 14.dp,
-                        placeholder = Brush.linearGradient(channelGradient(show.name)), contentScale = ContentScale.Crop
-                    )
-                }
-                Spacer(Modifier.width(30.dp))
-                Column(Modifier.weight(1f).padding(top = 4.dp)) {
-                    Text(show.name, color = White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 34.sp)
+                Column(Modifier.width(112.dp)) {
+                    Box(
+                        Modifier.fillMaxWidth().aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(12.dp))
+                    ) {
+                        ChannelLogo(
+                            show.name, show.logo, Modifier.fillMaxSize(), fontSize = 22.sp, corner = 12.dp,
+                            placeholder = Brush.linearGradient(channelGradient(show.name)), contentScale = ContentScale.Crop
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        when {
+                            next != null -> {
+                                val (episode, start) = next
+                                val label = (if (start > 0L) t("Resume") else t("Play")) + " " + code(episode)
+                                SmallRoundButton("▶\uFE0E", label, Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) {
+                                    onPlay(Shows.playable(show, episode), start)
+                                }
+                            }
+                            failed != null -> SmallRoundButton("↻", t("Try again"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { attempt++ }
+                        }
+                        SmallRoundButton(
+                            if (starred) "♥\uFE0E" else "♡", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            Modifier.weight(1f).then(if (next == null && failed == null) Modifier.focusRequester(primary) else Modifier),
+                            { buttonLabel = it }
+                        ) { onFavorite() }
+                    }
+                    Text(buttonLabel, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+                Spacer(Modifier.width(24.dp))
+                Column(Modifier.weight(1f).padding(top = 2.dp)) {
+                    Text(show.name, color = White, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         val pills = titlePills(show, showInfo, t("Series")) +
                             listOfNotNull(all.size.takeIf { it > 0 }?.let { "$it ${t(if (it == 1) "season" else "seasons")}" })
                         for (label in pills) {
                             Box(
                                 Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .padding(horizontal = 10.dp, vertical = 3.dp)
                             ) {
-                                Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(label, color = White.copy(alpha = .9f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                     showInfo?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
-                        Spacer(Modifier.height(10.dp))
-                        Text(plot, color = White.copy(alpha = .75f), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 620.dp))
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        when {
-                            next != null -> {
-                                val (episode, start) = next
-                                val label = (if (start > 0L) t("Resume") else t("Play")) + "  " + code(episode)
-                                WhiteButton(label, Modifier.focusRequester(primary)) { onPlay(Shows.playable(show, episode), start) }
-                            }
-                            failed != null -> WhiteButton("Try again", Modifier.focusRequester(primary)) { attempt++ }
-                            else -> WhiteButton(if (starred) "Remove from favorites" else "Add to favorites", Modifier.focusRequester(primary)) { onFavorite() }
-                        }
-                        if (next != null || failed != null) {
-                            WhiteButton(if (starred) "Remove from favorites" else "Add to favorites") { onFavorite() }
-                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp))
                     }
                 }
             }
