@@ -72,6 +72,8 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
         val liveGroups = categories("get_live_categories")
         streams("get_live_streams") { s ->
             val id = s["stream_id"] ?: return@streams
+            // Some servers answer every list with everything; a film is never a live channel.
+            if (!s.isLive()) return@streams
             val name = s["name"].orEmpty().ifBlank { "Channel $id" }
             val url = account.live(id)
             result += Channel(s["epg_channel_id"]?.takeIf { it.isNotBlank() } ?: "$name|$url", name, url,
@@ -87,6 +89,7 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
         val movieGroups = categories("get_vod_categories")
         streams("get_vod_streams") { s ->
             val id = s["stream_id"] ?: return@streams
+            if (s["stream_type"].equals("live", ignoreCase = true)) return@streams
             val name = s["name"].orEmpty().ifBlank { "Movie $id" }
             val url = account.movie(id, s["container_extension"].orEmpty())
             result += Channel("$name|$url", name, url, s["stream_icon"]?.takeIf { it.startsWith("http") }, movieGroups[s["category_id"]] ?: "Other")
@@ -130,6 +133,16 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             val body = response.body ?: error("Xtream server sent nothing")
             JsonReader(body.charStream()).use { reader -> reader.isLenient = true; block(reader) }
         }
+    }
+
+    /**
+     * A live channel or radio, by what the server says it is: its stream type when it gives one,
+     * else the absence of a file type (films and episodes have one, "mp4", "mkv"...).
+     */
+    private fun Map<String, String>.isLive(): Boolean {
+        val type = this["stream_type"]?.lowercase()
+        if (!type.isNullOrBlank()) return type != "movie" && type != "series"
+        return this["container_extension"].isNullOrBlank()
     }
 
     /** A text or number value; null for anything else (skipped). */
