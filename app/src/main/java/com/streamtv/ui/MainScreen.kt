@@ -978,56 +978,67 @@ private fun TitleDetails(
                 .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
-            // The page stays still; only the row below slides sideways.
+            // The page stays still; only the row below slides sideways. Compact, so the row of
+            // suggestions gets the room: the poster with three small round buttons under it, and
+            // beside it the name, the pills, the story and the time left.
+            var buttonLabel by remember(item.key) { mutableStateOf("") }
             Row {
-                Box(
-                    Modifier.width(130.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
-                ) {
-                    ChannelLogo(
-                        item.name, item.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 14.dp,
-                        placeholder = Brush.linearGradient(channelGradient(item.name)), contentScale = ContentScale.Crop
-                    )
-                }
-                Spacer(Modifier.width(34.dp))
-                Column(Modifier.weight(1f).padding(top = 6.dp)) {
-                    Text(item.name, color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 36.sp)
+                Column(Modifier.width(112.dp)) {
+                    Box(
+                        Modifier.fillMaxWidth().aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(12.dp))
+                    ) {
+                        ChannelLogo(
+                            item.name, item.logo, Modifier.fillMaxSize(), fontSize = 22.sp, corner = 12.dp,
+                            placeholder = Brush.linearGradient(channelGradient(item.name)), contentScale = ContentScale.Crop
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (saved != null) {
+                            SmallRoundButton("▶\uFE0E", t("Resume"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { onPlay(saved.first) }
+                            SmallRoundButton("↺", t("Start over"), Modifier.weight(1f), { buttonLabel = it }) { onPlay(0L) }
+                        } else {
+                            SmallRoundButton("▶\uFE0E", t("Play"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { onPlay(0L) }
+                        }
+                        SmallRoundButton(
+                            if (starred) "♥\uFE0E" else "♡", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            Modifier.weight(1f), { buttonLabel = it }
+                        ) { onFavorite() }
+                    }
+                    // What the focused button does, small under the buttons.
+                    Text(buttonLabel, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+                Spacer(Modifier.width(24.dp))
+                Column(Modifier.weight(1f).padding(top = 2.dp)) {
+                    Text(item.name, color = White, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(8.dp))
                     // Soft pills: what it is, its year and rating, and its genres (else where it belongs).
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (label in titlePills(item, info, t(if (kind == ChannelKind.Movie) "Movie" else "Series"))) {
                             Box(
                                 Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .padding(horizontal = 10.dp, vertical = 3.dp)
                             ) {
-                                Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(label, color = White.copy(alpha = .9f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                     info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
-                        Spacer(Modifier.height(10.dp))
-                        Text(plot, color = White.copy(alpha = .75f), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 620.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp))
                     }
                     if (saved != null) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val done = (saved.first.toFloat() / saved.second.coerceAtLeast(1L)).coerceIn(0f, 1f)
-                            Box(Modifier.width(200.dp).height(4.dp).clip(CircleShape).background(White.copy(alpha = .2f))) {
+                            Box(Modifier.width(180.dp).height(4.dp).clip(CircleShape).background(White.copy(alpha = .2f))) {
                                 Box(Modifier.fillMaxWidth(done).fillMaxHeight().clip(CircleShape).background(White))
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Text("${formatTime((saved.second - saved.first).coerceAtLeast(0L))} ${t("left")}", color = Muted, fontSize = 15.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("${formatTime((saved.second - saved.first).coerceAtLeast(0L))} ${t("left")}", color = Muted, fontSize = 14.sp)
                         }
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        if (saved != null) {
-                            WhiteButton("Resume", Modifier.focusRequester(primary)) { onPlay(saved.first) }
-                            WhiteButton("Start over") { onPlay(0L) }
-                        } else {
-                            WhiteButton("Play", Modifier.focusRequester(primary)) { onPlay(0L) }
-                        }
-                        WhiteButton(if (starred) "Remove from favorites" else "Add to favorites") { onFavorite() }
                     }
                 }
             }
@@ -1244,6 +1255,26 @@ private fun SeriesDetails(
                 }
             }
         }
+    }
+}
+
+/**
+ * A small round button with a mark (play, start over, favourite) for the title page: white with a
+ * dark mark under the remote, see-through otherwise. [onFocus] gets its name, shown under the row.
+ */
+@Composable
+private fun SmallRoundButton(mark: String, label: String, modifier: Modifier, onFocus: (String) -> Unit, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val (pressed, press) = rememberPress(onClick)
+    val scale by animateFloatAsState(if (pressed) .92f else if (focused) 1.1f else 1f, spring(stiffness = 430f), label = "smallButton")
+    Box(
+        modifier.height(34.dp).scale(scale).clip(CircleShape)
+            .background(if (focused) White else White.copy(alpha = .14f))
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus(label) }
+            .clickable(onClick = press),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(mark, color = if (focused) Ink else White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
