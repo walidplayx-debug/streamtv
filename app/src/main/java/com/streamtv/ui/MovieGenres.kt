@@ -7,7 +7,7 @@ import com.streamtv.data.Channel
  * are called or however many it has. A title's genre is read from its provider category name
  * (in English, French or Arabic); a title that fits none is only under "All".
  */
-internal object Genres {
+internal object MovieGenres {
     val order = listOf(
         "Action", "Comedy", "Drama", "Horror", "Romance",
         "Thriller", "Science fiction", "Animation", "Documentary", "Family"

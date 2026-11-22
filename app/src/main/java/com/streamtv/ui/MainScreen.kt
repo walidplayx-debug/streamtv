@@ -696,7 +696,7 @@ private fun LibraryContent(
     // category names say nothing of genre keeps its own categories, as before.
     val genres: Map<String, List<Channel>> = remember(titles) {
         Memo.of<Map<String, List<Channel>>>("genres", titles) {
-            val fixed = Genres.group(titles)
+            val fixed = MovieGenres.group(titles)
             if (fixed.size >= 2) fixed else titles.groupBy { it.group.ifBlank { "Other" } }
         }
     }
@@ -912,16 +912,16 @@ private fun TitleDetails(
     }
     // The film's other parts ("Rocky", "Rocky II"...), then titles of the same genre.
     val parts = remember(item.key, titles) {
-        val saga = Genres.saga(item.name)
+        val saga = MovieGenres.saga(item.name)
         if (saga == null) emptyList() else titles.filter {
-            it.key != item.key && it.name.startsWith(saga.take(4), ignoreCase = true) && Genres.saga(it.name) == saga
+            it.key != item.key && it.name.startsWith(saga.take(4), ignoreCase = true) && MovieGenres.saga(it.name) == saga
         }.sortedBy { it.name.lowercase() }.take(24)
     }
     val more = remember(item.key, titles, parts) {
-        val genre = Genres.of(item)
+        val genre = MovieGenres.of(item)
         val skip = parts.mapTo(HashSet()) { it.key }
         titles.asSequence().filter {
-            it.key != item.key && it.key !in skip && (if (genre != null) Genres.of(it) == genre else it.group == item.group)
+            it.key != item.key && it.key !in skip && (if (genre != null) MovieGenres.of(it) == genre else it.group == item.group)
         }.take(24).toList()
     }
     val partsFocus = remember(item.key) { FocusRequester() }
@@ -1029,7 +1029,7 @@ private fun TitleDetails(
                     if (parts.isNotEmpty()) TitleRow(t("Other parts"), parts, first = true)
                     if (more.isNotEmpty()) {
                         if (parts.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                        val heading = if (Genres.of(item) != null) t("Similar") else t("More in") + " " + t(item.group.ifBlank { "Other" })
+                        val heading = if (MovieGenres.of(item) != null) t("Similar") else t("More in") + " " + t(item.group.ifBlank { "Other" })
                         TitleRow(heading, more, first = parts.isEmpty())
                     }
                 }
