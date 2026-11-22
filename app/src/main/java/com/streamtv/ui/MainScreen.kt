@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -1026,7 +1027,8 @@ private fun TitleDetails(
                     // Posters as tall as the room left allows (room for the focus growth included).
                     val posterHeight = (maxHeight - 28.dp).coerceIn(90.dp, 200.dp)
                     val rowState = rememberLazyListState()
-                    val rowScope = rememberCoroutineScope()
+                    var rowFocus by remember(item.key) { mutableStateOf<Int?>(null) }
+                    GlideRow(rowState, rowFocus)
                     LazyRow(
                         state = rowState,
                         modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
@@ -1041,12 +1043,7 @@ private fun TitleDetails(
                         itemsIndexed(row, key = { _, entry -> entry.key }) { index, other ->
                             PosterCard(
                                 other, state.favorites.hasFavorite(other), Modifier.width(posterHeight * (2f / 3f)),
-                                onFocus = {
-                                    rowIndex = index
-                                    // Back on the first poster, the row goes right back to its start: brought
-                                    // into view on its own it stopped at the edge, the poster cut in half.
-                                    if (index == 0) rowScope.launch { rowState.animateScrollToItem(0) }
-                                }
+                                onFocus = { rowIndex = index; rowFocus = index }
                             ) { onOpen(other) }
                         }
                     }
@@ -1192,7 +1189,8 @@ private fun SeriesDetails(
                         val imageHeight = (maxHeight - 70.dp).coerceIn(60.dp, 170.dp)
                         key(seasonIndex) {
                             val rowState = rememberLazyListState()
-                            val rowScope = rememberCoroutineScope()
+                            var rowFocus by remember { mutableStateOf<Int?>(null) }
+                            GlideRow(rowState, rowFocus)
                             LazyRow(
                                 state = rowState,
                                 modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
@@ -1211,7 +1209,7 @@ private fun SeriesDetails(
                                         episode, show.logo,
                                         saved?.let { (it.first.toFloat() / it.second.coerceAtLeast(1L)).coerceIn(0f, 1f) },
                                         Modifier.width(imageHeight * (16f / 9f)),
-                                        onFocus = { if (index == 0) rowScope.launch { rowState.animateScrollToItem(0) } }
+                                        onFocus = { rowFocus = index }
                                     ) {
                                         val start = saved?.takeIf { it.first < it.second * 0.95 }?.first ?: 0L
                                         onPlay(playable, start)
@@ -1411,6 +1409,28 @@ private fun GlideToFocus(gridState: LazyGridState, focusedKey: String?) {
             if (kotlin.math.abs(delta) < 1f) return@LaunchedEffect
             try {
                 gridState.animateScrollBy(delta, tween(320, easing = FastOutSlowInEasing))
+                return@LaunchedEffect
+            } catch (e: CancellationException) {
+                // The built-in "keep the focus visible" scroll took over; try again on the next frame.
+                ensureActive()
+                withFrameNanos { }
+            }
+        }
+    }
+}
+
+/**
+ * A sideways row as on Apple TV: the focused poster glides to the second place from the start
+ * (the first one to the very start), so it is always whole, its growth and shadow included.
+ * Left alone, the row only scrolled until the poster touched its edge, and cut it.
+ */
+@Composable
+private fun GlideRow(state: LazyListState, focusedIndex: Int?) {
+    LaunchedEffect(focusedIndex) {
+        val index = focusedIndex ?: return@LaunchedEffect
+        repeat(4) {
+            try {
+                state.animateScrollToItem((index - 1).coerceAtLeast(0))
                 return@LaunchedEffect
             } catch (e: CancellationException) {
                 // The built-in "keep the focus visible" scroll took over; try again on the next frame.

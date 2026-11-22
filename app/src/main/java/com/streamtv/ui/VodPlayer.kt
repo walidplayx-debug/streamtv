@@ -92,6 +92,8 @@ import kotlinx.coroutines.delay
 private val VodWhite = Color.White
 private val VodMuted get() = ActivePalette.current.overlayMuted
 private const val ControlsMillis = 4_500L
+/** Left/right let go this long: the film jumps to the chosen place by itself (no OK needed). */
+private const val ScrubSettleMillis = 900L
 /** The preview follows the chosen place after this pause, so a held key does not flood it with seeks. */
 private const val PreviewSeekMillis = 120L
 /** The preview player is kept this long after choosing ends, ready for the next time. */
@@ -349,6 +351,13 @@ fun VodPlayerScreen(
         } else if (preview != null) {
             delay(PreviewKeepMillis)
             dropPreview()
+        }
+    }
+    // Choosing a place ends by itself: once the arrows rest, the film goes there, as on Apple TV.
+    LaunchedEffect(scrubTarget) {
+        if (scrubTarget != null) {
+            delay(ScrubSettleMillis)
+            commitScrub()
         }
     }
     // The controls step away on their own while the title plays.
