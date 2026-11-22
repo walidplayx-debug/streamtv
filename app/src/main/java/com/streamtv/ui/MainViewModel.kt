@@ -457,7 +457,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         const val EpgMaxAgeMillis = 6L * 60 * 60 * 1000
         /** A cached playlist older than this is downloaded again (quietly) at start. */
-        const val CacheMaxAgeMillis = 12L * 60 * 60 * 1000
+        const val CacheMaxAgeMillis = 24L * 60 * 60 * 1000
     }
     fun setSearchText(value: String) { _state.value = _state.value.copy(searchText = value) }
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }

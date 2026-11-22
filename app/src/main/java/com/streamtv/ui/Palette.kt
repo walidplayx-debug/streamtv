@@ -67,7 +67,7 @@ class StvPalette(
     val lightTileFocused: List<Color> = listOf(Color(0xFFD3D8E0), Color(0xFFA2AAB8)),
     /** The STV wordmark drawn for this theme. */
     val wordmark: Int = R.drawable.stv_wordmark,
-    /** A soft band of light that keeps sweeping across the focused tile, like light on glass. */
+    /** A soft band of light that sweeps across a tile when it gets focus, like light on glass. */
     val sheen: Boolean = false
 ) {
     val focusBrush: Brush get() = Brush.verticalGradient(focus)

@@ -81,4 +81,13 @@ class M3uParserTest {
         // A file without the #EXTM3U header, starting straight with a marked #EXTINF line.
         assertEquals(listOf("A"), M3uParser.parse("﻿#EXTINF:-1,A\nhttps://x/a\n").map { it.name })
     }
+
+    @Test fun keepsOnlyFilteredEntries() {
+        // How an Xtream account's series are read from its get.php: only the series lines are kept.
+        val text = "#EXTM3U\n#EXTINF:-1,Live\nhttp://h/live/u/p/1.ts\n" +
+            "#EXTINF:-1,Show S01E01\nhttp://h/series/u/p/2.mkv\n#EXTINF:-1,Film\nhttp://h/movie/u/p/3.mp4\n"
+        val kept = M3uParser.parse(java.io.StringReader(text)) { it.contains("/series/") }
+        assertEquals(listOf("Show S01E01"), kept.map { it.name })
+        assertEquals(ChannelKind.Series, kept.single().kind())
+    }
 }

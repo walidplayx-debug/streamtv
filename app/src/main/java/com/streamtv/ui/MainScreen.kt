@@ -12,10 +12,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -1260,13 +1256,17 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
     // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
-    // Glass themes: light keeps sweeping across the focused tile. Only the focused tile runs it.
+    // Glass themes: light sweeps twice across a tile when it gets focus, then rests (no endless
+    // animation keeping the TV's graphics busy while the viewer reads or steps away).
     val sheenOn = ActivePalette.current.sheen && focused
-    val sheen = if (sheenOn) {
-        rememberInfiniteTransition(label = "sheen").animateFloat(
-            -0.6f, 1.6f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "sheenPos"
-        ).value
-    } else 0f
+    val sweep = remember { Animatable(1.6f) }
+    LaunchedEffect(sheenOn) {
+        if (sheenOn) repeat(2) {
+            sweep.snapTo(-0.6f)
+            sweep.animateTo(1.6f, tween(1400, easing = LinearEasing))
+        } else sweep.snapTo(1.6f)
+    }
+    val sheen = sweep.value
     Box(
         // The focused tile grows and sits above its neighbours.
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)

@@ -43,8 +43,13 @@ object Players {
         )
         // Start showing after 1.5 s of picture (3 s after a stall) instead of the generic 2.5 s / 5 s:
         // channels open sooner and sit closer to live, while up to 50 s is still gathered behind.
+        // Up to 50 s, but never more than 48 MB (24 MB on a low-memory TV). Left to itself the player
+        // may hold about 130 MB of video in the app's memory, most of what a TV allows an app.
+        val lowRam = (app.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)?.isLowRamDevice == true
         val buffers = DefaultLoadControl.Builder()
             .setBufferDurationsMs(/* min = */ 15_000, /* max = */ 50_000, /* forPlayback = */ 1_500, /* afterRebuffer = */ 3_000)
+            .setTargetBufferBytes((if (lowRam) 24 else 48) * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
             .build()
         // The device's own decoders first; FFmpeg (Dolby AC3 / E-AC3, DTS, TrueHD...) only for a sound
         // the device cannot play, which otherwise left the picture silent.

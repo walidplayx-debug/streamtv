@@ -4,6 +4,7 @@ import android.app.Application
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
+import coil.memory.MemoryCache
 
 class StreamTvApp : Application() {
     override fun onCreate() {
@@ -16,6 +17,9 @@ class StreamTvApp : Application() {
                         .maxSizeBytes(64L * 1024 * 1024)
                         .build()
                 }
+                // Decoded pictures kept in memory: an eighth of what the app may use. The library's
+                // own share (a quarter) grew with the larger memory a big playlist needs.
+                .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.125).build() }
                 .crossfade(true)
                 // Wikimedia refuses pictures asked for without a name: logos found by "Search logo".
                 .okHttpClient {
