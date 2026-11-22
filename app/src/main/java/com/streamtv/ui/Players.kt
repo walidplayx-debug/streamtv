@@ -29,21 +29,34 @@ import java.net.URLDecoder
 @OptIn(UnstableApi::class)
 object Players {
     /**
-     * Subtitles as the big apps show them: white letters with a light dark shadow, no black box
-     * behind them, a little smaller than the library's default, whatever the file asks for.
+     * Subtitles as Apple shows them: white letters on a small dark box just around the words. The
+     * viewer can choose "transparent background" instead: no box, a light dark shadow. The choice
+     * is kept for both players. Whatever the file asks for (colours, sizes) is ignored.
      */
     fun styleSubtitles(view: androidx.media3.ui.PlayerView) {
+        val boxed = subtitleBox(view.context)
         view.subtitleView?.apply {
             setApplyEmbeddedStyles(false)
             setApplyEmbeddedFontSizes(false)
             setStyle(
-                androidx.media3.ui.CaptionStyleCompat(
+                if (boxed) androidx.media3.ui.CaptionStyleCompat(
+                    android.graphics.Color.WHITE, 0xA6000000.toInt(), android.graphics.Color.TRANSPARENT,
+                    androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.TRANSPARENT, null
+                ) else androidx.media3.ui.CaptionStyleCompat(
                     android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
                     androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, 0xB3000000.toInt(), null
                 )
             )
             setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * .9f)
         }
+    }
+
+    /** True: the dark box behind subtitles (the default); false: no box, a shadow. */
+    fun subtitleBox(context: Context): Boolean =
+        context.getSharedPreferences("stv_player", Context.MODE_PRIVATE).getBoolean("subtitle_box", true)
+
+    fun setSubtitleBox(context: Context, boxed: Boolean) {
+        context.getSharedPreferences("stv_player", Context.MODE_PRIVATE).edit().putBoolean("subtitle_box", boxed).apply()
     }
 
     private var meter: DefaultBandwidthMeter? = null

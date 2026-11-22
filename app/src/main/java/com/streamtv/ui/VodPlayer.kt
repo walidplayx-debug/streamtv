@@ -55,6 +55,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -106,8 +107,14 @@ private const val RunGapMillis = 1_200L
 /** Light text over the picture keeps a soft shadow, so it reads on bright scenes too. */
 private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f))
 
-/** One subtitle track found in the file. */
+/** One subtitle or sound track found in the file. */
 private class TextTrack(val label: String, val language: String?, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
+
+/** One row of a player menu: a choice (with a check mark when in use) or a way into a sub-menu. */
+private class MenuRow(val label: String, val detail: String? = null, val checked: Boolean = false, val opens: Boolean = false, val lineAbove: Boolean = false)
+
+/** Fast-forward and rewind speeds 1 to 5: seconds of the title crossed per second. */
+private val ScrubSpeeds = longArrayOf(0L, 10_000L, 30_000L, 60_000L, 120_000L, 300_000L)
 
 /** Left/right presses in one direction, close together: the longer the run, the bigger the step. */
 private class ScrubRun {
@@ -195,17 +202,29 @@ fun VodPlayerScreen(
     var subtitlesOff by remember { mutableStateOf(false) }
     // The subtitles are set once per title: the app's language when the file has it, otherwise off.
     val subtitlesDecided = remember(player) { booleanArrayOf(false) }
-    // The subtitles list above the CC box: open or not, and the row under the remote (0 is "Off").
-    var menuOpen by remember { mutableStateOf(false) }
+    // Sound tracks in the file (dubbings); the button shows only when there are two or more.
+    var sounds by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
+    // The menu open above the buttons: "subtitles" (on/off, then Language and Style), its two
+    // sub-menus "language" and "style", or "audio"; null when closed. menuIndex: the row under the remote.
+    var menu by remember { mutableStateOf<String?>(null) }
     var menuIndex by remember { mutableIntStateOf(0) }
+    // The subtitles' look (box or shadow), kept for both players.
+    var subtitleBox by remember { mutableStateOf(Players.subtitleBox(context)) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    // The last subtitles turned on, so "On" brings them back.
+    var lastSubtitle by remember { mutableIntStateOf(0) }
+    // Fast-forward (positive) or rewind (negative) at speed 1 to 5, set by repeated presses; the
+    // place keeps moving on its own until OK plays it or Back drops it. 0: plain steps.
+    var speed by remember { mutableIntStateOf(0) }
+    var speedMode by remember { mutableStateOf(false) }
     val appLanguage = LocalAppLanguage.current
     LaunchedEffect(player, appLanguage) {
         Players.preferSound(player, appLanguage)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setPreferredTextLanguage(appLanguage).build()
     }
-    // Beside the title, at the end of the bar: the CC box, only when the title has subtitles.
-    val buttons = if (subtitles.isNotEmpty()) listOf("subtitles") else emptyList()
+    // Beside the title, at the end of the bar: sound (two tracks or more) and subtitles (any).
+    val buttons = listOfNotNull("audio".takeIf { sounds.size > 1 }, "subtitles".takeIf { subtitles.isNotEmpty() })
     val chosenSubtitle = if (subtitlesOff) -1 else subtitles.indexOfFirst { it.selected }
     /** Shows subtitle track [index] of [list]; -1 turns subtitles off. */
     fun chooseSubtitle(index: Int, list: List<TextTrack> = subtitles) {
@@ -217,8 +236,20 @@ fun VodPlayerScreen(
             params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                 .setOverrideForType(androidx.media3.common.TrackSelectionOverride(list[index].group, 0))
             subtitlesOff = false
+            lastSubtitle = index
         }
         player.trackSelectionParameters = params.build()
+    }
+    /** Plays sound track [index] (a dubbing) instead of the one playing. */
+    fun chooseSound(index: Int) {
+        val track = sounds.getOrNull(index) ?: return
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(track.group, 0)).build()
+    }
+    fun setBox(boxed: Boolean) {
+        subtitleBox = boxed
+        Players.setSubtitleBox(context, boxed)
+        playerView?.let { Players.styleSubtitles(it) }
     }
 
     fun save() {
@@ -234,6 +265,8 @@ fun VodPlayerScreen(
     }
     /** Plays the chosen place now (OK). Until then the title goes on playing behind the preview. */
     fun commitScrub() {
+        speedMode = false
+        speed = 0
         val target = scrubTarget ?: return
         scrubTarget = null
         player.seekTo(target)
@@ -251,14 +284,37 @@ fun VodPlayerScreen(
             run.lastStep = 0L
         }
         run.last = now
+        if (speedMode) {
+            // Each press changes the speed by one: the same way faster, the other way slower and
+            // then backwards. A held key does nothing more; the place moves on its own.
+            if (!held) speed = (speed + direction).coerceIn(-5, 5)
+            show()
+            return
+        }
+        // A second quick press the same way (not a held key) starts fast-forward / rewind at speed 1.
+        if (!held && run.steps >= 1 && scrubTarget != null) {
+            speedMode = true
+            speed = direction
+            show()
+            return
+        }
         // A held key repeats very fast: one step every HoldStepMillis keeps the speed even.
         if (held && now - run.lastStep < HoldStepMillis) return
         run.lastStep = now
         run.steps++
         val step = scrubStep(run.steps, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
-        // No picture of the chosen place above the bar: most servers cannot serve it fast enough,
-        // so it only ever showed a spinner. The time under the playhead says where it lands.
+        // A small silent player for the picture above the bar; it shows only once it has a picture.
+        if (preview == null && !previewFailed) {
+            preview = Players.createPreview(context).apply {
+                addListener(object : Player.Listener {
+                    override fun onRenderedFirstFrame() { previewShown = true }
+                    override fun onPlayerError(error: PlaybackException) { previewFailed = true; dropPreview() }
+                })
+                setMediaSource(Players.stream(context, channel.url), scrubTarget ?: 0L)
+                prepare()
+            }
+        }
         show()
     }
     fun togglePlay() {
@@ -267,13 +323,15 @@ fun VodPlayerScreen(
     }
     fun press(name: String) {
         when (name) {
-            "subtitles" -> { menuIndex = chosenSubtitle + 1; menuOpen = true; show() }
+            "subtitles" -> { menu = "subtitles"; menuIndex = if (chosenSubtitle >= 0) 0 else 1; show() }
+            "audio" -> { menu = "audio"; menuIndex = sounds.indexOfFirst { it.selected }.coerceAtLeast(0); show() }
         }
     }
     fun leave() { save(); onExit() }
 
     // Read here: the player's listener below is not part of the screen and cannot translate.
     val subtitleWord = t("Subtitles")
+    val soundWord = t("Audio")
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -290,6 +348,16 @@ fun VodPlayerScreen(
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
                         ?: "$subtitleWord ${index + 1}"
+                    TextTrack(label, language, group.mediaTrackGroup, group.isSelected)
+                }
+                sounds = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO && it.isSupported }.mapIndexed { index, group ->
+                    val format = group.getTrackFormat(0)
+                    val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
+                    val name = format.label?.takeIf { it.isNotBlank() }
+                        ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
+                        ?: "$soundWord ${index + 1}"
+                    // "5.1" beside the name when the track is surround.
+                    val label = if (format.channelCount >= 6) "$name 5.1" else name
                     TextTrack(label, language, group.mediaTrackGroup, group.isSelected)
                 }
                 // First time the title's subtitles are known: the viewer's language on, or none at all.
@@ -314,6 +382,8 @@ fun VodPlayerScreen(
                     save()
                     stoppedInBackground[0] = true
                     scrubTarget = null
+                    speedMode = false
+                    speed = 0
                     dropPreview()
                     player.playWhenReady = false
                     player.stop()
@@ -354,15 +424,29 @@ fun VodPlayerScreen(
         }
     }
     // Choosing a place ends by itself: once the arrows rest, the film goes there, as on Apple TV.
-    LaunchedEffect(scrubTarget) {
-        if (scrubTarget != null) {
+    LaunchedEffect(scrubTarget, speedMode) {
+        if (scrubTarget != null && !speedMode) {
             delay(ScrubSettleMillis)
             commitScrub()
         }
     }
+    // Fast-forward / rewind: the place moves on its own at the chosen speed until OK or Back.
+    LaunchedEffect(speedMode, speed) {
+        if (!speedMode || speed == 0) return@LaunchedEffect
+        val perTick = ScrubSpeeds[kotlin.math.abs(speed)] / 10 * (if (speed > 0) 1 else -1)
+        while (true) {
+            delay(100)
+            val from = scrubTarget ?: player.currentPosition
+            val next = clampPlace(from + perTick)
+            scrubTarget = next
+            touch++
+            // At the start or the end it stops there, waiting for OK.
+            if (next == from) { speed = 0; break }
+        }
+    }
     // The controls step away on their own while the title plays.
-    LaunchedEffect(controls, touch, playing, menuOpen) {
-        if (controls && playing && !failed && scrubTarget == null && !menuOpen) {
+    LaunchedEffect(controls, touch, playing, (menu != null)) {
+        if (controls && playing && !failed && scrubTarget == null && !(menu != null)) {
             delay(ControlsMillis)
             controls = false
             row = 0
@@ -377,8 +461,9 @@ fun VodPlayerScreen(
     }
     BackHandler {
         when {
-            menuOpen -> { menuOpen = false; show() }
-            scrubTarget != null -> { scrubTarget = null; show() }
+            menu == "language" || menu == "style" -> { menuIndex = if (menu == "language") 2 else 3; menu = "subtitles"; show() }
+            (menu != null) -> { menu = null; show() }
+            scrubTarget != null -> { scrubTarget = null; speedMode = false; speed = 0; show() }
             controls && !failed -> { controls = false; row = 0; button = 0 }
             else -> leave()
         }
@@ -394,14 +479,34 @@ fun VodPlayerScreen(
                         return@onPreviewKeyEvent event.key != Key.Back
                     }
                     val held = event.nativeKeyEvent.repeatCount > 0
-                    // The subtitles list takes every key while open: up/down move, OK picks, Back closes.
-                    if (menuOpen) {
-                        when (event.key) {
-                            Key.Back -> return@onPreviewKeyEvent false
-                            Key.DirectionUp -> menuIndex = (menuIndex - 1).coerceAtLeast(0)
-                            Key.DirectionDown -> menuIndex = (menuIndex + 1).coerceAtMost(subtitles.size)
-                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect ->
-                                if (!held) { chooseSubtitle(menuIndex - 1); menuOpen = false }
+                    // A menu takes every key while open: up/down move, OK picks, right opens a sub-menu,
+                    // left or Back goes back up, Back on the first level closes.
+                    if ((menu != null)) {
+                        val count = when (menu) {
+                            "subtitles" -> 4
+                            "language" -> subtitles.size
+                            "style" -> 2
+                            else -> sounds.size
+                        }
+                        val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                        when {
+                            event.key == Key.Back -> return@onPreviewKeyEvent false
+                            event.key == Key.DirectionUp -> menuIndex = (menuIndex - 1).coerceAtLeast(0)
+                            event.key == Key.DirectionDown -> menuIndex = (menuIndex + 1).coerceAtMost((count - 1).coerceAtLeast(0))
+                            event.key == Key.DirectionLeft && (menu == "language" || menu == "style") -> {
+                                menuIndex = if (menu == "language") 2 else 3; menu = "subtitles"
+                            }
+                            (ok && !held) || (event.key == Key.DirectionRight && menu == "subtitles" && menuIndex >= 2) -> when (menu) {
+                                "subtitles" -> when (menuIndex) {
+                                    0 -> { chooseSubtitle(lastSubtitle.coerceIn(0, (subtitles.size - 1).coerceAtLeast(0))); menu = null }
+                                    1 -> { chooseSubtitle(-1); menu = null }
+                                    2 -> { menu = "language"; menuIndex = chosenSubtitle.coerceAtLeast(0) }
+                                    else -> { menu = "style"; menuIndex = if (subtitleBox) 0 else 1 }
+                                }
+                                "language" -> { chooseSubtitle(menuIndex); menu = null }
+                                "style" -> { setBox(menuIndex == 0); menu = null }
+                                else -> { chooseSound(menuIndex); menu = null }
+                            }
                             else -> Unit
                         }
                         show()
@@ -450,6 +555,7 @@ fun VodPlayerScreen(
                         isFocusable = false
                         setShutterBackgroundColor(android.graphics.Color.BLACK)
                         Players.styleSubtitles(this)
+                        playerView = this
                         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     }
                 },
@@ -503,11 +609,28 @@ fun VodPlayerScreen(
                             modifier = Modifier.fillMaxWidth(),
                             content = {
                                 AnimatedVisibility(
-                                    visible = menuOpen,
+                                    visible = (menu != null),
                                     enter = fadeIn(tween(180)) + scaleIn(spring(dampingRatio = .82f, stiffness = 520f), initialScale = .9f, transformOrigin = TransformOrigin(1f, 1f)),
                                     exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = .94f, transformOrigin = TransformOrigin(1f, 1f))
                                 ) {
-                                    SubtitleMenu(subtitles, chosenSubtitle, menuIndex)
+                                    // What the open menu lists (kept while it fades out).
+                                    val shownMenu = menu ?: "subtitles"
+                                    val chosenLabel = subtitles.getOrNull(chosenSubtitle)?.label
+                                    val styleLabel = t(if (subtitleBox) "Dark background" else "Transparent background")
+                                    when (shownMenu) {
+                                        "subtitles" -> PlayerMenu(t("Subtitles"), listOf(
+                                            MenuRow(t("On") + (subtitles.getOrNull(if (chosenSubtitle >= 0) chosenSubtitle else lastSubtitle)?.label?.let { " ($it)" } ?: ""), checked = chosenSubtitle >= 0),
+                                            MenuRow(t("Off"), checked = chosenSubtitle < 0),
+                                            MenuRow(t("Language"), detail = chosenLabel ?: subtitles.getOrNull(lastSubtitle)?.label, opens = true, lineAbove = true),
+                                            MenuRow(t("Style"), detail = styleLabel, opens = true)
+                                        ), menuIndex)
+                                        "language" -> PlayerMenu(t("Language"), subtitles.mapIndexed { i, track -> MenuRow(track.label, checked = i == chosenSubtitle) }, menuIndex)
+                                        "style" -> PlayerMenu(t("Style"), listOf(
+                                            MenuRow(t("Dark background"), checked = subtitleBox),
+                                            MenuRow(t("Transparent background"), checked = !subtitleBox)
+                                        ), menuIndex)
+                                        else -> PlayerMenu(t("Audio"), sounds.map { MenuRow(it.label, checked = it.selected) }, menuIndex)
+                                    }
                                 }
                             }
                         ) { measurables, constraints ->
@@ -516,20 +639,32 @@ fun VodPlayerScreen(
                                 menu?.place(constraints.maxWidth - menu.width, -menu.height - 10.dp.roundToPx())
                             }
                         }
-                        // The title on the left, the CC box on the right, both just above the bar.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                channel.name, Modifier.weight(1f), color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
-                            )
+                        // The title (its year small above it) on the left, the round buttons on the right,
+                        // both just above the bar.
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Column(Modifier.weight(1f)) {
+                                if (channel.year > 0) Text(channel.year.toString(), color = VodWhite.copy(alpha = .85f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
+                                Text(
+                                    channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, style = ShadowStyle
+                                )
+                            }
                             Spacer(Modifier.width(16.dp))
-                            if (buttons.isNotEmpty()) CcButton(on = chosenSubtitle >= 0, selected = row == 1 || menuOpen)
+                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                buttons.forEachIndexed { index, name ->
+                                    RoundIconButton(
+                                        name, selected = row == 1 && button == index || menu?.let { (it == "audio") == (name == "audio") } == true,
+                                        on = name == "audio" || chosenSubtitle >= 0
+                                    )
+                                }
+                            }
                         }
                         Spacer(Modifier.height(4.dp))
                         TimeBar(
                             position = scrubTarget ?: position, duration = duration, playing = playing,
                             selected = row == 0, scrubbing = scrubTarget != null,
                             jump = scrubTarget?.let { it - player.currentPosition },
+                            speed = if (speedMode) speed else null,
                             preview = preview?.takeIf { scrubTarget != null },
                             previewShown = previewShown
                         )
@@ -554,7 +689,7 @@ private fun CompositionLocalProviderLtr(content: @Composable () -> Unit) {
 @Composable
 private fun TimeBar(
     position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean, jump: Long?,
-    preview: ExoPlayer? = null, previewShown: Boolean = false
+    speed: Int? = null, preview: ExoPlayer? = null, previewShown: Boolean = false
 ) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val lift by animateFloatAsState(if (selected || scrubbing) 1f else 0f, spring(stiffness = 500f), label = "bar")
@@ -598,9 +733,11 @@ private fun TimeBar(
             content = {
                 Text(formatTime(position), color = VodWhite, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
                 PlayStateIcon(playing)
-                // While choosing a place: how far it is from where the title is now.
+                // While choosing a place: the fast-forward / rewind speed (1 to 5), else how far it
+                // is from where the title is now.
                 Text(
-                    jump?.let { (if (it < 0) "−" else "+") + formatTime(kotlin.math.abs(it)) } ?: "",
+                    speed?.let { (if (it < 0) "◀◀ " else "▶▶ ") + kotlin.math.abs(it) }
+                        ?: jump?.let { (if (it < 0) "−" else "+") + formatTime(kotlin.math.abs(it)) } ?: "",
                     Modifier.clip(CircleShape).background(if (jump != null) Color(0x40FFFFFF) else Color.Transparent)
                         .padding(horizontal = if (jump != null) 10.dp else 0.dp, vertical = 2.dp),
                     color = VodWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
@@ -636,9 +773,11 @@ private fun TimeBar(
 /** The picture at the chosen place, from the silent preview player. */
 @Composable
 private fun ScrubPreview(preview: ExoPlayer, shown: Boolean) {
+    // As on Apple TV: a rounded picture, nothing at all until the picture is there (no spinner).
+    // It is laid out from the start, hidden, so the silent player has somewhere to draw.
     Box(
-        Modifier.width(160.dp).height(90.dp).clip(RoundedCornerShape(10.dp)).background(Color.Black)
-            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(10.dp)),
+        Modifier.width(224.dp).height(126.dp).graphicsLayer { alpha = if (shown) 1f else 0f }
+            .clip(RoundedCornerShape(12.dp)).background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
         AndroidView(
@@ -647,12 +786,7 @@ private fun ScrubPreview(preview: ExoPlayer, shown: Boolean) {
             update = { view -> preview.setVideoTextureView(view) },
             onRelease = { view -> preview.clearVideoTextureView(view) }
         )
-        if (!shown) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = VodWhite.copy(alpha = .85f), trackColor = VodWhite.copy(alpha = .14f), strokeWidth = 2.5.dp
-            )
-        }
+
     }
 }
 
@@ -685,60 +819,91 @@ private fun sameLanguage(code: String?, app: String): Boolean {
     return c == iso3 || c == older[app]
 }
 
-/** The CC box: filled while subtitles are on, outlined while off; it grows when selected. */
+/**
+ * A round button as on Apple TV: a sound wave for the sound tracks, a speech bubble for the
+ * subtitles. White with a dark mark while selected, an outlined ring otherwise.
+ */
 @Composable
-private fun CcButton(on: Boolean, selected: Boolean) {
-    val scale by animateFloatAsState(if (selected) 1.2f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "cc")
-    Box(
-        Modifier.scale(scale).clip(RoundedCornerShape(5.dp))
-            .background(if (selected) VodWhite else if (on) VodWhite.copy(alpha = .85f) else Color.Transparent)
-            .border(1.5.dp, VodWhite.copy(alpha = if (on || selected) 1f else .75f), RoundedCornerShape(5.dp))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("CC", color = if (selected || on) Color.Black else VodWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+private fun RoundIconButton(name: String, selected: Boolean, on: Boolean) {
+    val scale by animateFloatAsState(if (selected) 1.15f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "roundButton")
+    val ink = if (selected) Color.Black else VodWhite
+    Canvas(Modifier.size(40.dp).scale(scale)) {
+        val w = size.width
+        val h = size.height
+        if (selected) drawCircle(VodWhite) else {
+            drawCircle(Color(0x33000000))
+            drawCircle(VodWhite.copy(alpha = .85f), style = Stroke(width = 1.6.dp.toPx()))
+        }
+        val line = 2.dp.toPx()
+        if (name == "audio") {
+            // Five bars of a sound wave.
+            val heights = floatArrayOf(.18f, .34f, .46f, .34f, .18f)
+            val gap = w * .1f
+            val left = w / 2f - gap * 2f
+            for (i in heights.indices) {
+                val x = left + gap * i
+                val half = h * heights[i] / 2f
+                drawLine(ink, Offset(x, h / 2f - half), Offset(x, h / 2f + half), strokeWidth = line, cap = StrokeCap.Round)
+            }
+        } else {
+            // A speech bubble with two lines of text; filled when the subtitles are on.
+            val bubble = Path().apply {
+                addRoundRect(androidx.compose.ui.geometry.RoundRect(w * .26f, h * .3f, w * .74f, h * .64f, CornerRadius(w * .07f)))
+                moveTo(w * .36f, h * .63f); lineTo(w * .36f, h * .74f); lineTo(w * .47f, h * .63f); close()
+            }
+            if (on) drawPath(bubble, ink) else drawPath(bubble, ink, style = Stroke(width = line * .8f))
+            val text = if (on) (if (selected) VodWhite else Color.Black) else ink
+            drawLine(text, Offset(w * .34f, h * .42f), Offset(w * .66f, h * .42f), strokeWidth = line * .8f, cap = StrokeCap.Round)
+            drawLine(text, Offset(w * .34f, h * .52f), Offset(w * .58f, h * .52f), strokeWidth = line * .8f, cap = StrokeCap.Round)
+        }
     }
 }
 
 /**
- * The subtitles list: small, at the side, the same size whatever the number of languages: five
- * rows at a time that scroll with the remote around the one under it, "Off" first and a check
- * mark on the one in use. A thin bar on its edge shows where in a long list it is.
+ * A small menu above the buttons, the same size whatever it lists: five rows at a time that
+ * scroll around the one under the remote, a check mark on what is in use, and "›" on the rows
+ * that open a sub-menu (with what is chosen there under their name). A thin bar on its edge shows
+ * where in a long list it is.
  */
 @Composable
-private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
-    val labels = listOf(t("Off")) + tracks.map { it.label }
-    val rows = 5
-    val start = (focused - rows / 2).coerceIn(0, (labels.size - rows).coerceAtLeast(0))
+private fun PlayerMenu(title: String, rows: List<MenuRow>, focused: Int) {
+    val visible = 5
+    val start = (focused - visible / 2).coerceIn(0, (rows.size - visible).coerceAtLeast(0))
     Row(
-        Modifier.width(220.dp).clip(RoundedCornerShape(18.dp)).background(ActivePalette.current.panel)
+        Modifier.width(240.dp).clip(RoundedCornerShape(18.dp)).background(ActivePalette.current.panel)
             .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
             .padding(6.dp)
     ) {
         Column(Modifier.weight(1f)) {
-            Text(t("Subtitles"), color = VodMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            Text(title, color = VodMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 10.dp, top = 4.dp, bottom = 4.dp))
-            for (i in start until minOf(labels.size, start + rows)) {
-                val on = i == chosen + 1
+            for (i in start until minOf(rows.size, start + visible)) {
+                val row = rows[i]
+                if (row.lineAbove) Box(Modifier.padding(horizontal = 10.dp, vertical = 4.dp).fillMaxWidth().height(1.dp).background(Color(0x26FFFFFF)))
                 val lit = i == focused
-                val fill by androidx.compose.animation.animateColorAsState(if (lit) ActivePalette.current.lit else Color.Transparent, tween(140), label = "subtitleRow")
+                val fill by androidx.compose.animation.animateColorAsState(if (lit) ActivePalette.current.lit else Color.Transparent, tween(140), label = "menuRow")
                 val ink = if (lit) ActivePalette.current.onLit else VodWhite
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(fill).padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (on) "✓" else "", Modifier.width(20.dp), color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(labels[i], color = ink, fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (row.checked) "✓" else "", Modifier.width(20.dp), color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Column(Modifier.weight(1f)) {
+                        Text(row.label, color = ink, fontSize = 14.sp, fontWeight = if (row.checked || row.opens) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        row.detail?.let {
+                            Text(it, color = ink.copy(alpha = .7f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (row.opens) Text("›", color = ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
-        if (labels.size > rows) {
-            // Where the five rows sit in the whole list.
-            val visible = rows.toFloat() / labels.size
-            val offset = start.toFloat() / labels.size
-            Box(Modifier.padding(start = 4.dp, top = 26.dp, bottom = 4.dp).width(3.dp).height((rows * 32).dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
-                Box(Modifier.fillMaxWidth().fillMaxHeight(visible).offset(y = (rows * 32).dp * offset).clip(CircleShape).background(Color(0x99FFFFFF)))
+        if (rows.size > visible) {
+            val share = visible.toFloat() / rows.size
+            val offset = start.toFloat() / rows.size
+            Box(Modifier.padding(start = 4.dp, top = 26.dp, bottom = 4.dp).width(3.dp).height((visible * 32).dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(share).offset(y = (visible * 32).dp * offset).clip(CircleShape).background(Color(0x99FFFFFF)))
             }
         }
     }
