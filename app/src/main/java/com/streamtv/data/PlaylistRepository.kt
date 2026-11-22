@@ -63,6 +63,18 @@ class PlaylistRepository {
     }
 
     companion object {
+        /**
+         * The live channels and the rest together, without the "channels" that are the account's
+         * own films again (same name and picture). Some servers, test servers among them, answer
+         * the live list with their films and mark them as live.
+         */
+        fun merge(live: List<Channel>, more: List<Channel>): List<Channel> {
+            if (more.isEmpty()) return live
+            fun sign(c: Channel) = c.name.trim().lowercase() + "\u0000" + c.logo.orEmpty()
+            val films = more.mapTo(HashSet()) { sign(it) }
+            return live.filter { it.kind() != ChannelKind.Live || sign(it) !in films } + more
+        }
+
         /** What the app says it is to servers; accepted by most IPTV servers. */
         const val PlayerAgent = "VLC/3.0.20 LibVLC/3.0.20"
     }

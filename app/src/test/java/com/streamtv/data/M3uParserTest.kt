@@ -96,4 +96,11 @@ class M3uParserTest {
         val list = M3uParser.parse("#EXTM3U\n#EXTINF:-1,News\nhttps://x/news.m3u8\n#EXTINF:5400,Spring\nhttps://x/spring.m3u8\n")
         assertEquals(listOf(ChannelKind.Live, ChannelKind.Movie), list.map { it.kind() })
     }
+
+    @Test fun filmsListedAsLiveAreDropped() {
+        val live = listOf(Channel("1", "Spring", "http://h/live/u/p/1.ts", "http://h/spring.jpg"), Channel("2", "News", "http://h/live/u/p/2.ts"))
+        val films = listOf(Channel("Spring|m", "Spring", "http://h/movie/u/p/9.mp4", "http://h/spring.jpg"))
+        assertEquals(listOf("News", "Spring"), PlaylistRepository.merge(live, films).map { it.name })
+        assertEquals(ChannelKind.Movie, PlaylistRepository.merge(live, films).last().kind())
+    }
 }

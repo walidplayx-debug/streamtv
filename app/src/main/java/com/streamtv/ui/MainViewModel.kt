@@ -667,7 +667,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val keep = quiet || _state.value.playing
                 var channels = first
                 if (quiet) {
-                    channels = first + repository.loadMore(url, first)
+                    channels = PlaylistRepository.merge(first, repository.loadMore(url, first))
                     _state.value = _state.value.copy(channels = channels)
                 } else {
                     _state.value = _state.value.copy(channels = channels, loading = false, selected = if (keep) _state.value.selected else channels.firstOrNull())
@@ -683,7 +683,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!quiet) {
                     val more = repository.loadMore(url, first)
                     if (more.isNotEmpty()) {
-                        channels = first + more
+                        channels = PlaylistRepository.merge(first, more)
                         _state.value = _state.value.copy(channels = channels)
                         dao.replaceAll(channels)
                     }
