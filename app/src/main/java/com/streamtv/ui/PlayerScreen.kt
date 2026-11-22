@@ -466,6 +466,7 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = {
                 PlayerView(it).apply {
+                    Players.styleSubtitles(this)
                     this.player = player
                     // The screen stays on while a channel is on screen, not while browsing menus.
                     keepScreenOn = true

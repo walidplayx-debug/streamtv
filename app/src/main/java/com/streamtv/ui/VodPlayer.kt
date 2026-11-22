@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -254,16 +255,8 @@ fun VodPlayerScreen(
         run.steps++
         val step = scrubStep(run.steps, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
-        if (preview == null && !previewFailed) {
-            preview = Players.createPreview(context).apply {
-                addListener(object : Player.Listener {
-                    override fun onRenderedFirstFrame() { previewShown = true }
-                    override fun onPlayerError(error: PlaybackException) { previewFailed = true; dropPreview() }
-                })
-                setMediaSource(Players.stream(context, channel.url), scrubTarget ?: 0L)
-                prepare()
-            }
-        }
+        // No picture of the chosen place above the bar: most servers cannot serve it fast enough,
+        // so it only ever showed a spinner. The time under the playhead says where it lands.
         show()
     }
     fun togglePlay() {
@@ -292,7 +285,7 @@ fun VodPlayerScreen(
                     val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
-                        ?: "${index + 1}"
+                        ?: "${t("Subtitles")} ${index + 1}"
                     TextTrack(label, language, group.mediaTrackGroup, group.isSelected)
                 }
                 // First time the title's subtitles are known: the viewer's language on, or none at all.
@@ -445,6 +438,7 @@ fun VodPlayerScreen(
                         useController = false
                         isFocusable = false
                         setShutterBackgroundColor(android.graphics.Color.BLACK)
+                        Players.styleSubtitles(this)
                         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     }
                 },
@@ -696,32 +690,44 @@ private fun CcButton(on: Boolean, selected: Boolean) {
 }
 
 /**
- * The subtitles list: "Off" and the languages in the file, a check mark on the one in use and a
- * light row under the remote. Long lists show eight rows at a time around that row.
+ * The subtitles list: small, at the side, the same size whatever the number of languages: five
+ * rows at a time that scroll with the remote around the one under it, "Off" first and a check
+ * mark on the one in use. A thin bar on its edge shows where in a long list it is.
  */
 @Composable
 private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
     val labels = listOf(t("Off")) + tracks.map { it.label }
-    val start = (focused - 7).coerceAtLeast(0)
-    Column(
-        Modifier.width(260.dp).clip(RoundedCornerShape(22.dp)).background(ActivePalette.current.panel)
-            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
-            .padding(8.dp)
+    val rows = 5
+    val start = (focused - rows / 2).coerceIn(0, (labels.size - rows).coerceAtLeast(0))
+    Row(
+        Modifier.width(220.dp).clip(RoundedCornerShape(18.dp)).background(ActivePalette.current.panel)
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
+            .padding(6.dp)
     ) {
-        Text(t("Subtitles"), color = VodMuted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp))
-        for (i in start until minOf(labels.size, start + 8)) {
-            val on = i == chosen + 1
-            val lit = i == focused
-            val fill by androidx.compose.animation.animateColorAsState(if (lit) ActivePalette.current.lit else Color.Transparent, tween(140), label = "subtitleRow")
-            val ink = if (lit) ActivePalette.current.onLit else VodWhite
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(fill).padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(if (on) "✓" else "", Modifier.width(24.dp), color = ink, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text(labels[i], color = ink, fontSize = 16.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f)) {
+            Text(t("Subtitles"), color = VodMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 10.dp, top = 4.dp, bottom = 4.dp))
+            for (i in start until minOf(labels.size, start + rows)) {
+                val on = i == chosen + 1
+                val lit = i == focused
+                val fill by androidx.compose.animation.animateColorAsState(if (lit) ActivePalette.current.lit else Color.Transparent, tween(140), label = "subtitleRow")
+                val ink = if (lit) ActivePalette.current.onLit else VodWhite
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(fill).padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (on) "✓" else "", Modifier.width(20.dp), color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(labels[i], color = ink, fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        if (labels.size > rows) {
+            // Where the five rows sit in the whole list.
+            val visible = rows.toFloat() / labels.size
+            val offset = start.toFloat() / labels.size
+            Box(Modifier.padding(start = 4.dp, top = 26.dp, bottom = 4.dp).width(3.dp).height(rows * 32.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(visible).offset(y = rows * 32.dp * offset).clip(CircleShape).background(Color(0x99FFFFFF)))
             }
         }
     }

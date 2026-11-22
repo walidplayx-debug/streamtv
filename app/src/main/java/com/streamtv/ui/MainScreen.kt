@@ -1025,20 +1025,28 @@ private fun TitleDetails(
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     // Posters as tall as the room left allows (room for the focus growth included).
                     val posterHeight = (maxHeight - 28.dp).coerceIn(90.dp, 200.dp)
+                    val rowState = rememberLazyListState()
+                    val rowScope = rememberCoroutineScope()
                     LazyRow(
+                        state = rowState,
                         modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
                             if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
                                 runCatching { primary.requestFocus() }
                                 true
                             } else false
                         },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         itemsIndexed(row, key = { _, entry -> entry.key }) { index, other ->
                             PosterCard(
                                 other, state.favorites.hasFavorite(other), Modifier.width(posterHeight * (2f / 3f)),
-                                onFocus = { rowIndex = index }
+                                onFocus = {
+                                    rowIndex = index
+                                    // Back on the first poster, the row goes right back to its start: brought
+                                    // into view on its own it stopped at the edge, the poster cut in half.
+                                    if (index == 0) rowScope.launch { rowState.animateScrollToItem(0) }
+                                }
                             ) { onOpen(other) }
                         }
                     }
@@ -1183,23 +1191,27 @@ private fun SeriesDetails(
                         // Pictures as tall as the room left allows, under their names.
                         val imageHeight = (maxHeight - 70.dp).coerceIn(60.dp, 170.dp)
                         key(seasonIndex) {
+                            val rowState = rememberLazyListState()
+                            val rowScope = rememberCoroutineScope()
                             LazyRow(
+                                state = rowState,
                                 modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
                                         runCatching { if (all.size > 1) chosenSeason.requestFocus() else primary.requestFocus() }
                                         true
                                     } else false
                                 },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                items(season.episodes, key = { it.id }) { episode ->
+                                itemsIndexed(season.episodes, key = { _, e -> e.id }) { index, episode ->
                                     val playable = Shows.playable(show, episode)
                                     val saved = state.positions[playable.key]
                                     EpisodeCard(
                                         episode, show.logo,
                                         saved?.let { (it.first.toFloat() / it.second.coerceAtLeast(1L)).coerceIn(0f, 1f) },
-                                        Modifier.width(imageHeight * (16f / 9f))
+                                        Modifier.width(imageHeight * (16f / 9f)),
+                                        onFocus = { if (index == 0) rowScope.launch { rowState.animateScrollToItem(0) } }
                                     ) {
                                         val start = saved?.takeIf { it.first < it.second * 0.95 }?.first ?: 0L
                                         onPlay(playable, start)
@@ -1231,11 +1243,11 @@ private fun SeasonChip(label: String, chosen: Boolean, modifier: Modifier = Modi
 
 /** An episode: its picture (16:9) with how much was watched, then its number, name and length. */
 @Composable
-private fun EpisodeCard(episode: Episode, fallback: String?, progress: Float?, modifier: Modifier, onClick: () -> Unit) {
+private fun EpisodeCard(episode: Episode, fallback: String?, progress: Float?, modifier: Modifier, onFocus: () -> Unit = {}, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "episodeScale")
     Column(
-        modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused }
+        modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
         Box(

@@ -28,6 +28,24 @@ import java.net.URLDecoder
  */
 @OptIn(UnstableApi::class)
 object Players {
+    /**
+     * Subtitles as the big apps show them: white letters with a light dark shadow, no black box
+     * behind them, a little smaller than the library's default, whatever the file asks for.
+     */
+    fun styleSubtitles(view: androidx.media3.ui.PlayerView) {
+        view.subtitleView?.apply {
+            setApplyEmbeddedStyles(false)
+            setApplyEmbeddedFontSizes(false)
+            setStyle(
+                androidx.media3.ui.CaptionStyleCompat(
+                    android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+                    androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, 0xB3000000.toInt(), null
+                )
+            )
+            setFractionalTextSize(androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * .9f)
+        }
+    }
+
     private var meter: DefaultBandwidthMeter? = null
 
     fun create(context: Context): ExoPlayer {
