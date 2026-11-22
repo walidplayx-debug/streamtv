@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -355,12 +356,12 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         return
     }
 
-    // TV safe area: 72dp sides and 30/38dp top/bottom keep everything inside the overscan margin.
+    // TV safe area: 48dp sides and 27dp top/bottom (Android TV's own margins) keep everything inside the overscan margin.
     // Every page sits on the softer, less black backdrop.
     Column(
         Modifier.fillMaxSize()
             .background(LibraryBackdrop)
-            .padding(start = 72.dp, end = 72.dp, top = 30.dp, bottom = 38.dp)
+            .padding(start = 48.dp, end = 48.dp, top = 27.dp, bottom = 27.dp)
     ) {
         // Back first returns to the tab bar; from the tab bar it leaves the app.
         val tabFocus = remember { FocusRequester() }
@@ -691,7 +692,14 @@ private fun LibraryContent(
     // History and favourites of this page only: channels keep theirs apart.
     val history = remember(byKey, state.recentVod) { state.recentVod.mapNotNull { byKey[it] } }
     val favorites = remember(titles, state.favorites) { titles.filter { state.favorites.hasFavorite(it) } }
-    val genres = remember(titles) { titles.groupBy { it.group.ifBlank { "Other" } } }
+    // Ten fixed genres (Action, Comedy, Drama...), the same for every provider. A provider whose
+    // category names say nothing of genre keeps its own categories, as before.
+    val genres: Map<String, List<Channel>> = remember(titles) {
+        Memo.of<Map<String, List<Channel>>>("genres", titles) {
+            val fixed = Genres.group(titles)
+            if (fixed.size >= 2) fixed else titles.groupBy { it.group.ifBlank { "Other" } }
+        }
+    }
     val query = ui.search.trim()
     val chosen = ui.section
     val section = when {
@@ -730,7 +738,7 @@ private fun LibraryContent(
                     if (favorites.isNotEmpty()) {
                         item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
                     }
-                    item { Text(t("BY CATEGORY"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    item { Text(t("GENRES"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                     items(genres.toList()) { (genre, list) ->
                         FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
                     }
@@ -809,8 +817,8 @@ private fun PosterGrid(
             }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 LazyVerticalGrid(
-                    // Six posters a row.
-                    columns = GridCells.Fixed(6),
+                    // Seven posters a row: the page uses its width.
+                    columns = GridCells.Fixed(7),
                     state = gridState,
                     modifier = Modifier.fillMaxSize(),
                     // Free room under the last row, so every row can glide up to the focus height.
@@ -902,7 +910,21 @@ private fun TitleDetails(
             withFrameNanos { }
         }
     }
-    val more = remember(item.key, titles) { titles.filter { it.group == item.group && it.key != item.key }.take(24) }
+    // The film's other parts ("Rocky", "Rocky II"...), then titles of the same genre.
+    val parts = remember(item.key, titles) {
+        val saga = Genres.saga(item.name)
+        if (saga == null) emptyList() else titles.filter {
+            it.key != item.key && it.name.startsWith(saga.take(4), ignoreCase = true) && Genres.saga(it.name) == saga
+        }.sortedBy { it.name.lowercase() }.take(24)
+    }
+    val more = remember(item.key, titles, parts) {
+        val genre = Genres.of(item)
+        val skip = parts.mapTo(HashSet()) { it.key }
+        titles.asSequence().filter {
+            it.key != item.key && it.key !in skip && (if (genre != null) Genres.of(it) == genre else it.group == item.group)
+        }.take(24).toList()
+    }
+    val partsFocus = remember(item.key) { FocusRequester() }
     // The page eases in when a title opens.
     val enter = remember(item.key) { Animatable(0f) }
     LaunchedEffect(item.key) { enter.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
@@ -976,25 +998,40 @@ private fun TitleDetails(
                     }
                 }
             }
-            if (more.isNotEmpty()) {
+            if (parts.isNotEmpty() || more.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Column(Modifier.graphicsLayer { translationY = -(topHeight + gap) * lift }) {
-                Text("${t("More in")} ${t(item.group.ifBlank { "Other" })}", color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                LazyRow(
-                    // Up from this row always goes back to Play / Resume.
-                    modifier = Modifier.onFocusChanged { lower = it.hasFocus }.onPreviewKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
-                            runCatching { primary.requestFocus() }
-                            true
-                        } else false
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                Column(
+                    Modifier.graphicsLayer { translationY = -(topHeight + gap) * lift }
+                        .onFocusChanged { lower = it.hasFocus }
                 ) {
-                    items(more, key = { it.key }) { other ->
-                        PosterCard(other, state.favorites.hasFavorite(other), Modifier.width(70.dp)) { onOpen(other) }
+                    // Up from the first row always goes back to Play / Resume; from the second, to the first.
+                    @Composable
+                    fun TitleRow(heading: String, list: List<Channel>, first: Boolean) {
+                        Text(heading, color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        LazyRow(
+                            modifier = Modifier.onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                    if (first || parts.isEmpty()) runCatching { primary.requestFocus() } else runCatching { partsFocus.requestFocus() }
+                                    true
+                                } else false
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            itemsIndexed(list, key = { _, entry -> entry.key }) { index, other ->
+                                PosterCard(
+                                    other, state.favorites.hasFavorite(other),
+                                    Modifier.width(70.dp).then(if (first && index == 0) Modifier.focusRequester(partsFocus) else Modifier)
+                                ) { onOpen(other) }
+                            }
+                        }
                     }
-                }
+                    if (parts.isNotEmpty()) TitleRow(t("Other parts"), parts, first = true)
+                    if (more.isNotEmpty()) {
+                        if (parts.isNotEmpty()) Spacer(Modifier.height(6.dp))
+                        val heading = if (Genres.of(item) != null) t("Similar") else t("More in") + " " + t(item.group.ifBlank { "Other" })
+                        TitleRow(heading, more, first = parts.isEmpty())
+                    }
                 }
             }
         }
@@ -1012,7 +1049,7 @@ private fun PosterCard(
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
+    val scale by animateFloatAsState(if (focused) 1.14f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "posterScale")
     Column(
         modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
@@ -1021,7 +1058,9 @@ private fun PosterCard(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
                 .shadow(if (focused) 24.dp else 0.dp, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
-                .border(if (focused) 2.dp else 1.dp, White.copy(alpha = if (focused) .9f else .08f), RoundedCornerShape(12.dp))
+                // No white frame: as on the channel tiles, the focused poster is picked out by its
+                // size and its shadow.
+                .border(1.dp, White.copy(alpha = if (focused) .16f else .07f), RoundedCornerShape(12.dp))
         ) {
             ChannelLogo(
                 channel.name, channel.logo, Modifier.fillMaxSize(), fontSize = 26.sp, corner = 12.dp,

@@ -100,7 +100,7 @@ fun TextEntryScreen(
     }
 
     Box(Modifier.fillMaxSize().background(EntryInk)) {
-        Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 28.dp)) {
             Text(t(title), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -202,7 +202,7 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
     }
 
     Box(Modifier.fillMaxSize().background(EntryInk)) {
-        Column(Modifier.fillMaxWidth().padding(start = 72.dp, end = 72.dp, top = 28.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 28.dp)) {
             Text(t("Xtream Codes login"), color = EntryWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
