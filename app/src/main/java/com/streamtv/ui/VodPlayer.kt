@@ -270,6 +270,8 @@ fun VodPlayerScreen(
     }
     fun leave() { save(); onExit() }
 
+    // Read here: the player's listener below is not part of the screen and cannot translate.
+    val subtitleWord = t("Subtitles")
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -285,7 +287,7 @@ fun VodPlayerScreen(
                     val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: language?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(appLanguage)).replaceFirstChar { c -> c.uppercase() } }
-                        ?: "${t("Subtitles")} ${index + 1}"
+                        ?: "$subtitleWord ${index + 1}"
                     TextTrack(label, language, group.mediaTrackGroup, group.isSelected)
                 }
                 // First time the title's subtitles are known: the viewer's language on, or none at all.
@@ -726,8 +728,8 @@ private fun SubtitleMenu(tracks: List<TextTrack>, chosen: Int, focused: Int) {
             // Where the five rows sit in the whole list.
             val visible = rows.toFloat() / labels.size
             val offset = start.toFloat() / labels.size
-            Box(Modifier.padding(start = 4.dp, top = 26.dp, bottom = 4.dp).width(3.dp).height(rows * 32.dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
-                Box(Modifier.fillMaxWidth().fillMaxHeight(visible).offset(y = rows * 32.dp * offset).clip(CircleShape).background(Color(0x99FFFFFF)))
+            Box(Modifier.padding(start = 4.dp, top = 26.dp, bottom = 4.dp).width(3.dp).height((rows * 32).dp).clip(CircleShape).background(Color(0x22FFFFFF))) {
+                Box(Modifier.fillMaxWidth().fillMaxHeight(visible).offset(y = (rows * 32).dp * offset).clip(CircleShape).background(Color(0x99FFFFFF)))
             }
         }
     }
