@@ -17,6 +17,8 @@ import com.streamtv.data.hasFavorite
 import com.streamtv.data.LogoIndex
 import com.streamtv.data.XtreamAccount
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -172,21 +174,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     init {
         viewModelScope.launch {
+            // Cache first, as the big apps do: the last playlist is on screen at once, and it is
+            // downloaded again only when it is old, quietly, while the viewer already watches.
+            // (It used to be downloaded again at every start, before anything could be watched.)
+            val cached = withContext(Dispatchers.IO) { dao.getAll().map { it.toChannel() } }
+            if (cached.isNotEmpty() && _state.value.channels.isEmpty()) {
+                _state.value = _state.value.copy(channels = cached, selected = cached.firstOrNull { it.id == lastChannelId } ?: cached.firstOrNull())
+            }
             preferences.playlistUrl.collect { saved ->
                 // No playlist is bundled: a fresh install shows the welcome screen instead.
                 if (_state.value.playlistUrl.isBlank() && saved.isNotBlank()) {
                     _state.value = _state.value.copy(playlistUrl = saved)
-                    if (_state.value.channels.isEmpty()) loadPlaylist()
+                    val (stampUrl, stampAt) = preferences.cacheStamp()
+                    val fresh = stampUrl == saved && System.currentTimeMillis() - stampAt < CacheMaxAgeMillis
+                    when {
+                        _state.value.channels.isEmpty() -> loadPlaylist()
+                        !fresh && !saved.startsWith("local://") -> loadPlaylist(quiet = true)
+                    }
                 }
                 _state.value = _state.value.copy(ready = true)
-            }
-        }
-        viewModelScope.launch {
-            dao.observeAll().collect { cached ->
-                if (_state.value.channels.isEmpty() && cached.isNotEmpty()) {
-                    val channels = cached.map { it.toChannel() }
-                    _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull())
-                }
             }
         }
     }
@@ -195,6 +201,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.epgUrl.collect { saved ->
                 if (saved.isNotBlank() && _state.value.epgUrl.isBlank()) {
                     _state.value = _state.value.copy(epgUrl = saved)
+                    // The guide keeps only the playlist's own channels, so it waits for them.
+                    withTimeoutOrNull(60_000) { _state.first { it.channels.isNotEmpty() } }
                     // The saved guide loads by itself on start; a failure here stays quiet.
                     loadEpg(silent = true)
                 }
@@ -348,7 +356,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     preferences.savePlaylists(updated.map { "${it.name}\t${it.url}" }.toSet())
                     // Remembered as the active playlist, so the app reopens on it.
                     preferences.savePlaylist(localUrl)
-                    dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                    dao.replaceAll(channels)
+                    preferences.saveCacheStamp(localUrl)
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
@@ -409,7 +418,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(channels = channels, selected = channels.firstOrNull { it.id == lastChannelId } ?: channels.firstOrNull(), loading = false, tab = "Live TV")
                 // Remembered as the active playlist, so the app reopens on it.
                 preferences.savePlaylist(entry.url)
-                dao.replaceAll(channels.map { ChannelEntity.from(it) })
+                dao.replaceAll(channels)
+                preferences.saveCacheStamp(entry.url)
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load saved playlist")
@@ -420,7 +430,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val url = _state.value.epgUrl
         epgJob?.cancel()
         epgJob = viewModelScope.launch {
-            runCatching { epgRepository.load(url) }.onSuccess { items ->
+            // Only programmes of this playlist's channels (matched by id or by name, as the player does).
+            val channels = _state.value.channels
+            val ids = HashSet<String>(channels.size * 2)
+            for (c in channels) if (c.kind() == ChannelKind.Live) { ids += c.id; ids += c.name.lowercase() }
+            val wanted: ((String) -> Boolean)? = if (ids.isEmpty()) null else { id -> id in ids || id.lowercase() in ids }
+            runCatching { epgRepository.load(url, wanted) }.onSuccess { items ->
                 _state.value = _state.value.copy(programs = items)
                 epgLoadedAt = System.currentTimeMillis()
                 preferences.saveEpg(url)
@@ -441,6 +456,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     private companion object {
         const val EpgMaxAgeMillis = 6L * 60 * 60 * 1000
+        /** A cached playlist older than this is downloaded again (quietly) at start. */
+        const val CacheMaxAgeMillis = 12L * 60 * 60 * 1000
     }
     fun setSearchText(value: String) { _state.value = _state.value.copy(searchText = value) }
     fun setSearchQuery(value: String) { _state.value = _state.value.copy(searchQuery = value) }
@@ -629,30 +646,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(favorites = updated)
         viewModelScope.launch { preferences.saveFavorites(updated) }
     }
-    /** [openLive]: a playlist that was just added opens on Live TV once its channels are in. */
-    fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false) {
+    /**
+     * [openLive]: a playlist that was just added opens on Live TV once its channels are in.
+     * [quiet]: a background refresh of the playlist already on screen. No loading state and no
+     * error: the cached channels stay until the new ones are complete, then swap in at once.
+     *
+     * An Xtream account arrives in two parts: its live channels first (seconds), then its movies
+     * and series while the viewer can already watch, as the big IPTV apps do.
+     */
+    fun loadPlaylist(urlOverride: String? = null, openLive: Boolean = false, quiet: Boolean = false) {
         val url = (urlOverride ?: _state.value.playlistUrl).trim()
         startPlaylistJob {
-            _state.value = _state.value.copy(loading = true, error = null)
+            if (!quiet) _state.value = _state.value.copy(loading = true, error = null)
             // An imported file is read again from the app's copy (it is the active playlist after a restart too).
-            runCatching { readChannels(url) }.onSuccess { channels ->
-                // A reload while something plays leaves it playing.
-                val keep = _state.value.playing
-                _state.value = _state.value.copy(channels = channels, loading = false, selected = if (keep) _state.value.selected else channels.firstOrNull())
-                moveOldFavorites(channels)
-                if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
-                preferences.savePlaylist(url)
-                dao.replaceAll(channels.map { ChannelEntity.from(it) })
+            runCatching { readChannels(url) }.onSuccess { first ->
                 // A guide that comes with the playlist (an Xtream account's own, or the one an M3U names
                 // in its first line) is used when no guide was set, as the big apps do.
                 val guide = XtreamAccount.from(url)?.guideUrl ?: M3uParser.lastGuideUrl
+                // A reload while something plays leaves it playing.
+                val keep = quiet || _state.value.playing
+                var channels = first
+                if (quiet) {
+                    channels = first + repository.loadMore(url, first)
+                    _state.value = _state.value.copy(channels = channels)
+                } else {
+                    _state.value = _state.value.copy(channels = channels, loading = false, selected = if (keep) _state.value.selected else channels.firstOrNull())
+                    if (openLive) _state.value = _state.value.copy(tab = "Live TV", searchQuery = "")
+                }
+                moveOldFavorites(channels)
+                preferences.savePlaylist(url)
+                dao.replaceAll(channels)
                 if (guide != null && _state.value.epgUrl.isBlank()) {
                     _state.value = _state.value.copy(epgUrl = guide)
                     loadEpg(silent = true)
                 }
+                if (!quiet) {
+                    val more = repository.loadMore(url, first)
+                    if (more.isNotEmpty()) {
+                        channels = first + more
+                        _state.value = _state.value.copy(channels = channels)
+                        dao.replaceAll(channels)
+                    }
+                }
+                preferences.saveCacheStamp(url)
             }.onFailure { e ->
                 if (e is CancellationException) throw e
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
+                if (!quiet) _state.value = _state.value.copy(loading = false, error = e.message ?: "Unable to load playlist")
             }
         }
     }

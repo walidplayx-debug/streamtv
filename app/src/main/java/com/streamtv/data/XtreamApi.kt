@@ -32,9 +32,9 @@ class XtreamAccount(val base: String, val username: String, val password: String
 
 /**
  * Reads an Xtream account the way the big IPTV apps do, through its player_api.php: the account
- * status first (so a wrong password or an expired account says so), then the live channels and
- * the movies with their categories. Used when the server refuses or empties the get.php playlist,
- * which many servers do. Every list is read as a stream, so a large one never sits in memory whole.
+ * status first (so a wrong password or an expired account says so), then the live channels with
+ * their categories, and only after them the movies. The get.php playlist holds everything at once
+ * (often tens of megabytes) and is only a fallback. Every list is read as a stream, so a large one never sits in memory whole.
  */
 class XtreamApi(private val client: OkHttpClient, private val account: XtreamAccount, private val agent: String) {
 
@@ -62,7 +62,11 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
         }
     }
 
-    fun load(): List<Channel> {
+    /**
+     * The live channels only: one small list, so they are on screen in seconds. Movies come
+     * afterwards through [loadMovies], while the viewer is already watching.
+     */
+    fun loadLive(): List<Channel> {
         checkAccount()
         val result = ArrayList<Channel>()
         val liveGroups = categories("get_live_categories")
@@ -73,6 +77,13 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             result += Channel(s["epg_channel_id"]?.takeIf { it.isNotBlank() } ?: "$name|$url", name, url,
                 s["stream_icon"]?.takeIf { it.startsWith("http") }, liveGroups[s["category_id"]] ?: "Other")
         }
+        if (result.isEmpty()) error("The Xtream account has no channels")
+        return result
+    }
+
+    /** The account's movies; empty when the server has none or refuses the list. */
+    fun loadMovies(): List<Channel> {
+        val result = ArrayList<Channel>()
         val movieGroups = categories("get_vod_categories")
         streams("get_vod_streams") { s ->
             val id = s["stream_id"] ?: return@streams
@@ -80,7 +91,6 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             val url = account.movie(id, s["container_extension"].orEmpty())
             result += Channel("$name|$url", name, url, s["stream_icon"]?.takeIf { it.startsWith("http") }, movieGroups[s["category_id"]] ?: "Other")
         }
-        if (result.isEmpty()) error("The Xtream account has no channels")
         return result
     }
 

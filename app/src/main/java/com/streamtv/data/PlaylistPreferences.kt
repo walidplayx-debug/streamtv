@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "streamtv_settings")
@@ -35,6 +36,13 @@ class PlaylistPreferences(private val context: Context) {
     // Only real changes: the settings store sends every key again whenever any one is saved.
     val lastChannelId: Flow<String> = context.dataStore.data.map { it[lastChannelKey].orEmpty() }.distinctUntilChanged()
     suspend fun savePlaylist(url: String) { context.dataStore.edit { it[playlistKey] = url } }
+    /** Which playlist the channel cache holds, and when it was downloaded. */
+    private val cacheStampKey = stringPreferencesKey("cache_stamp")
+    suspend fun saveCacheStamp(url: String) { context.dataStore.edit { it[cacheStampKey] = url + "\t" + System.currentTimeMillis() } }
+    suspend fun cacheStamp(): Pair<String, Long> {
+        val raw = context.dataStore.data.first()[cacheStampKey].orEmpty()
+        return raw.substringBeforeLast("\t", "") to (raw.substringAfterLast("\t", "").toLongOrNull() ?: 0L)
+    }
     suspend fun saveEpg(url: String) { context.dataStore.edit { it[epgKey] = url } }
     suspend fun saveFavorites(ids: Set<String>) { context.dataStore.edit { it[favoritesKey] = ids } }
     suspend fun savePlaylists(entries: Set<String>) { context.dataStore.edit { it[playlistsKey] = entries } }

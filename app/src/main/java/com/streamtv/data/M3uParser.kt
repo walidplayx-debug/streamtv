@@ -21,6 +21,9 @@ object M3uParser {
      */
     fun parse(reader: java.io.Reader): List<Channel> = reader.buffered().useLines { parse(it) }
 
+    /** Like [parse], keeping only the entries whose stream address passes [keep]. */
+    fun parse(reader: java.io.Reader, keep: (String) -> Boolean): List<Channel> = reader.buffered().useLines { parse(it, keep) }
+
     /**
      * The TV guide the last playlist read names in its first line ("#EXTM3U url-tvg=…" or
      * "x-tvg-url=…"; the first address when it lists several), or null.
@@ -28,7 +31,7 @@ object M3uParser {
     @Volatile var lastGuideUrl: String? = null
         private set
 
-    private fun parse(source: Sequence<String>): List<Channel> {
+    private fun parse(source: Sequence<String>, keep: (String) -> Boolean = { true }): List<Channel> {
         lastGuideUrl = null
         // A byte-order mark may start the first line; it is not whitespace, so trim() keeps it.
         val lines = source.map { it.removePrefix("\uFEFF").trim().removeSuffix("\r") }.iterator()
@@ -58,6 +61,7 @@ object M3uParser {
                         "http-origin" -> options["Origin"] = value
                     }
                 }
+                line.isNotEmpty() && !line.startsWith("#") && info != null && !keep(line) -> info = null
                 line.isNotEmpty() && !line.startsWith("#") && info != null -> {
                     val raw = info
                     val attrs = attribute.findAll(raw).associate { m ->

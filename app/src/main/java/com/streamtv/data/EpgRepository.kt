@@ -8,8 +8,13 @@ import java.util.concurrent.TimeUnit
 import java.io.BufferedInputStream
 
 class EpgRepository {
-    private val client = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).build()
-    suspend fun load(url: String): List<EpgProgram> = withContext(Dispatchers.IO) {
+    // A whole server's guide can be tens of megabytes: only a stalled download fails, not a long one.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(5, TimeUnit.MINUTES)
+        .build()
+    suspend fun load(url: String, wanted: ((String) -> Boolean)? = null): List<EpgProgram> = withContext(Dispatchers.IO) {
         require(url.startsWith("http://") || url.startsWith("https://")) { "Enter a valid XMLTV URL" }
         val request = Request.Builder().url(url).header("User-Agent", "streamtv/1.0").build()
         client.newCall(request).execute().use { response ->
@@ -20,7 +25,7 @@ class EpgRepository {
             val second = stream.read()
             stream.reset()
             val gzipped = first == 0x1f && second == 0x8b
-            XmlTvParser.parse(stream, gzipped)
+            XmlTvParser.parse(stream, gzipped, wanted)
         }
     }
 }

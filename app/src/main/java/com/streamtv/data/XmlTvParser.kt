@@ -10,14 +10,21 @@ import java.util.TimeZone
 
 object XmlTvParser {
     private val formats = listOf("yyyyMMddHHmmss Z", "yyyyMMddHHmmss")
-    private fun parseTime(value: String): Long {
-        for (pattern in formats) try {
-            val f = SimpleDateFormat(pattern, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+    // Made once per guide: making two date formats for each of a guide's 100 000 programmes was
+    // most of the time it took to read.
+    private fun parseTime(value: String, readers: List<SimpleDateFormat>): Long {
+        for (f in readers) try {
             return f.parse(value.trim())?.time ?: 0L
         } catch (_: Exception) { }
         return 0L
     }
-    fun parse(input: InputStream, gzipped: Boolean = false): List<EpgProgram> {
+
+    /**
+     * [wanted]: keeps only programmes of these channels (by the guide's channel id). An Xtream
+     * account's guide covers every channel of the server; kept whole it filled a TV's memory.
+     */
+    fun parse(input: InputStream, gzipped: Boolean = false, wanted: ((String) -> Boolean)? = null): List<EpgProgram> {
+        val readers = formats.map { SimpleDateFormat(it, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") } }
         val source = if (gzipped) GZIPInputStream(input) else input
         val parser = Xml.newPullParser()
         parser.setInput(source, null)
@@ -38,19 +45,23 @@ object XmlTvParser {
                     if ((tag == "title" && title.isNotEmpty()) || (tag == "desc" && desc.isNotEmpty())) tag = ""
                     if (tag == "programme") {
                         channel = parser.getAttributeValue(null, "channel") ?: ""
-                        start = parseTime(parser.getAttributeValue(null, "start") ?: "")
-                        end = parseTime(parser.getAttributeValue(null, "stop") ?: "")
+                        // A programme of another channel is passed over without reading its times.
+                        if (wanted != null && channel.isNotBlank() && !wanted(channel)) channel = ""
+                        if (channel.isNotBlank()) {
+                            start = parseTime(parser.getAttributeValue(null, "start") ?: "", readers)
+                            end = parseTime(parser.getAttributeValue(null, "stop") ?: "", readers)
+                        }
                         title = ""; desc = ""
                     }
                 }
-                XmlPullParser.TEXT -> if (tag == "title") title += parser.text else if (tag == "desc") desc += parser.text
+                XmlPullParser.TEXT -> if (channel.isNotBlank()) { if (tag == "title") title += parser.text else if (tag == "desc") desc += parser.text }
                 XmlPullParser.END_TAG -> {
                     // Text after a closing tag (line breaks, indentation) belongs to no element.
                     tag = ""
                     if (parser.name == "programme" && channel.isNotBlank() && title.isNotBlank()) {
                         val now = System.currentTimeMillis()
                         if (end > now - 2 * 60 * 60 * 1000L && start < now + 24 * 60 * 60 * 1000L) {
-                            result += EpgProgram(channel, title.trim(), desc.trim(), start, end)
+                            result += EpgProgram(channel, title.trim(), desc.trim().take(400), start, end)
                         }
                     }
                 }
