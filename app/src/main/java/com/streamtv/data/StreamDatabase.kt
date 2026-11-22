@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ChannelEntity::class], version = 2, exportSchema = false)
+@Database(entities = [ChannelEntity::class], version = 3, exportSchema = false)
 abstract class StreamDatabase : RoomDatabase() {
     abstract fun channelDao(): ChannelDao
     companion object {

@@ -93,12 +93,15 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             if (s["stream_type"].equals("live", ignoreCase = true)) return@streams
             val name = s["name"].orEmpty().ifBlank { "Movie $id" }
             val url = account.movie(id, s["container_extension"].orEmpty())
-            result += Channel("$name|$url", name, url, s["stream_icon"]?.takeIf { it.startsWith("http") }, movieGroups[s["category_id"]] ?: "Other")
+            result += Channel(
+                "$name|$url", name, url, s["stream_icon"]?.takeIf { it.startsWith("http") }, movieGroups[s["category_id"]] ?: "Other",
+                rating = s.rating(), year = s.year()
+            )
         }
         return result
     }
 
-    /** The account's series, one title each (their episodes come from [loadEpisodes] when opened). */
+    /** The account's series, one title each (their episodes come from [loadShow] when opened). */
     fun loadSeries(): List<Channel> {
         val result = ArrayList<Channel>()
         val groups = categories("get_series_categories")
@@ -106,7 +109,7 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             val id = s["series_id"] ?: return@streams
             val name = s["name"]?.trim().orEmpty()
             if (name.isEmpty()) return@streams
-            result += Shows.xtream(id, name, s["cover"]?.takeIf { it.startsWith("http") }, groups[s["category_id"]] ?: "Other")
+            result += Shows.xtream(id, name, s["cover"]?.takeIf { it.startsWith("http") }, groups[s["category_id"]] ?: "Other", s.rating(), s.year())
         }
         return result
     }
@@ -115,13 +118,16 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
      * A series' seasons and episodes (get_series_info). Servers give "episodes" either as an
      * object keyed by season number or as a list of per-season lists; both are read.
      */
-    fun loadEpisodes(seriesId: String): List<Season> {
+    fun loadShow(seriesId: String): ShowDetails {
         val episodes = ArrayList<Episode>()
+        var info: TitleInfo? = null
         read(account.api("get_series_info") + "&series_id=" + java.net.URLEncoder.encode(seriesId, "UTF-8")) { reader ->
             if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); return@read }
             reader.beginObject()
             while (reader.hasNext()) {
-                if (reader.nextName() != "episodes") { reader.skipValue(); continue }
+                val section = reader.nextName()
+                if (section == "info") { info = readInfo(reader); continue }
+                if (section != "episodes") { reader.skipValue(); continue }
                 when (reader.peek()) {
                     JsonToken.BEGIN_OBJECT -> {
                         reader.beginObject()
@@ -142,7 +148,56 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             }
             reader.endObject()
         }
-        return episodes.groupBy { it.season }.toSortedMap().map { (n, list) -> Season(n, list.sortedBy { it.number }) }
+        return ShowDetails(episodes.groupBy { it.season }.toSortedMap().map { (n, list) -> Season(n, list.sortedBy { it.number }) }, info)
+    }
+
+    /** A film's genre, story, year and rating (get_vod_info), for its page. */
+    fun loadMovieInfo(vodId: String): TitleInfo? {
+        var info: TitleInfo? = null
+        read(account.api("get_vod_info") + "&vod_id=" + java.net.URLEncoder.encode(vodId, "UTF-8")) { reader ->
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); return@read }
+            reader.beginObject()
+            while (reader.hasNext()) {
+                if (reader.nextName() == "info") info = readInfo(reader) else reader.skipValue()
+            }
+            reader.endObject()
+        }
+        return info
+    }
+
+    /** The "info" object of a film or series; null when the server leaves it empty. */
+    private fun readInfo(reader: JsonReader): TitleInfo? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); return null }
+        val f = HashMap<String, String>()
+        reader.beginObject()
+        while (reader.hasNext()) {
+            val key = reader.nextName()
+            reader.text()?.let { f[key] = it }
+        }
+        reader.endObject()
+        val genres = f["genre"].orEmpty().split(',', '/', '|').map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(3)
+        val plot = (f["plot"] ?: f["description"]).orEmpty().trim().take(600)
+        val result = TitleInfo(genres, plot, f.year(), f.rating())
+        return result.takeIf { it.genres.isNotEmpty() || it.plot.isNotEmpty() || it.year > 0 || it.rating > 0f }
+    }
+
+    /** Out of 10: "rating", else "rating_5based" doubled. */
+    private fun Map<String, String>.rating(): Float {
+        val ten = this["rating"]?.replace(',', '.')?.toFloatOrNull()
+        val five = this["rating_5based"]?.replace(',', '.')?.toFloatOrNull()?.times(2f)
+        return (ten?.takeIf { it > 0f } ?: five ?: 0f).coerceIn(0f, 10f)
+    }
+
+    // Made once: read for every film of a list that can hold tens of thousands.
+    private val yearPattern = Regex("""(19|20)\d{2}""")
+
+    /** The year from "year", "releaseDate", "releasedate" or "release_date" (first four digits). */
+    private fun Map<String, String>.year(): Int {
+        for (key in listOf("year", "releaseDate", "releasedate", "release_date")) {
+            val digits = yearPattern.find(this[key].orEmpty())?.value?.toIntOrNull()
+            if (digits != null) return digits
+        }
+        return 0
     }
 
     private fun readEpisodeList(reader: JsonReader, season: Int, into: MutableList<Episode>) {

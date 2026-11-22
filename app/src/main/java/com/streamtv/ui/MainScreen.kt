@@ -109,6 +109,7 @@ import com.streamtv.data.EpgProgram
 import com.streamtv.data.Episode
 import com.streamtv.data.Season
 import com.streamtv.data.Shows
+import com.streamtv.data.TitleInfo
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -702,6 +703,7 @@ private fun LibraryContent(
     }
     ui.details?.let { item ->
         TitleDetails(
+            loadInfo = { model.titleInfo(it) },
             item, kind, titles, state,
             onPlay = { start -> onPlay(item, start) },
             onFavorite = { model.toggleFavorite(item) },
@@ -722,9 +724,14 @@ private fun LibraryContent(
             if (fixed.size >= 2) fixed else titles.groupBy { it.group.ifBlank { "Other" } }
         }
     }
+    // The provider's own ratings: its 100 best rated titles, when it rates them.
+    val topRated = remember(titles) {
+        Memo.of("topRated", titles) { titles.filter { it.rating > 0f }.sortedByDescending { it.rating }.take(100) }
+    }
     val query = ui.search.trim()
     val chosen = ui.section
     val section = when {
+        chosen == "__top" -> if (topRated.isEmpty()) "__all" else chosen
         chosen == "__history" -> if (history.isEmpty()) "__all" else chosen
         chosen == "__favorites" -> if (favorites.isEmpty()) "__all" else chosen
         chosen == "__all" || genres.containsKey(chosen) -> chosen
@@ -732,6 +739,7 @@ private fun LibraryContent(
     }
     val shown = when {
         query.isNotEmpty() -> titles.filter { it.name.contains(query, true) || it.group.contains(query, true) }
+        section == "__top" -> topRated
         section == "__history" -> history
         section == "__favorites" -> favorites
         section == "__all" -> titles
@@ -743,7 +751,7 @@ private fun LibraryContent(
         LaunchedEffect(Unit) {
             val genreIndex = genres.keys.indexOf(section)
             if (query.isEmpty() && genreIndex >= 0) {
-                val before = (if (liveMenu) 2 else 3) + (if (history.isNotEmpty()) 1 else 0) + (if (favorites.isNotEmpty()) 1 else 0) + 1
+                val before = (if (liveMenu) 2 else 3) + (if (topRated.isNotEmpty()) 1 else 0) + (if (history.isNotEmpty()) 1 else 0) + (if (favorites.isNotEmpty()) 1 else 0) + 1
                 menuState.scrollToItem((before + genreIndex - 2).coerceAtLeast(0))
             }
         }
@@ -754,6 +762,9 @@ private fun LibraryContent(
                 LazyColumn(state = menuState, modifier = Modifier.fillMaxSize().padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     item { LibrarySearch(ui.search, searchHint, large = true) { ui.search = it } }
                     item { FocusRow("All", titles.size.toString(), query.isEmpty() && section == "__all") { ui.search = ""; ui.section = "__all" } }
+                    if (topRated.isNotEmpty()) {
+                        item { FocusRow("Top rated", topRated.size.toString(), query.isEmpty() && section == "__top") { ui.search = ""; ui.section = "__top" } }
+                    }
                     if (history.isNotEmpty()) {
                         item { FocusRow("Watch history", history.size.toString(), query.isEmpty() && section == "__history") { ui.search = ""; ui.section = "__history" } }
                     }
@@ -918,10 +929,14 @@ private fun LibrarySearch(text: String, hint: String, large: Boolean = false, on
 /** A title's own page: poster, name, genre, where it was left, and Play / Resume / favourite. */
 @Composable
 private fun TitleDetails(
+    loadInfo: suspend (Channel) -> TitleInfo?,
     item: Channel, kind: ChannelKind, titles: List<Channel>, state: TvState,
     onPlay: (Long) -> Unit, onFavorite: () -> Unit, onOpen: (Channel) -> Unit, onClose: () -> Unit
 ) {
     BackHandler { onClose() }
+    // The provider's genre and story, asked for now (an Xtream film); the page shows without them first.
+    var info by remember(item.key) { mutableStateOf<TitleInfo?>(null) }
+    LaunchedEffect(item.key) { info = loadInfo(item) }
     val saved = state.positions[item.key]
     val starred = state.favorites.hasFavorite(item)
     val primary = remember(item.key) { FocusRequester() }
@@ -978,9 +993,9 @@ private fun TitleDetails(
                 Column(Modifier.weight(1f).padding(top = 6.dp)) {
                     Text(item.name, color = White, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 36.sp)
                     Spacer(Modifier.height(10.dp))
-                    // Soft pills: what it is and where it belongs.
+                    // Soft pills: what it is, its year and rating, and its genres (else where it belongs).
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (label in listOf(t(if (kind == ChannelKind.Movie) "Movie" else "Series"), t(item.group.ifBlank { "Other" }))) {
+                        for (label in titlePills(item, info, t(if (kind == ChannelKind.Movie) "Movie" else "Series"))) {
                             Box(
                                 Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -988,6 +1003,10 @@ private fun TitleDetails(
                                 Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                    }
+                    info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 620.dp))
                     }
                     if (saved != null) {
                         Spacer(Modifier.height(16.dp))
@@ -1077,6 +1096,8 @@ private fun SeriesDetails(
         }
     }
     val all = seasons.orEmpty()
+    // Known once the seasons came (the same answer from the server carries it).
+    val showInfo = remember(show.key, seasons) { if (seasons == null) null else model.showInfo(show) }
     var seasonIndex by remember(show.key) { mutableStateOf(0) }
     val season = all.getOrNull(seasonIndex.coerceIn(0, (all.size - 1).coerceAtLeast(0)))
     val primary = remember(show.key) { FocusRequester() }
@@ -1126,10 +1147,8 @@ private fun SeriesDetails(
                     Text(show.name, color = White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 34.sp)
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val pills = listOfNotNull(
-                            t("Series"), t(show.group.ifBlank { "Other" }),
-                            all.size.takeIf { it > 0 }?.let { "$it ${t(if (it == 1) "season" else "seasons")}" }
-                        )
+                        val pills = titlePills(show, showInfo, t("Series")) +
+                            listOfNotNull(all.size.takeIf { it > 0 }?.let { "$it ${t(if (it == 1) "season" else "seasons")}" })
                         for (label in pills) {
                             Box(
                                 Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
@@ -1138,6 +1157,10 @@ private fun SeriesDetails(
                                 Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                    }
+                    showInfo?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 620.dp))
                     }
                     Spacer(Modifier.height(18.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1222,6 +1245,15 @@ private fun SeriesDetails(
             }
         }
     }
+}
+
+/** The pills under a title's name: its kind, year, rating, and its genres (else its category). */
+@Composable
+private fun titlePills(item: Channel, info: TitleInfo?, kindLabel: String): List<String> {
+    val year = info?.year?.takeIf { it > 0 } ?: item.year.takeIf { it > 0 }
+    val rating = info?.rating?.takeIf { it > 0f } ?: item.rating.takeIf { it > 0f }
+    val genres = info?.genres.orEmpty().ifEmpty { listOf(t(item.group.ifBlank { "Other" })) }.take(2)
+    return listOfNotNull(kindLabel, year?.toString(), rating?.let { "★ " + String.format(java.util.Locale.US, "%.1f", it) }) + genres
 }
 
 @Composable

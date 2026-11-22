@@ -58,11 +58,20 @@ class PlaylistRepository {
         movies + series
     }
 
-    /** The seasons and episodes of an Xtream series, asked for when it is opened. */
-    suspend fun seasons(playlistUrl: String, show: Channel): List<Season> = withContext(Dispatchers.IO) {
-        val id = Shows.xtreamId(show) ?: return@withContext emptyList()
+    /** The seasons, episodes and details of an Xtream series, asked for when it is opened. */
+    suspend fun show(playlistUrl: String, show: Channel): ShowDetails = withContext(Dispatchers.IO) {
+        val id = Shows.xtreamId(show) ?: return@withContext ShowDetails(emptyList(), null)
         val account = XtreamAccount.from(playlistUrl) ?: error("This series belongs to another playlist")
-        XtreamApi(client, account, PlayerAgent).loadEpisodes(id)
+        XtreamApi(client, account, PlayerAgent).loadShow(id)
+    }
+
+    /** A film's details from an Xtream account (its id is the last part of its address); null elsewhere. */
+    suspend fun movieInfo(playlistUrl: String, movie: Channel): TitleInfo? = withContext(Dispatchers.IO) {
+        val account = XtreamAccount.from(playlistUrl) ?: return@withContext null
+        val path = movie.url.substringBefore("?")
+        if (!path.contains("/movie/")) return@withContext null
+        val id = path.substringAfterLast('/').substringBefore('.').takeIf { it.isNotBlank() } ?: return@withContext null
+        XtreamApi(client, account, PlayerAgent).loadMovieInfo(id)
     }
 
     private fun loadM3u(url: String, keep: ((String) -> Boolean)? = null): List<Channel> {

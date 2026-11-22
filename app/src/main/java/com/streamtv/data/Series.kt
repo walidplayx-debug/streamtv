@@ -20,11 +20,17 @@ data class Episode(
 
 data class Season(val number: Int, val episodes: List<Episode>)
 
+/** What the provider tells about one film or series, asked for when its page opens. */
+data class TitleInfo(val genres: List<String>, val plot: String, val year: Int, val rating: Float)
+
+/** A series' page: its seasons, and what the provider tells about it. */
+data class ShowDetails(val seasons: List<Season>, val info: TitleInfo?)
+
 object Shows {
     private val marker = Regex("""\bS(\d{1,2})\s?E(\d{1,3})\b""", RegexOption.IGNORE_CASE)
 
-    fun xtream(seriesId: String, name: String, cover: String?, group: String) =
-        Channel("show:$seriesId", name, "${ShowScheme}xtream:$seriesId", cover, group, onDemand = true)
+    fun xtream(seriesId: String, name: String, cover: String?, group: String, rating: Float = 0f, year: Int = 0) =
+        Channel("show:$seriesId", name, "${ShowScheme}xtream:$seriesId", cover, group, onDemand = true, rating = rating, year = year)
 
     fun xtreamId(show: Channel): String? = show.url.removePrefix(ShowScheme).takeIf { it.startsWith("xtream:") }?.removePrefix("xtream:")
 

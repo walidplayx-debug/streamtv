@@ -17,6 +17,8 @@ import com.streamtv.data.hasFavorite
 import com.streamtv.data.LogoIndex
 import com.streamtv.data.XtreamAccount
 import com.streamtv.data.Season
+import com.streamtv.data.ShowDetails
+import com.streamtv.data.TitleInfo
 import com.streamtv.data.Shows
 import com.streamtv.data.isShow
 import kotlinx.coroutines.flow.collect
@@ -313,8 +315,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun showOpened() { _state.value = _state.value.copy(openShow = null) }
 
     // The last series opened, so going back and forth does not ask the server again.
-    private val seasonCache = object : LinkedHashMap<String, List<Season>>(16, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Season>>?) = size > 12
+    private val seasonCache = object : LinkedHashMap<String, ShowDetails>(16, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ShowDetails>?) = size > 12
+    }
+    // The last films opened: their genre and story, asked for once.
+    private val infoCache = object : LinkedHashMap<String, TitleInfo?>(32, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TitleInfo?>?) = size > 40
     }
 
     /** A series' seasons: from the server for an Xtream series (once), else from the playlist. */
@@ -324,10 +330,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return withContext(Dispatchers.Default) { Shows.seasonsFromPlaylist(show, channels) }
         }
         val cacheKey = _state.value.playlistUrl + "|" + show.key
-        synchronized(seasonCache) { seasonCache[cacheKey] }?.let { return it }
-        val loaded = repository.seasons(_state.value.playlistUrl, show)
-        if (loaded.isNotEmpty()) synchronized(seasonCache) { seasonCache[cacheKey] = loaded }
-        return loaded
+        synchronized(seasonCache) { seasonCache[cacheKey] }?.let { return it.seasons }
+        val loaded = repository.show(_state.value.playlistUrl, show)
+        if (loaded.seasons.isNotEmpty()) synchronized(seasonCache) { seasonCache[cacheKey] = loaded }
+        return loaded.seasons
+    }
+
+    /** What the provider tells about a series, once its seasons were asked for; null otherwise. */
+    fun showInfo(show: Channel): TitleInfo? =
+        synchronized(seasonCache) { seasonCache[_state.value.playlistUrl + "|" + show.key] }?.info
+
+    /** A film's genre, story, year and rating from its Xtream account (asked for once); null elsewhere. */
+    suspend fun titleInfo(movie: Channel): TitleInfo? {
+        val cacheKey = _state.value.playlistUrl + "|" + movie.key
+        synchronized(infoCache) { if (infoCache.containsKey(cacheKey)) return infoCache[cacheKey] }
+        val info = runCatching { repository.movieInfo(_state.value.playlistUrl, movie) }
+            .onFailure { if (it is CancellationException) throw it }.getOrNull()
+        synchronized(infoCache) { infoCache[cacheKey] = info }
+        return info
     }
 
     private fun rememberWatched(channel: Channel) {

@@ -4,7 +4,11 @@ data class Channel(
     val id: String, val name: String, val url: String, val logo: String? = null,
     val group: String = "Other", val country: String = "", val language: String = "",
     /** The playlist gives it a running time (#EXTINF:5400): a film or an episode, never a channel. */
-    val onDemand: Boolean = false
+    val onDemand: Boolean = false,
+    /** Out of 10, as the provider rates it (0: not rated). Films and series of an Xtream account. */
+    val rating: Float = 0f,
+    /** Year of release, when the provider gives it (0: unknown). */
+    val year: Int = 0
 ) {
     /** Unique per playlist entry: several streams may share one tvg-id. */
     val key: String get() = "$id|$url"
