@@ -42,13 +42,27 @@ class PlaylistRepository {
      */
     suspend fun loadMore(url: String, haveLive: List<Channel>): List<Channel> = withContext(Dispatchers.IO) {
         val account = XtreamAccount.from(url) ?: return@withContext emptyList()
-        // The live list came from get.php itself (no API): it already holds everything.
-        if (haveLive.any { it.kind() != ChannelKind.Live }) return@withContext emptyList()
-        val movies = runCatching { XtreamApi(client, account, PlayerAgent).loadMovies() }
+        val api = XtreamApi(client, account, PlayerAgent)
+        // The live list came from get.php itself (no API): it already holds the films.
+        val fromPlaylist = haveLive.any { it.kind() != ChannelKind.Live }
+        val movies = if (fromPlaylist) emptyList() else runCatching { api.loadMovies() }
             .onFailure { if (it is CancellationException) throw it }.getOrDefault(emptyList())
-        val series = runCatching { loadM3u(url, keep = { line -> line.substringBefore("?").contains("/series/", ignoreCase = true) }) }
-            .onFailure { if (it is CancellationException) throw it }.getOrDefault(emptyList())
+        // Series: the API's list of shows, their episodes asked for only when one is opened (many
+        // servers leave series out of get.php altogether). get.php's episode lines only when the
+        // API has no series list.
+        val shows = if (fromPlaylist && haveLive.any { it.kind() == ChannelKind.Series }) emptyList()
+            else runCatching { api.loadSeries() }.onFailure { if (it is CancellationException) throw it }.getOrDefault(emptyList())
+        val series = if (shows.isNotEmpty() || fromPlaylist) shows else runCatching {
+            loadM3u(url, keep = { line -> line.substringBefore("?").contains("/series/", ignoreCase = true) })
+        }.onFailure { if (it is CancellationException) throw it }.getOrDefault(emptyList())
         movies + series
+    }
+
+    /** The seasons and episodes of an Xtream series, asked for when it is opened. */
+    suspend fun seasons(playlistUrl: String, show: Channel): List<Season> = withContext(Dispatchers.IO) {
+        val id = Shows.xtreamId(show) ?: return@withContext emptyList()
+        val account = XtreamAccount.from(playlistUrl) ?: error("This series belongs to another playlist")
+        XtreamApi(client, account, PlayerAgent).loadEpisodes(id)
     }
 
     private fun loadM3u(url: String, keep: ((String) -> Boolean)? = null): List<Channel> {

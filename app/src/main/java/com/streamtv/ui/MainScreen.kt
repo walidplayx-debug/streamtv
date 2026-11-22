@@ -105,6 +105,9 @@ import com.streamtv.data.kind
 import com.streamtv.data.hasFavorite
 import com.streamtv.data.detectedLanguage
 import com.streamtv.data.EpgProgram
+import com.streamtv.data.Episode
+import com.streamtv.data.Season
+import com.streamtv.data.Shows
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -159,6 +162,10 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     // The Movies and Series pages keep their place (menu choice, open title) while a title plays.
     val movieUi = remember { LibraryUi() }
     val seriesUi = remember { LibraryUi() }
+    // A series chosen elsewhere (search) opens on its own page under Series.
+    LaunchedEffect(state.openShow) {
+        state.openShow?.let { seriesUi.search = ""; seriesUi.details = it; model.showOpened() }
+    }
     // Where the next movie starts: 0, or the place it was left when "Resume" was chosen.
     var vodStart by remember { mutableLongStateOf(0L) }
 
@@ -670,12 +677,26 @@ private fun LibraryContent(
     /** The menu looks like the Live TV list (plain rows, no glass card). */
     liveMenu: Boolean = false
 ) {
-    val titles = remember(state.channels, kind) { Memo.of("titles", state.channels, kind) { state.channels.filter { it.kind() == kind } } }
+    // Series: one title per show (its episodes are on its page), not one per episode.
+    val titles = remember(state.channels, kind) {
+        Memo.of("titles", state.channels, kind) {
+            if (kind == ChannelKind.Series) Shows.of(state.channels) else state.channels.filter { it.kind() == kind }
+        }
+    }
     val name = if (kind == ChannelKind.Movie) "movies" else "series"
     if (titles.isEmpty()) {
         EmptyState("No $name yet", "Your playlist has no $name. Add one that includes them in Settings.", "Settings") {
             model.selectTab("Settings")
         }
+        return
+    }
+    ui.details?.takeIf { kind == ChannelKind.Series && it.url.startsWith(com.streamtv.data.ShowScheme) }?.let { show ->
+        SeriesDetails(
+            show, state, model,
+            onPlay = { episode, start -> onPlay(episode, start) },
+            onFavorite = { model.toggleFavorite(show) },
+            onClose = { ui.details = null; onReturn(show.key) }
+        )
         return
     }
     ui.details?.let { item ->
@@ -1025,6 +1046,219 @@ private fun TitleDetails(
                 }
             }
         }
+    }
+}
+
+/**
+ * A series' page, as on Apple TV: the poster and Play / Resume above, then the seasons and a row
+ * of episodes that slides sideways. The episodes of an Xtream series are asked for only now.
+ */
+@Composable
+private fun SeriesDetails(
+    show: Channel, state: TvState, model: MainViewModel,
+    onPlay: (Channel, Long) -> Unit, onFavorite: () -> Unit, onClose: () -> Unit
+) {
+    BackHandler { onClose() }
+    var seasons by remember(show.key) { mutableStateOf<List<Season>?>(null) }
+    var failed by remember(show.key) { mutableStateOf<String?>(null) }
+    var attempt by remember(show.key) { mutableStateOf(0) }
+    LaunchedEffect(show.key, attempt) {
+        failed = null
+        try {
+            seasons = model.seasons(show)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            failed = e.message ?: "Unable to load episodes"
+        }
+    }
+    val all = seasons.orEmpty()
+    var seasonIndex by remember(show.key) { mutableStateOf(0) }
+    val season = all.getOrNull(seasonIndex.coerceIn(0, (all.size - 1).coerceAtLeast(0)))
+    val primary = remember(show.key) { FocusRequester() }
+    val chosenSeason = remember(show.key) { FocusRequester() }
+    LaunchedEffect(show.key) {
+        repeat(30) {
+            if (runCatching { primary.requestFocus() }.isSuccess) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+    val starred = state.favorites.hasFavorite(show)
+    // Go on where the viewer stopped: the last episode started and not finished, else the first.
+    val byKey = remember(all) { all.flatMap { it.episodes }.associateBy { Shows.playable(show, it).key } }
+    val next: Pair<Episode, Long>? = remember(byKey, state.recentVod, state.positions) {
+        state.recentVod.firstNotNullOfOrNull { key ->
+            val episode = byKey[key] ?: return@firstNotNullOfOrNull null
+            val saved = state.positions[key] ?: return@firstNotNullOfOrNull null
+            if (saved.first < saved.second * 0.95) episode to saved.first else null
+        } ?: all.firstOrNull()?.episodes?.firstOrNull()?.let { it to 0L }
+    }
+    fun code(e: Episode) = "S${e.season} E${e.number}"
+    val enter = remember(show.key) { Animatable(0f) }
+    LaunchedEffect(show.key) { enter.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+    Box(Modifier.fillMaxSize().clipToBounds()) {
+        AsyncImage(
+            model = show.logo, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).graphicsLayer { alpha = .14f }
+        )
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink))))
+        Column(
+            Modifier.fillMaxSize()
+                .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+        ) {
+            Row {
+                Box(
+                    Modifier.width(120.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
+                ) {
+                    ChannelLogo(
+                        show.name, show.logo, Modifier.fillMaxSize(), fontSize = 24.sp, corner = 14.dp,
+                        placeholder = Brush.linearGradient(channelGradient(show.name)), contentScale = ContentScale.Crop
+                    )
+                }
+                Spacer(Modifier.width(30.dp))
+                Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                    Text(show.name, color = White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 34.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val pills = listOfNotNull(
+                            t("Series"), t(show.group.ifBlank { "Other" }),
+                            all.size.takeIf { it > 0 }?.let { "$it ${t(if (it == 1) "season" else "seasons")}" }
+                        )
+                        for (label in pills) {
+                            Box(
+                                Modifier.clip(CircleShape).background(White.copy(alpha = .08f)).border(1.dp, White.copy(alpha = .12f), CircleShape)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(label, color = White.copy(alpha = .9f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        when {
+                            next != null -> {
+                                val (episode, start) = next
+                                val label = (if (start > 0L) t("Resume") else t("Play")) + "  " + code(episode)
+                                WhiteButton(label, Modifier.focusRequester(primary)) { onPlay(Shows.playable(show, episode), start) }
+                            }
+                            failed != null -> WhiteButton("Try again", Modifier.focusRequester(primary)) { attempt++ }
+                            else -> WhiteButton(if (starred) "Remove from favorites" else "Add to favorites", Modifier.focusRequester(primary)) { onFavorite() }
+                        }
+                        if (next != null || failed != null) {
+                            WhiteButton(if (starred) "Remove from favorites" else "Add to favorites") { onFavorite() }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            when {
+                failed != null -> Text(t(failed ?: ""), color = Color(0xFFFF8A80), fontSize = 16.sp, maxLines = 2)
+                seasons == null -> Text(t("Loading episodes…"), color = Muted, fontSize = 16.sp)
+                season == null -> Text(t("No episodes yet"), color = Muted, fontSize = 16.sp)
+                else -> {
+                    // The seasons: moving onto one shows its episodes at once.
+                    if (all.size > 1) {
+                        LazyRow(
+                            modifier = Modifier.onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                    runCatching { primary.requestFocus() }
+                                    true
+                                } else false
+                            },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            itemsIndexed(all, key = { _, s -> s.number }) { index, s ->
+                                SeasonChip(
+                                    "${t("Season")} ${s.number}", index == seasonIndex,
+                                    if (index == seasonIndex) Modifier.focusRequester(chosenSeason) else Modifier
+                                ) { seasonIndex = index }
+                            }
+                        }
+                    } else {
+                        Text("${t("Season")} ${season.number}", color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        // Pictures as tall as the room left allows, under their names.
+                        val imageHeight = (maxHeight - 70.dp).coerceIn(60.dp, 170.dp)
+                        key(seasonIndex) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                        runCatching { if (all.size > 1) chosenSeason.requestFocus() else primary.requestFocus() }
+                                        true
+                                    } else false
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(season.episodes, key = { it.id }) { episode ->
+                                    val playable = Shows.playable(show, episode)
+                                    val saved = state.positions[playable.key]
+                                    EpisodeCard(
+                                        episode, show.logo,
+                                        saved?.let { (it.first.toFloat() / it.second.coerceAtLeast(1L)).coerceIn(0f, 1f) },
+                                        Modifier.width(imageHeight * (16f / 9f))
+                                    ) {
+                                        val start = saved?.takeIf { it.first < it.second * 0.95 }?.first ?: 0L
+                                        onPlay(playable, start)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonChip(label: String, chosen: Boolean, modifier: Modifier = Modifier, onChoose: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier.clip(CircleShape)
+            .background(if (focused) FocusBrush else SolidColor(White.copy(alpha = if (chosen) .16f else .06f)))
+            .border(1.dp, White.copy(alpha = if (focused) .5f else if (chosen) .3f else .1f), CircleShape)
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onChoose() }
+            .clickable { onChoose() }
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        Text(label, color = White, fontSize = 16.sp, fontWeight = if (chosen || focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+    }
+}
+
+/** An episode: its picture (16:9) with how much was watched, then its number, name and length. */
+@Composable
+private fun EpisodeCard(episode: Episode, fallback: String?, progress: Float?, modifier: Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.08f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "episodeScale")
+    Column(
+        modifier.zIndex(if (focused) 1f else 0f).scale(scale).onFocusChanged { focused = it.isFocused }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+    ) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                .shadow(if (focused) 20.dp else 0.dp, RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(10.dp))
+                .background(White.copy(alpha = .06f))
+                // As on the posters: no white frame, the focused one stands out by size and shadow.
+                .border(1.dp, White.copy(alpha = if (focused) .16f else .07f), RoundedCornerShape(10.dp))
+        ) {
+            AsyncImage(model = episode.image ?: fallback, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            if (progress != null) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(White.copy(alpha = .25f))) {
+                    Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(White))
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        val title = episode.title.ifBlank { "${t("Episode")} ${episode.number}" }
+        Text("${episode.number}. $title", color = if (focused) White else White.copy(alpha = .78f), fontSize = 14.sp,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (episode.seconds > 0) Text(formatTime(episode.seconds * 1000L), color = Muted, fontSize = 12.sp, maxLines = 1)
     }
 }
 

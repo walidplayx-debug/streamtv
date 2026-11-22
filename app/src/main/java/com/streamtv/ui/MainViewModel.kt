@@ -16,6 +16,9 @@ import com.streamtv.data.kind
 import com.streamtv.data.hasFavorite
 import com.streamtv.data.LogoIndex
 import com.streamtv.data.XtreamAccount
+import com.streamtv.data.Season
+import com.streamtv.data.Shows
+import com.streamtv.data.isShow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -79,6 +82,8 @@ data class TvState(
     val logos: Map<String, String> = emptyMap(),
     val pinSet: Boolean = false,
     val pin: PinPrompt? = null,
+    /** A series asked to open from outside its page (search): the Series page opens it. */
+    val openShow: Channel? = null,
     val pinError: Boolean = false,
     /** What is typed in the Search tab; separate from the Live TV list choice (searchQuery). */
     val searchText: String = "",
@@ -305,6 +310,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(logos = logos)
         viewModelScope.launch { preferences.saveChannelLogos(logos) }
     }
+    fun showOpened() { _state.value = _state.value.copy(openShow = null) }
+
+    // The last series opened, so going back and forth does not ask the server again.
+    private val seasonCache = object : LinkedHashMap<String, List<Season>>(16, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Season>>?) = size > 12
+    }
+
+    /** A series' seasons: from the server for an Xtream series (once), else from the playlist. */
+    suspend fun seasons(show: Channel): List<Season> {
+        if (Shows.xtreamId(show) == null) {
+            val channels = _state.value.channels
+            return withContext(Dispatchers.Default) { Shows.seasonsFromPlaylist(show, channels) }
+        }
+        val cacheKey = _state.value.playlistUrl + "|" + show.key
+        synchronized(seasonCache) { seasonCache[cacheKey] }?.let { return it }
+        val loaded = repository.seasons(_state.value.playlistUrl, show)
+        if (loaded.isNotEmpty()) synchronized(seasonCache) { seasonCache[cacheKey] = loaded }
+        return loaded
+    }
+
     private fun rememberWatched(channel: Channel) {
         if (channel.kind() != ChannelKind.Live) {
             // Movies and episodes have a history of their own.
@@ -472,6 +497,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         play(channel, from, title)
     }
     private fun play(channel: Channel, from: List<Channel>?, title: String?) {
+        // A series is not a stream: it opens on its seasons and episodes.
+        if (channel.isShow()) {
+            _state.value = _state.value.copy(tab = "Series", openShow = channel)
+            return
+        }
         if (channel.kind() != ChannelKind.Live) {
             // A movie plays on its own: no channel list, no zapping, and the last channel stays the last channel.
             _state.value = _state.value.copy(selected = channel, playing = true)

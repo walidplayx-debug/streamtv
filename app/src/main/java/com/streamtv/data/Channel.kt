@@ -41,6 +41,8 @@ fun Channel.kind(): ChannelKind {
     val path = url.substringBefore("|").substringBefore("?").lowercase()
     val file = videoFileExtensions.any { path.endsWith(it) }
     return when {
+        // A series title (see Series.kt): opens on its seasons, never played itself.
+        path.startsWith(ShowScheme) -> ChannelKind.Series
         path.contains("/series/") || (file && episodeMarker.containsMatchIn(name)) -> ChannelKind.Series
         path.contains("/movie/") || path.contains("/movies/") || file -> ChannelKind.Movie
         // A stream (HLS and the like) the playlist gives a running time: a film, or an episode.

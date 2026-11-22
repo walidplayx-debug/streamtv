@@ -14,6 +14,7 @@ class XtreamAccount(val base: String, val username: String, val password: String
         "$base/player_api.php?username=${enc(username)}&password=${enc(password)}" + (action?.let { "&action=$it" } ?: "")
     fun live(id: String) = "$base/live/${path(username)}/${path(password)}/$id.ts"
     fun movie(id: String, extension: String) = "$base/movie/${path(username)}/${path(password)}/$id.${extension.ifBlank { "mp4" }}"
+    fun episode(id: String, extension: String) = "$base/series/${path(username)}/${path(password)}/$id.${extension.ifBlank { "mp4" }}"
 
     companion object {
         private fun enc(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
@@ -95,6 +96,85 @@ class XtreamApi(private val client: OkHttpClient, private val account: XtreamAcc
             result += Channel("$name|$url", name, url, s["stream_icon"]?.takeIf { it.startsWith("http") }, movieGroups[s["category_id"]] ?: "Other")
         }
         return result
+    }
+
+    /** The account's series, one title each (their episodes come from [loadEpisodes] when opened). */
+    fun loadSeries(): List<Channel> {
+        val result = ArrayList<Channel>()
+        val groups = categories("get_series_categories")
+        streams("get_series") { s ->
+            val id = s["series_id"] ?: return@streams
+            val name = s["name"]?.trim().orEmpty()
+            if (name.isEmpty()) return@streams
+            result += Shows.xtream(id, name, s["cover"]?.takeIf { it.startsWith("http") }, groups[s["category_id"]] ?: "Other")
+        }
+        return result
+    }
+
+    /**
+     * A series' seasons and episodes (get_series_info). Servers give "episodes" either as an
+     * object keyed by season number or as a list of per-season lists; both are read.
+     */
+    fun loadEpisodes(seriesId: String): List<Season> {
+        val episodes = ArrayList<Episode>()
+        read(account.api("get_series_info") + "&series_id=" + java.net.URLEncoder.encode(seriesId, "UTF-8")) { reader ->
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); return@read }
+            reader.beginObject()
+            while (reader.hasNext()) {
+                if (reader.nextName() != "episodes") { reader.skipValue(); continue }
+                when (reader.peek()) {
+                    JsonToken.BEGIN_OBJECT -> {
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            val season = reader.nextName().toIntOrNull() ?: 0
+                            readEpisodeList(reader, season, episodes)
+                        }
+                        reader.endObject()
+                    }
+                    JsonToken.BEGIN_ARRAY -> {
+                        reader.beginArray()
+                        var index = 0
+                        while (reader.hasNext()) readEpisodeList(reader, ++index, episodes)
+                        reader.endArray()
+                    }
+                    else -> reader.skipValue()
+                }
+            }
+            reader.endObject()
+        }
+        return episodes.groupBy { it.season }.toSortedMap().map { (n, list) -> Season(n, list.sortedBy { it.number }) }
+    }
+
+    private fun readEpisodeList(reader: JsonReader, season: Int, into: MutableList<Episode>) {
+        if (reader.peek() != JsonToken.BEGIN_ARRAY) { reader.skipValue(); return }
+        reader.beginArray()
+        while (reader.hasNext()) {
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); continue }
+            val f = HashMap<String, String>()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val key = reader.nextName()
+                if (key == "info" && reader.peek() == JsonToken.BEGIN_OBJECT) {
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        val inner = reader.nextName()
+                        if (inner == "movie_image" || inner == "plot" || inner == "duration_secs" || inner == "cover_big") reader.text()?.let { f["info." + inner] = it }
+                        else reader.skipValue()
+                    }
+                    reader.endObject()
+                } else reader.text()?.let { f[key] = it }
+            }
+            reader.endObject()
+            val id = f["id"] ?: f["stream_id"] ?: continue
+            val number = f["episode_num"]?.toDoubleOrNull()?.toInt() ?: (into.count { it.season == season } + 1)
+            val inSeason = f["season"]?.toIntOrNull() ?: season
+            into += Episode(
+                id, inSeason, number, f["title"]?.trim().orEmpty(), account.episode(id, f["container_extension"].orEmpty()),
+                (f["info.movie_image"] ?: f["info.cover_big"])?.takeIf { it.startsWith("http") },
+                f["info.plot"].orEmpty().take(400), f["info.duration_secs"]?.toDoubleOrNull()?.toInt() ?: 0
+            )
+        }
+        reader.endArray()
     }
 
     private fun categories(action: String): Map<String, String> {
