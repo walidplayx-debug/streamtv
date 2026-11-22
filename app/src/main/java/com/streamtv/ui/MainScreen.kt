@@ -386,9 +386,9 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
         val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
         when (state.tab) {
-            // Movies uses the Live TV style of list for its menu.
+            // Movies and Series use the Live TV style of list for their menus.
             "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
-            "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle)
+            "Series" -> LibraryContent(ChannelKind.Series, state, model, seriesUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
             "Favorites" -> {
                 ScreenHeading("Favorites", "${state.channels.count { state.favorites.hasFavorite(it) }} ${t("saved channels")}")
                 Spacer(Modifier.height(20.dp))
@@ -848,11 +848,10 @@ private fun PosterGrid(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     gridItems(titles, key = { it.key }) { item ->
-                        val saved = positions[item.key]
                         PosterCard(
                             item, favorites.hasFavorite(item), if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier,
-                            { focusedKey = item.key }, showTitle = false,
-                            progress = saved?.let { (it.first.toFloat() / it.second.coerceAtLeast(1L)).coerceIn(0f, 1f) }
+                            // No watched bar on the poster: the time left is named above the grid.
+                            { focusedKey = item.key }, showTitle = false
                         ) { onOpen(item) }
                     }
                 }
