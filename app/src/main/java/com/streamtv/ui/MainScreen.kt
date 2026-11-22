@@ -821,6 +821,9 @@ private fun LibraryContent(
     }
 }
 
+/** Posters a row in the Movies and Series grids. */
+private const val PosterColumns = 7
+
 @Composable
 private fun PosterGrid(
     titles: List<Channel>, listKey: String, favorites: Set<String>, positions: Map<String, Pair<Long, Long>>,
@@ -834,6 +837,22 @@ private fun PosterGrid(
         RestoreFocus(restoreKey, restoreIndex >= 0, restoreFocus, onRestored)
         var focusedKey by remember { mutableStateOf<String?>(null) }
         GlideToFocus(gridState, focusedKey)
+        // CH+ / CH- (and Page Down / Up) turn a whole page: three rows (21 titles) on, same column,
+        // so a library of a thousand titles is crossed in a few presses.
+        var pageTarget by remember { mutableStateOf<String?>(null) }
+        val pageFocus = remember { FocusRequester() }
+        LaunchedEffect(pageTarget) {
+            val key = pageTarget ?: return@LaunchedEffect
+            val index = titles.indexOfFirst { it.key == key }
+            if (index < 0) { pageTarget = null; return@LaunchedEffect }
+            // The new row second from the top, as the grid glides to for the focus anyway.
+            gridState.scrollToItem((index - index % PosterColumns - PosterColumns).coerceAtLeast(0))
+            repeat(20) {
+                if (runCatching { pageFocus.requestFocus() }.isSuccess) { pageTarget = null; return@LaunchedEffect }
+                withFrameNanos { }
+            }
+            pageTarget = null
+        }
         Column(Modifier.fillMaxSize()) {
             // The title under the remote, named once above the grid: the posters carry no names,
             // so twice as many fit on the screen.
@@ -851,9 +870,20 @@ private fun PosterGrid(
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 LazyVerticalGrid(
                     // Seven posters a row: the page uses its width.
-                    columns = GridCells.Fixed(7),
+                    columns = GridCells.Fixed(PosterColumns),
                     state = gridState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+                        val down = event.key == Key.ChannelUp || event.key == Key.PageDown
+                        val up = event.key == Key.ChannelDown || event.key == Key.PageUp
+                        if (!down && !up) return@onPreviewKeyEvent false
+                        if (event.type == KeyEventType.KeyDown) {
+                            val from = titles.indexOfFirst { it.key == focusedKey }.coerceAtLeast(0)
+                            val page = PosterColumns * 3
+                            val to = (from + if (down) page else -page).coerceIn(0, titles.lastIndex)
+                            if (to != from) pageTarget = titles[to].key
+                        }
+                        true
+                    },
                     // Free room under the last row, so every row can glide up to the focus height.
                     contentPadding = PaddingValues(start = 12.dp, top = 10.dp, end = 16.dp, bottom = maxHeight),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -861,7 +891,12 @@ private fun PosterGrid(
                 ) {
                     gridItems(titles, key = { it.key }) { item ->
                         PosterCard(
-                            item, favorites.hasFavorite(item), if (item.key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier,
+                            item, favorites.hasFavorite(item),
+                            when (item.key) {
+                                pageTarget -> Modifier.focusRequester(pageFocus)
+                                restoreKey -> Modifier.focusRequester(restoreFocus)
+                                else -> Modifier
+                            },
                             // No watched bar on the poster: the time left is named above the grid.
                             { focusedKey = item.key }, showTitle = false
                         ) { onOpen(item) }
