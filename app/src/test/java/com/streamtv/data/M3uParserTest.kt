@@ -90,4 +90,10 @@ class M3uParserTest {
         assertEquals(listOf("Show S01E01"), kept.map { it.name })
         assertEquals(ChannelKind.Series, kept.single().kind())
     }
+
+    @Test fun runningTimeMakesAFilm() {
+        // An HLS film has no file extension; its running time in #EXTINF tells it from a channel.
+        val list = M3uParser.parse("#EXTM3U\n#EXTINF:-1,News\nhttps://x/news.m3u8\n#EXTINF:5400,Spring\nhttps://x/spring.m3u8\n")
+        assertEquals(listOf(ChannelKind.Live, ChannelKind.Movie), list.map { it.kind() })
+    }
 }

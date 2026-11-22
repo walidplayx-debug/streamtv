@@ -2,7 +2,9 @@ package com.streamtv.data
 
 data class Channel(
     val id: String, val name: String, val url: String, val logo: String? = null,
-    val group: String = "Other", val country: String = "", val language: String = ""
+    val group: String = "Other", val country: String = "", val language: String = "",
+    /** The playlist gives it a running time (#EXTINF:5400): a film or an episode, never a channel. */
+    val onDemand: Boolean = false
 ) {
     /** Unique per playlist entry: several streams may share one tvg-id. */
     val key: String get() = "$id|$url"
@@ -41,6 +43,8 @@ fun Channel.kind(): ChannelKind {
     return when {
         path.contains("/series/") || (file && episodeMarker.containsMatchIn(name)) -> ChannelKind.Series
         path.contains("/movie/") || path.contains("/movies/") || file -> ChannelKind.Movie
+        // A stream (HLS and the like) the playlist gives a running time: a film, or an episode.
+        onDemand -> if (episodeMarker.containsMatchIn(name)) ChannelKind.Series else ChannelKind.Movie
         else -> ChannelKind.Live
     }
 }

@@ -12,9 +12,10 @@ data class ChannelEntity(
     val logo: String?,
     val groupName: String,
     val country: String,
-    val language: String
+    val language: String,
+    val onDemand: Boolean = false
 ) {
-    fun toChannel() = Channel(id, name, url, logo, groupName, country, language)
+    fun toChannel() = Channel(id, name, url, logo, groupName, country, language, onDemand)
     companion object {
         fun from(channel: Channel) = ChannelEntity(
             cacheKey = "${channel.id}|${channel.url}",
@@ -24,7 +25,8 @@ data class ChannelEntity(
             logo = channel.logo,
             groupName = channel.group,
             country = channel.country,
-            language = channel.language
+            language = channel.language,
+            onDemand = channel.onDemand
         )
     }
 }

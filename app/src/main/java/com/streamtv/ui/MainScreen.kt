@@ -924,16 +924,11 @@ private fun TitleDetails(
             it.key != item.key && it.key !in skip && (if (genre != null) MovieGenres.of(it) == genre else it.group == item.group)
         }.take(24).toList()
     }
-    val partsFocus = remember(item.key) { FocusRequester() }
     // The page eases in when a title opens.
     val enter = remember(item.key) { Animatable(0f) }
     LaunchedEffect(item.key) { enter.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
-    // On the "More in" row, the poster and its details are pushed up under the tab bar, and the
-    // row takes their place; back up, they glide down again. Nothing shrinks.
-    var lower by remember(item.key) { mutableStateOf(false) }
-    val lift by animateFloatAsState(if (lower) 1f else 0f, tween(480, easing = FastOutSlowInEasing), label = "detailsLift")
-    var topHeight by remember { mutableStateOf(0) }
-    val gap = with(LocalDensity.current) { 16.dp.toPx() }
+    // Which poster of the row below has focus: its heading says whether it is another part or a similar title.
+    var rowIndex by remember(item.key) { mutableStateOf(0) }
     Box(Modifier.fillMaxSize().clipToBounds()) {
         // The poster, faint and wide, behind the page.
         AsyncImage(
@@ -947,12 +942,10 @@ private fun TitleDetails(
                 .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
-            Row(
-                Modifier.onSizeChanged { topHeight = it.height }
-                    .graphicsLayer { translationY = -(topHeight + gap) * lift; alpha = 1f - lift }
-            ) {
+            // The page stays still; only the row below slides sideways.
+            Row {
                 Box(
-                    Modifier.width(150.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                    Modifier.width(130.dp).aspectRatio(2f / 3f).shadow(18.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
                         .border(1.dp, White.copy(alpha = .12f), RoundedCornerShape(14.dp))
                 ) {
                     ChannelLogo(
@@ -998,39 +991,36 @@ private fun TitleDetails(
                     }
                 }
             }
-            if (parts.isNotEmpty() || more.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Column(
-                    Modifier.graphicsLayer { translationY = -(topHeight + gap) * lift }
-                        .onFocusChanged { lower = it.hasFocus }
-                ) {
-                    // Up from the first row always goes back to Play / Resume; from the second, to the first.
-                    @Composable
-                    fun TitleRow(heading: String, list: List<Channel>, first: Boolean) {
-                        Text(heading, color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                        LazyRow(
-                            modifier = Modifier.onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
-                                    if (first || parts.isEmpty()) runCatching { primary.requestFocus() } else runCatching { partsFocus.requestFocus() }
-                                    true
-                                } else false
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            itemsIndexed(list, key = { _, entry -> entry.key }) { index, other ->
-                                PosterCard(
-                                    other, state.favorites.hasFavorite(other),
-                                    Modifier.width(70.dp).then(if (first && index == 0) Modifier.focusRequester(partsFocus) else Modifier)
-                                ) { onOpen(other) }
-                            }
+            // One row under the page, as on Apple TV: the other parts first, then similar titles.
+            // It slides sideways; the page above never moves. Up always goes back to Play / Resume.
+            val row = remember(parts, more) { parts + more }
+            if (row.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                val heading = when {
+                    rowIndex < parts.size -> t("Other parts")
+                    MovieGenres.of(item) != null -> t("Similar")
+                    else -> t("More in") + " " + t(item.group.ifBlank { "Other" })
+                }
+                Text(heading, color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                    // Posters as tall as the room left allows (room for the focus growth included).
+                    val posterHeight = (maxHeight - 28.dp).coerceIn(90.dp, 200.dp)
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                runCatching { primary.requestFocus() }
+                                true
+                            } else false
+                        },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        itemsIndexed(row, key = { _, entry -> entry.key }) { index, other ->
+                            PosterCard(
+                                other, state.favorites.hasFavorite(other), Modifier.width(posterHeight * (2f / 3f)),
+                                onFocus = { rowIndex = index }
+                            ) { onOpen(other) }
                         }
-                    }
-                    if (parts.isNotEmpty()) TitleRow(t("Other parts"), parts, first = true)
-                    if (more.isNotEmpty()) {
-                        if (parts.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                        val heading = if (MovieGenres.of(item) != null) t("Similar") else t("More in") + " " + t(item.group.ifBlank { "Other" })
-                        TitleRow(heading, more, first = parts.isEmpty())
                     }
                 }
             }
