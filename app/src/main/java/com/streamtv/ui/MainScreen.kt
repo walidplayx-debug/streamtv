@@ -76,6 +76,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -414,14 +415,66 @@ private fun TopNavigation(tab: String, onSelect: (String) -> Unit, tabFocus: Foc
     Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(124.dp), contentAlignment = Alignment.CenterStart) { Clock() }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            // One lens for the whole bar, as in the newer phone apps: it glides from tab to tab
+            // with the remote, stretching a little on the way, instead of each tab lighting up on
+            // its own. Resting, it sits on the open tab as soft glass; with the remote on the bar
+            // it takes the focus colour.
+            val items = listOf("Live TV", "Search", "Movies", "Series", "Settings")
+            val selectedIndex = items.indexOf(tab).coerceAtLeast(0)
+            var focusedIndex by remember { mutableStateOf<Int?>(null) }
+            var pressedIndex by remember { mutableStateOf<Int?>(null) }
+            val target = (focusedIndex ?: selectedIndex).toFloat()
+            val lensAt by animateFloatAsState(target, spring(dampingRatio = .72f, stiffness = 340f), label = "lensAt")
+            val lit by animateFloatAsState(if (focusedIndex != null) 1f else 0f, tween(180), label = "lensLit")
+            val squeeze by animateFloatAsState(if (pressedIndex != null) .94f else 1f, spring(stiffness = 500f), label = "lensPress")
+            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            val focusColors = ActivePalette.current.focus
             Row(
-                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f)).padding(5.dp)
-                    .onFocusChanged { onFocus(it.hasFocus) },
+                Modifier.fillMaxWidth().clip(CircleShape).background(Glass.copy(alpha = .72f))
+                    .drawBehind {
+                        val pad = 5.dp.toPx()
+                        val cell = (size.width - 2 * pad) / items.size
+                        // Wider while it travels, back to one tab when it arrives.
+                        val stretch = 1f + (kotlin.math.abs(lensAt - target) * .45f).coerceAtMost(.5f)
+                        val w = cell * stretch * squeeze
+                        val h = (size.height - 2 * pad) * squeeze
+                        var middle = pad + cell * (lensAt + .5f)
+                        if (rtl) middle = size.width - middle
+                        val left = (middle - w / 2f).coerceIn(pad, size.width - pad - w)
+                        val top = (size.height - h) / 2f
+                        val corner = androidx.compose.ui.geometry.CornerRadius(h / 2f)
+                        val box = androidx.compose.ui.geometry.Size(w, h)
+                        drawRoundRect(White.copy(alpha = .2f * (1f - lit)), Offset(left, top), box, corner)
+                        if (lit > 0f) drawRoundRect(Brush.verticalGradient(focusColors, startY = top, endY = top + h), Offset(left, top), box, corner, alpha = lit)
+                        drawRoundRect(White.copy(alpha = .16f + .32f * lit), Offset(left, top), box, corner, style = Stroke(1.dp.toPx()))
+                    }
+                    .padding(5.dp)
+                    .onFocusChanged { onFocus(it.hasFocus); if (!it.hasFocus) focusedIndex = null },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Live TV", "Search", "Movies", "Series", "Settings").forEach { item ->
-                    val selected = tab == item
-                    FocusPill(item, selected, Modifier.weight(1f).fillMaxWidth().then(if (selected) Modifier.focusRequester(tabFocus) else Modifier)) { onSelect(item) }
+                items.forEachIndexed { index, item ->
+                    var focused by remember { mutableStateOf(false) }
+                    val (pressed, press) = rememberPress { onSelect(item) }
+                    LaunchedEffect(pressed) { pressedIndex = if (pressed) index else null }
+                    // The word under the lens grows a little, as the icon does in those apps.
+                    val grow by animateFloatAsState(if (focused) 1.08f else 1f, spring(stiffness = 500f), label = "tabGrow")
+                    Box(
+                        Modifier.weight(1f).then(if (index == selectedIndex) Modifier.focusRequester(tabFocus) else Modifier)
+                            .onFocusChanged { focused = it.isFocused; if (it.isFocused) focusedIndex = index }
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = press)
+                            .padding(horizontal = 15.dp, vertical = 11.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val label = t(item)
+                        var fontSize by remember(label) { mutableStateOf(16f) }
+                        Text(
+                            label, Modifier.graphicsLayer { scaleX = grow; scaleY = grow },
+                            color = White.copy(alpha = if (focused || index == selectedIndex) .98f else .72f),
+                            fontSize = fontSize.sp, maxLines = 1, softWrap = false,
+                            fontWeight = if (focused || index == selectedIndex) FontWeight.SemiBold else FontWeight.Medium,
+                            onTextLayout = { layout -> if (layout.hasVisualOverflow && fontSize > 10f) fontSize -= 1f }
+                        )
+                    }
                 }
             }
             // A newer version is waiting: the mark sits on the end of the bar, beside Settings (the
