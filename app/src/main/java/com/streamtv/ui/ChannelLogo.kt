@@ -162,7 +162,7 @@ private const val MinNameSize = 11f
 private const val MaxNameSize = 34f
 
 private fun nameStyle(size: Float) = TextStyle(
-    fontSize = size.sp, lineHeight = (size * 1.12f).sp, fontWeight = FontWeight.Bold,
+    fontSize = size.sp, lineHeight = (size * 1.12f).sp, fontWeight = FontWeight.Bold, fontFamily = StvFont,
     platformStyle = PlatformTextStyle(includeFontPadding = false)
 )
 
@@ -278,7 +278,7 @@ fun TileLabel(text: String, onLight: Boolean, modifier: Modifier = Modifier) {
         Text(
             text, color = if (onLight) Color(0xFF2A3045) else Color(0xFFD6D8DE), fontSize = 13.sp, fontWeight = FontWeight.Bold,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
-            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false), lineHeight = 15.sp)
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false), lineHeight = 15.sp, fontFamily = StvFont)
         )
     }
 }

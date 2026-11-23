@@ -942,7 +942,7 @@ private fun LibrarySearch(text: String, hint: String, large: Boolean = false, on
         if (editing) {
             BasicTextField(
                 value = text, onValueChange = onChange, singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = if (large) 18.sp else 15.sp),
+                textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = if (large) 18.sp else 15.sp, fontFamily = StvFont),
                 cursorBrush = SolidColor(White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { finish() }),
@@ -1837,7 +1837,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                     if (editing) {
                         BasicTextField(
                             value = text, onValueChange = model::setSearchText, singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 18.sp, fontFamily = StvFont),
                             cursorBrush = SolidColor(White),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { backToBar[0] = true; editing = false }),

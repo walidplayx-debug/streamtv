@@ -105,7 +105,7 @@ private const val HoldStepMillis = 80L
 private const val RunGapMillis = 1_200L
 
 /** Light text over the picture keeps a soft shadow, so it reads on bright scenes too. */
-private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f))
+private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f), fontFamily = StvFont)
 
 /** One subtitle or sound track found in the file. */
 private class TextTrack(val label: String, val language: String?, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
