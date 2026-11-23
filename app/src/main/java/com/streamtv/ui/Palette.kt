@@ -162,35 +162,35 @@ object Palettes {
     )
 
     /**
-     * Deep night violet: pages from indigo to near-black (090820), violet glass, and the owner's
-     * two brand colours, violet (7030EF) for what has focus and magenta (DB1FFF) for small
-     * highlights and the channel number. White text keeps at least 5.8:1 on the violet.
+     * The streaming-service look: near-black pages and flat greys, so posters carry the colour,
+     * and one soft violet for focus, the time bar and the channel number. Pop-ups use the
+     * white button with black text. White text keeps at least 5.2:1 on the violet.
      */
     val Violet = StvPalette(
         id = "violet", name = "Violet",
-        ink = Color(0xFF090820), text = Color(0xFFFFFFFF), muted = Color(0xFFB3ACD1), accent = Color(0xFFDB1FFF), glass = Color(0xFF241C4A),
-        focus = listOf(Color(0xFF7030EF), Color(0xFF5A22C9)),
-        press = listOf(Color(0xFFA066FF), Color(0xFF7030EF)),
-        backdrop = listOf(Color(0xFF1A1240), Color(0xFF110C2C), Color(0xFF090820)),
-        glassFill = listOf(Color(0xB32A2152), Color(0xB3140F30)),
-        tileFocused = listOf(Color(0xFF4A3A8A), Color(0xFF33276A)),
-        tile = listOf(Color(0xFF221A48), Color(0xFF150F33)),
-        listFocus = listOf(Color(0xFF7030EF), Color(0xFF5A22C9)),
-        welcomeTop = Color(0xFF2A1660),
-        swatch = listOf(Color(0xFF090820), Color(0xFF150F33), Color(0xFF7030EF), Color(0xFFDB1FFF), Color(0xFFFFFFFF)),
-        panel = Color(0xF0150F33),
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFFB3B3B3), accent = Color(0xFFA58BFF), glass = Color(0xFF222222),
+        focus = listOf(Color(0xFF7959C4), Color(0xFF5E44A0)),
+        press = listOf(Color(0xFF9A7FE0), Color(0xFF7959C4)),
+        backdrop = listOf(Color(0xFF181818), Color(0xFF141414), Color(0xFF0A0A0A)),
+        glassFill = listOf(Color(0xB3262626), Color(0xB3141414)),
+        tileFocused = listOf(Color(0xFF404040), Color(0xFF2A2A2A)),
+        tile = listOf(Color(0xFF2F2F2F), Color(0xFF181818)),
+        listFocus = listOf(Color(0xFF7959C4), Color(0xFF5E44A0)),
+        welcomeTop = Color(0xFF1C1430),
+        swatch = listOf(Color(0xFF000000), Color(0xFF141414), Color(0xFF2F2F2F), Color(0xFF7959C4), Color(0xFFFFFFFF)),
+        panel = Color(0xF0181818),
         faces = listOf(
-            listOf(Color(0xFF332A5E), Color(0xFF241C48), Color(0xFF150F30)),
-            listOf(Color(0xFF45226E), Color(0xFF311752), Color(0xFF1D0D33)),
-            listOf(Color(0xFF2E2A4A), Color(0xFF211E38), Color(0xFF131124)),
-            listOf(Color(0xFF26305E), Color(0xFF1B2246), Color(0xFF10142C))
+            listOf(Color(0xFF3A3A3A), Color(0xFF262626), Color(0xFF161616)),
+            listOf(Color(0xFF2E2448), Color(0xFF201933), Color(0xFF130F1F)),
+            listOf(Color(0xFF333333), Color(0xFF222222), Color(0xFF121212)),
+            listOf(Color(0xFF2E2A2A), Color(0xFF1F1C1C), Color(0xFF121010))
         ),
-        lit = Color(0xF2FFFFFF), onLit = Color(0xFF090820),
-        number = Color(0xFFDB1FFF),
-        overlayMuted = Color(0xFFC4BEDF),
-        seek = Color(0xFF9B5CFF),
-        lightTile = listOf(Color(0xFFE6E1F5), Color(0xFFBDB4DD)),
-        lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFD3CCEB)),
+        lit = Color(0xFFFFFFFF), onLit = Color(0xFF000000),
+        number = Color(0xFFA58BFF),
+        overlayMuted = Color(0xFFB3B3B3),
+        seek = Color(0xFF8F72DB),
+        lightTile = listOf(Color(0xFFE5E5E5), Color(0xFFB3B3B3)),
+        lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFCCCCCC)),
         wordmark = R.drawable.stv_wordmark_violet
     )
 
