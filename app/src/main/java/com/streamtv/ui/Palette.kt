@@ -157,7 +157,6 @@ object Palettes {
         seek = Color(0xFFFFFFFF),
         lightTile = listOf(Color(0xFFEEF2FF), Color(0xFFC9D2EC)),
         lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFDCE3F7)),
-        wordmark = R.drawable.stv_wordmark_glass,
         sheen = true
     )
 
@@ -191,7 +190,6 @@ object Palettes {
         seek = Color(0xFF8F72DB),
         lightTile = listOf(Color(0xFFE5E5E5), Color(0xFFB3B3B3)),
         lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFCCCCCC)),
-        wordmark = R.drawable.stv_wordmark_violet
     )
 
     val all = listOf(Default, Cupertino, Glass, Violet)
