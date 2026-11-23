@@ -162,39 +162,39 @@ object Palettes {
     )
 
     /**
-     * A warm, restful look for evening viewing: near-black pages with a brown undertone, warm greys,
-     * and one soft amber for the time bar, the channel number and highlights. The focused control is
-     * a deeper amber so white text keeps at least 4.2:1 on it. Pop-ups use a warm off-white platter.
+     * Deep night violet: pages from indigo to near-black (090820), violet glass, and the owner's
+     * two brand colours, violet (7030EF) for what has focus and magenta (DB1FFF) for small
+     * highlights and the channel number. White text keeps at least 5.8:1 on the violet.
      */
-    val Amber = StvPalette(
-        id = "amber", name = "Amber",
-        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFFB8B0A6), accent = Color(0xFFF2B35A), glass = Color(0xFF2A2520),
-        focus = listOf(Color(0xFFB26A1F), Color(0xFF96561A)),
-        press = listOf(Color(0xFFF2B35A), Color(0xFFD38B2C)),
-        backdrop = listOf(Color(0xFF1C1916), Color(0xFF14120F), Color(0xFF0B0A08)),
-        glassFill = listOf(Color(0xB32A2621), Color(0xB3161412)),
-        tileFocused = listOf(Color(0xFF4A4038), Color(0xFF332C26)),
-        tile = listOf(Color(0xFF2C2722), Color(0xFF1A1714)),
-        listFocus = listOf(Color(0xFFB26A1F), Color(0xFF96561A)),
-        welcomeTop = Color(0xFF2A1C0C),
-        swatch = listOf(Color(0xFF0B0A08), Color(0xFF1A1714), Color(0xFF332C26), Color(0xFFD38B2C), Color(0xFFF5EFE6)),
-        panel = Color(0xF01A1714),
+    val Violet = StvPalette(
+        id = "violet", name = "Violet",
+        ink = Color(0xFF090820), text = Color(0xFFFFFFFF), muted = Color(0xFFB3ACD1), accent = Color(0xFFDB1FFF), glass = Color(0xFF241C4A),
+        focus = listOf(Color(0xFF7030EF), Color(0xFF5A22C9)),
+        press = listOf(Color(0xFFA066FF), Color(0xFF7030EF)),
+        backdrop = listOf(Color(0xFF1A1240), Color(0xFF110C2C), Color(0xFF090820)),
+        glassFill = listOf(Color(0xB32A2152), Color(0xB3140F30)),
+        tileFocused = listOf(Color(0xFF4A3A8A), Color(0xFF33276A)),
+        tile = listOf(Color(0xFF221A48), Color(0xFF150F33)),
+        listFocus = listOf(Color(0xFF7030EF), Color(0xFF5A22C9)),
+        welcomeTop = Color(0xFF2A1660),
+        swatch = listOf(Color(0xFF090820), Color(0xFF150F33), Color(0xFF7030EF), Color(0xFFDB1FFF), Color(0xFFFFFFFF)),
+        panel = Color(0xF0150F33),
         faces = listOf(
-            listOf(Color(0xFF3A342E), Color(0xFF28231F), Color(0xFF181512)),
-            listOf(Color(0xFF4A3418), Color(0xFF332410), Color(0xFF1E1509)),
-            listOf(Color(0xFF34302B), Color(0xFF24211D), Color(0xFF151311)),
-            listOf(Color(0xFF2E2B27), Color(0xFF201E1B), Color(0xFF131210))
+            listOf(Color(0xFF332A5E), Color(0xFF241C48), Color(0xFF150F30)),
+            listOf(Color(0xFF45226E), Color(0xFF311752), Color(0xFF1D0D33)),
+            listOf(Color(0xFF2E2A4A), Color(0xFF211E38), Color(0xFF131124)),
+            listOf(Color(0xFF26305E), Color(0xFF1B2246), Color(0xFF10142C))
         ),
-        lit = Color(0xFFF5EFE6), onLit = Color(0xFF1A1714),
-        number = Color(0xFFF2B35A),
-        overlayMuted = Color(0xFFBDB5AB),
-        seek = Color(0xFFF2B35A),
-        lightTile = listOf(Color(0xFFE8E1D6), Color(0xFFBFB6A8)),
-        lightTileFocused = listOf(Color(0xFFF5EFE6), Color(0xFFD2C9BB)),
-        wordmark = R.drawable.stv_wordmark_amber
+        lit = Color(0xF2FFFFFF), onLit = Color(0xFF090820),
+        number = Color(0xFFDB1FFF),
+        overlayMuted = Color(0xFFC4BEDF),
+        seek = Color(0xFF9B5CFF),
+        lightTile = listOf(Color(0xFFE6E1F5), Color(0xFFBDB4DD)),
+        lightTileFocused = listOf(Color(0xFFFFFFFF), Color(0xFFD3CCEB)),
+        wordmark = R.drawable.stv_wordmark_violet
     )
 
-    val all = listOf(Default, Cupertino, Glass, Amber)
+    val all = listOf(Default, Cupertino, Glass, Violet)
 
     fun of(id: String): StvPalette = all.firstOrNull { it.id == id } ?: Default
 }
