@@ -53,6 +53,8 @@ data class PinPrompt(
 )
 
 data class TvState(
+    /** When the sleep timer stops playback (ms since 1970); 0 when it is off. */
+    val sleepAt: Long = 0L,
     val playlistUrl: String = "", val playlistName: String = "", val playlists: List<PlaylistEntry> = emptyList(),
     val epgUrl: String = "", val programs: List<EpgProgram> = emptyList(), val channels: List<Channel> = emptyList(),
     val selected: Channel? = null, val loading: Boolean = false, val error: String? = null,
@@ -533,6 +535,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.saveLastChannel(channel.id) }
     }
     fun stopPlaying() { _state.value = _state.value.copy(playing = false) }
+    /** Stops playback in [minutes] from now (0 turns it off). For tonight only: nothing is saved. */
+    fun setSleepTimer(minutes: Int) {
+        _state.value = _state.value.copy(sleepAt = if (minutes > 0) System.currentTimeMillis() + minutes * 60_000L else 0L)
+    }
     fun zap(delta: Int) {
         val channels = _state.value.queue.ifEmpty { _state.value.channels }
         if (channels.isEmpty()) return

@@ -159,6 +159,23 @@ fun MainScreen(state: TvState, model: MainViewModel) {
             }
         }
     }
+    // Sleep timer: a warning a minute before, then playback stops and the app steps back to the
+    // TV's home, so the TV can sleep on its own.
+    val activity = LocalContext.current as? android.app.Activity
+    var sleepWarning by remember { mutableStateOf(false) }
+    LaunchedEffect(state.sleepAt) {
+        sleepWarning = false
+        val at = state.sleepAt
+        if (at == 0L) return@LaunchedEffect
+        delay((at - 60_000L - System.currentTimeMillis()).coerceAtLeast(0L))
+        sleepWarning = true
+        delay((at - System.currentTimeMillis()).coerceAtLeast(0L))
+        sleepWarning = false
+        model.setSleepTimer(0)
+        model.stopPlaying()
+        activity?.moveTaskToBack(true)
+    }
+    if (sleepWarning) SleepWarning(onMore = { model.setSleepTimer(30) }, onDismiss = { sleepWarning = false })
     // The Movies and Series pages keep their place (menu choice, open title) while a title plays.
     val movieUi = remember { LibraryUi() }
     val seriesUi = remember { LibraryUi() }
@@ -1960,7 +1977,7 @@ private fun SettingsContent(
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
         // coming back into the list (from the page or the tabs) lands on the open section, so
         // passing over the list never opens another one by accident.
-        val sections = listOf("Playlist", "TV guide", "Language", "Parental control", "About")
+        val sections = listOf("Playlist", "TV guide", "Sleep timer", "Language", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
         // The list scrolls instead of squeezing: on a short screen the last row ("About") was
@@ -2073,6 +2090,19 @@ private fun SettingsContent(
                     state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
+                // For tonight only: playback stops at the chosen time, with a warning a minute before.
+                "Sleep timer" -> {
+                    SettingItem("Stops at", if (state.sleepAt > 0) SimpleDateFormat("HH:mm", Locale.US).format(Date(state.sleepAt)) else "Off")
+                    for (pair in listOf(0, 30, 60, 90, 120, 180).chunked(2)) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            for (minutes in pair) {
+                                ChoiceBox(if (minutes == 0) t("Off") else "$minutes ${t("min")}", minutes == 0 && state.sleepAt == 0L, Modifier.weight(1f)) {
+                                    model.setSleepTimer(minutes)
+                                }
+                            }
+                        }
+                    }
+                }
                 "Language" -> {
                     // Two even columns of boxes: all ten languages fit without scrolling.
                     for (pair in AppLanguages.chunked(2)) {
@@ -2150,6 +2180,26 @@ private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modif
         Text(label, Modifier.weight(1f), color = if (focused || chosen) White else White.copy(alpha = .7f), fontSize = 17.sp,
             fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
         if (chosen) Text("✓", color = if (focused) White else Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** A minute before the sleep timer stops playback: OK adds half an hour, Back lets it stop. */
+@Composable
+private fun SleepWarning(onMore: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        val button = remember { FocusRequester() }
+        Column(
+            Modifier.width(420.dp).clip(RoundedCornerShape(28.dp)).background(ActivePalette.current.panel)
+                .border(1.dp, White.copy(alpha = .2f), RoundedCornerShape(28.dp)).padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(t("Sleep timer"), color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text(t("Playback stops in a minute"), color = Muted, fontSize = 16.sp)
+            Spacer(Modifier.height(20.dp))
+            WhiteButton("30 more minutes", Modifier.focusRequester(button)) { onMore() }
+        }
+        LaunchedEffect(Unit) { runCatching { button.requestFocus() } }
     }
 }
 
