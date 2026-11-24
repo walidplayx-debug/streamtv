@@ -123,8 +123,7 @@ object Palettes {
         overlayMuted = Color(0xFFAEAEB2),
         seek = Color(0xFFFFFFFF),
         lightTile = listOf(Color(0xFFE5E5EA), Color(0xFFC7C7CC)),
-        lightTileFocused = listOf(Color(0xFFF2F2F7), Color(0xFFD1D1D6)),
-        wordmark = R.drawable.stv_wordmark_green
+        lightTileFocused = listOf(Color(0xFFF2F2F7), Color(0xFFD1D1D6))
     )
 
     /**
