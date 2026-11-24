@@ -56,7 +56,7 @@ private val French = mapOf(
     "Add M3U playlist" to "Ajouter une playlist M3U", "Xtream login" to "Connexion Xtream",
     "Loading…" to "Chargement…",
     // settings
-    "Playback" to "Lecture", "Playlist" to "Playlist", "Language" to "Langue", "Parental control" to "Contrôle parental",
+    "Playlist" to "Playlist", "Language" to "Langue", "Parental control" to "Contrôle parental",
     "TV guide" to "Guide TV", "About" to "À propos",
     "NOW PLAYING FROM" to "LECTURE DEPUIS", "Add a playlist" to "Ajouter une playlist", "M3U link" to "Lien M3U",
     "Import file" to "Importer un fichier", "Reload" to "Recharger",
@@ -68,7 +68,6 @@ private val French = mapOf(
     "XMLTV guide URL" to "Adresse du guide XMLTV", "Optional programme guide · not set" to "Guide des programmes facultatif · non défini",
     "Set guide address" to "Définir l'adresse du guide", "Reload TV guide" to "Recharger le guide TV",
     "programmes loaded" to "programmes chargés",
-    "Playback engine" to "Moteur de lecture", "Automatic · HLS / DASH" to "Automatique · HLS / DASH",
     "Version 1.0.0" to "Version 1.0.0",
     "Check for updates" to "Vérifier les mises à jour", "Checking for updates…" to "Recherche des mises à jour…",
     "Install update" to "Installer la mise à jour", "You're up to date" to "Vous êtes à jour",
@@ -156,7 +155,7 @@ private val Arabic = mapOf(
     "Add M3U playlist" to "إضافة قائمة M3U", "Xtream login" to "دخول Xtream",
     "Loading…" to "جارٍ التحميل…",
     // settings
-    "Playback" to "التشغيل", "Playlist" to "قائمة التشغيل", "Language" to "اللغة", "Parental control" to "الرقابة الأبوية",
+    "Playlist" to "قائمة التشغيل", "Language" to "اللغة", "Parental control" to "الرقابة الأبوية",
     "TV guide" to "دليل البرامج", "About" to "حول",
     "NOW PLAYING FROM" to "التشغيل من", "Add a playlist" to "إضافة قائمة", "M3U link" to "رابط M3U",
     "Import file" to "استيراد ملف", "Reload" to "تحديث",
@@ -168,7 +167,6 @@ private val Arabic = mapOf(
     "XMLTV guide URL" to "رابط دليل XMLTV", "Optional programme guide · not set" to "دليل برامج اختياري · غير محدد",
     "Set guide address" to "تحديد رابط الدليل", "Reload TV guide" to "إعادة تحميل الدليل",
     "programmes loaded" to "برنامج محمّل",
-    "Playback engine" to "محرك التشغيل", "Automatic · HLS / DASH" to "تلقائي · HLS / DASH",
     "Version 1.0.0" to "الإصدار 1.0.0",
     "Check for updates" to "التحقق من التحديثات", "Checking for updates…" to "جارٍ البحث عن تحديثات…",
     "Install update" to "تثبيت التحديث", "You're up to date" to "التطبيق محدّث",

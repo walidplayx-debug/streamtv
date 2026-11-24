@@ -11,8 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -76,7 +74,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -1667,17 +1664,6 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
     // A dark or see-through logo gets a soft silver tile instead of the dark one, same shape and size.
     var light by remember(channel.logo) { mutableStateOf(channel.logo?.let { LogoTone.known[it] } == true) }
     val scale by animateFloatAsState(if (pressed) 1.07f else if (focused) 1.17f else 1f, spring(dampingRatio = .7f, stiffness = 380f), label = "cardScale")
-    // Glass themes: light sweeps twice across a tile when it gets focus, then rests (no endless
-    // animation keeping the TV's graphics busy while the viewer reads or steps away).
-    val sheenOn = ActivePalette.current.sheen && focused
-    val sweep = remember { Animatable(1.6f) }
-    LaunchedEffect(sheenOn) {
-        if (sheenOn) repeat(2) {
-            sweep.snapTo(-0.6f)
-            sweep.animateTo(1.6f, tween(1400, easing = LinearEasing))
-        } else sweep.snapTo(1.6f)
-    }
-    val sheen = sweep.value
     Box(
         // The focused tile grows and sits above its neighbours.
         modifier.zIndex(if (focused) 1f else 0f).scale(scale)
@@ -1689,17 +1675,6 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
                 focused -> ActivePalette.current.tileFocused
                 else -> ActivePalette.current.tile
             }))
-            .drawWithContent {
-                drawContent()
-                if (sheenOn) {
-                    val x = size.width * sheen
-                    val band = size.width * .35f
-                    drawRect(Brush.linearGradient(
-                        listOf(Color.Transparent, Color.White.copy(alpha = .22f), Color.Transparent),
-                        start = Offset(x - band, 0f), end = Offset(x + band, size.height)
-                    ))
-                }
-            }
             // No white frame: the tile is picked out by its size, its lighter face and its shadow.
             .border(1.dp, White.copy(alpha = if (light) (if (focused) .30f else .18f) else if (focused) .16f else .07f), RoundedCornerShape(10.dp))
             .onFocusChanged {
@@ -1965,7 +1940,7 @@ private fun SettingsContent(
         // The sections as a list like Live TV's. Moving onto a section opens it, no press needed;
         // coming back into the list (from the page or the tabs) lands on the open section, so
         // passing over the list never opens another one by accident.
-        val sections = listOf("Playlist", "Playback", "TV guide", "Language", "Theme", "Parental control", "About")
+        val sections = listOf("Playlist", "TV guide", "Language", "Parental control", "About")
         // One focus target per row that never changes, so opening a section does not rebuild its row.
         val rows = remember { sections.associateWith { FocusRequester() } }
         // The list scrolls instead of squeezing: on a short screen the last row ("About") was
@@ -2076,24 +2051,12 @@ private fun SettingsContent(
                     state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
-                "Playback" -> SettingsRow("Playback engine", "Automatic · HLS / DASH")
                 "Language" -> {
                     // Two even columns of boxes: all ten languages fit without scrolling.
                     for (pair in AppLanguages.chunked(2)) {
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             for ((code, name) in pair) {
                                 ChoiceBox(name, state.language == code, Modifier.weight(1f)) { model.setLanguage(code) }
-                            }
-                            if (pair.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-                // One box per colour theme, its own colours as dots; choosing one repaints every screen.
-                "Theme" -> {
-                    for (pair in Palettes.all.chunked(2)) {
-                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            for (palette in pair) {
-                                ChoiceBox(t(palette.name), state.theme == palette.id, Modifier.weight(1f), palette.swatch) { model.setTheme(palette.id) }
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
@@ -2151,7 +2114,7 @@ private fun PlaylistRow(entry: PlaylistEntry, active: Boolean, onOpen: () -> Uni
 
 /** A box to pick one of several (a language): a check mark on the chosen one. */
 @Composable
-private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modifier, dots: List<Color> = emptyList(), onClick: () -> Unit) {
+private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     Row(
@@ -2164,9 +2127,6 @@ private fun ChoiceBox(label: String, chosen: Boolean, modifier: Modifier = Modif
     ) {
         Text(label, Modifier.weight(1f), color = if (focused || chosen) White else White.copy(alpha = .7f), fontSize = 17.sp,
             fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
-        for (dot in dots) {
-            Box(Modifier.padding(end = 6.dp).size(14.dp).clip(CircleShape).background(dot).border(1.dp, White.copy(alpha = .25f), CircleShape))
-        }
         if (chosen) Text("✓", color = if (focused) White else Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }

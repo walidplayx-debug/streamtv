@@ -67,8 +67,6 @@ data class TvState(
     val ready: Boolean = false,
     /** Interface language: "en", "fr" or "ar". */
     val language: String = "en",
-    /** The colour theme's id, see [Palettes]. */
-    val theme: String = "default",
     /** How the Live TV side list divides channels: "provider", "language", "country" or "genre". */
     val groupMode: String = "provider",
     /** The side list's order chosen by the user, and the entries hidden, per grouping mode. */
@@ -259,13 +257,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             preferences.language.collect { code -> _state.value = _state.value.copy(language = code) }
         }
         viewModelScope.launch {
-            preferences.theme.collect { id ->
-                val palette = Palettes.of(id)
-                ActivePalette.current = palette
-                _state.value = _state.value.copy(theme = palette.id)
-            }
-        }
-        viewModelScope.launch {
             preferences.groupMode.collect { mode -> _state.value = _state.value.copy(groupMode = mode) }
         }
         viewModelScope.launch {
@@ -294,13 +285,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // The old choice in the side list belongs to the old sections; start again from the top.
         _state.value = _state.value.copy(groupMode = mode, searchQuery = "")
         viewModelScope.launch { preferences.saveGroupMode(mode) }
-    }
-    /** Repaints every screen at once and keeps the choice for the next start. */
-    fun setTheme(id: String) {
-        val palette = Palettes.of(id)
-        ActivePalette.current = palette
-        _state.value = _state.value.copy(theme = palette.id)
-        viewModelScope.launch { preferences.saveTheme(palette.id) }
     }
     fun setLanguage(code: String) {
         _state.value = _state.value.copy(language = code)
