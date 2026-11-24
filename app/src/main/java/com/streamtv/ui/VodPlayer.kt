@@ -1,7 +1,6 @@
 package com.streamtv.ui
 
 import android.os.SystemClock
-import android.view.TextureView
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -85,7 +84,6 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.streamtv.data.Channel
 import kotlinx.coroutines.delay
@@ -95,10 +93,6 @@ private val VodMuted get() = ActivePalette.current.overlayMuted
 private const val ControlsMillis = 4_500L
 /** Left/right let go this long: the film jumps to the chosen place by itself (no OK needed). */
 private const val ScrubSettleMillis = 900L
-/** The preview follows the chosen place after this pause, so a held key does not flood it with seeks. */
-private const val PreviewSeekMillis = 120L
-/** The preview player is kept this long after choosing ends, ready for the next time. */
-private const val PreviewKeepMillis = 15_000L
 /** While left/right is held, the place moves one step this often. */
 private const val HoldStepMillis = 100L
 
@@ -174,16 +168,6 @@ fun VodPlayerScreen(
     // The place being chosen with left/right, before it is played; null when not choosing.
     var scrubTarget by remember { mutableStateOf<Long?>(null) }
     val run = remember { ScrubRun() }
-    // The small picture above the bar while choosing a place. Made when first needed; if the device
-    // or the server cannot give a second picture, only the time is shown.
-    var preview by remember { mutableStateOf<ExoPlayer?>(null) }
-    var previewShown by remember { mutableStateOf(false) }
-    var previewFailed by remember { mutableStateOf(false) }
-    fun dropPreview() {
-        preview?.release()
-        preview = null
-        previewShown = false
-    }
     // Subtitles carried inside the file. The one in the app's language is picked by itself.
     var subtitles by remember { mutableStateOf<List<TextTrack>>(emptyList()) }
     var subtitlesOff by remember { mutableStateOf(false) }
@@ -250,7 +234,7 @@ fun VodPlayerScreen(
         val end = if (length > 0) (length - 1_000L).coerceAtLeast(0L) else Long.MAX_VALUE
         return target.coerceIn(0L, end)
     }
-    /** Plays the chosen place now (OK). Until then the title goes on playing behind the preview. */
+    /** Plays the chosen place now (OK). Until then the title goes on playing where it was. */
     fun commitScrub() {
         speedMode = false
         speed = 0
@@ -279,17 +263,6 @@ fun VodPlayerScreen(
         run.lastStep = now
         val step = scrubStep(held, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
-        // A small silent player for the picture above the bar; it shows only once it has a picture.
-        if (preview == null && !previewFailed) {
-            preview = Players.createPreview(context).apply {
-                addListener(object : Player.Listener {
-                    override fun onRenderedFirstFrame() { previewShown = true }
-                    override fun onPlayerError(error: PlaybackException) { previewFailed = true; dropPreview() }
-                })
-                setMediaSource(Players.stream(context, channel.url), scrubTarget ?: 0L)
-                prepare()
-            }
-        }
         if (fast && !held) { speedMode = true; speed = direction }
         show()
     }
@@ -345,7 +318,7 @@ fun VodPlayerScreen(
             }
         }
         player.addListener(listener)
-        onDispose { save(); player.removeListener(listener); player.release(); dropPreview() }
+        onDispose { save(); player.removeListener(listener); player.release() }
     }
     // Home (or anything that takes the app off screen) stops the title completely: no download,
     // no decoder held. The place is kept; coming back, the title is ready again, paused there.
@@ -360,7 +333,6 @@ fun VodPlayerScreen(
                     scrubTarget = null
                     speedMode = false
                     speed = 0
-                    dropPreview()
                     player.playWhenReady = false
                     player.stop()
                 }
@@ -386,17 +358,6 @@ fun VodPlayerScreen(
                 if (++ticks % 60 == 0) save()
                 delay(500)
             }
-        }
-    }
-    // The preview follows the chosen place; once choosing ends it is let go after a while.
-    LaunchedEffect(scrubTarget) {
-        val target = scrubTarget
-        if (target != null) {
-            delay(PreviewSeekMillis)
-            preview?.seekTo(target)
-        } else if (preview != null) {
-            delay(PreviewKeepMillis)
-            dropPreview()
         }
     }
     // Choosing a place ends by itself: once the arrows rest, the film goes there, as on Apple TV.
@@ -618,8 +579,7 @@ fun VodPlayerScreen(
                         // The title (its year small above it) on the left, the round buttons on the right,
                         // both just above the bar.
                         Row(verticalAlignment = Alignment.Bottom) {
-                            // Hidden while choosing a place, so the preview above the bar stands alone.
-                            Column(Modifier.weight(1f).graphicsLayer { alpha = if (scrubTarget != null) 0f else 1f }) {
+                            Column(Modifier.weight(1f)) {
                                 if (channel.year > 0) Text(channel.year.toString(), color = VodWhite.copy(alpha = .85f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
                                 Text(
                                     channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
@@ -641,9 +601,7 @@ fun VodPlayerScreen(
                             position = scrubTarget ?: position, duration = duration, playing = playing,
                             selected = row == 0, scrubbing = scrubTarget != null,
                             jump = scrubTarget?.let { it - player.currentPosition },
-                            speed = if (speedMode) speed else null,
-                            preview = preview?.takeIf { scrubTarget != null },
-                            previewShown = previewShown
+                            speed = if (speedMode) speed else null
                         )
                     }
                 }
@@ -666,26 +624,11 @@ private fun CompositionLocalProviderLtr(content: @Composable () -> Unit) {
 @Composable
 private fun TimeBar(
     position: Long, duration: Long, playing: Boolean, selected: Boolean, scrubbing: Boolean, jump: Long?,
-    speed: Int? = null, preview: ExoPlayer? = null, previewShown: Boolean = false
+    speed: Int? = null
 ) {
     val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val lift by animateFloatAsState(if (selected || scrubbing) 1f else 0f, spring(stiffness = 500f), label = "bar")
     Column(Modifier.fillMaxWidth()) {
-        // The preview floats above the bar, centred on the playhead; it takes no room of its own,
-        // so nothing moves when it appears.
-        if (preview != null) {
-            Layout(
-                modifier = Modifier.fillMaxWidth(),
-                content = { ScrubPreview(preview, previewShown) }
-            ) { measurables, constraints ->
-                val box = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0))
-                val width = constraints.maxWidth
-                layout(width, 0) {
-                    val x = ((width * fraction).toInt() - box.width / 2).coerceIn(0, (width - box.width).coerceAtLeast(0))
-                    box.place(x, -box.height - 8.dp.roundToPx())
-                }
-            }
-        }
         Canvas(Modifier.fillMaxWidth().height(20.dp)) {
             val y = size.height / 2f
             val thick = 5.dp.toPx() + 2.dp.toPx() * lift
@@ -744,26 +687,6 @@ private fun TimeBar(
                 left.place(width - left.width, (height - left.height) / 2)
             }
         }
-    }
-}
-
-/** The picture at the chosen place, from the silent preview player. */
-@Composable
-private fun ScrubPreview(preview: ExoPlayer, shown: Boolean) {
-    // As on Apple TV: a rounded picture, nothing at all until the picture is there (no spinner).
-    // It is laid out from the start, hidden, so the silent player has somewhere to draw.
-    Box(
-        Modifier.width(176.dp).height(99.dp).graphicsLayer { alpha = if (shown) 1f else 0f }
-            .clip(RoundedCornerShape(12.dp)).background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { TextureView(it).also { view -> preview.setVideoTextureView(view) } },
-            update = { view -> preview.setVideoTextureView(view) },
-            onRelease = { view -> preview.clearVideoTextureView(view) }
-        )
-
     }
 }
 
