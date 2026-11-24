@@ -93,6 +93,8 @@ private val VodMuted get() = ActivePalette.current.overlayMuted
 private const val ControlsMillis = 4_500L
 /** Left/right let go this long: the film jumps to the chosen place by itself (no OK needed). */
 private const val ScrubSettleMillis = 900L
+/** At the end of an episode, the next one starts by itself after this many seconds. */
+private const val NextEpisodeSeconds = 10
 /** While left/right is held, the place moves one step this often. */
 private const val HoldStepMillis = 100L
 
@@ -141,7 +143,10 @@ fun VodPlayerScreen(
     onFavorite: () -> Unit,
     /** Saves where the title was left (position, duration), now and then and when leaving. */
     onPosition: (Long, Long) -> Unit,
-    onExit: () -> Unit
+    onExit: () -> Unit,
+    /** The episode after this one, if any: offered at the end, and played after a short count. */
+    next: Channel? = null,
+    onNext: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val savePosition by rememberUpdatedState(onPosition)
@@ -178,6 +183,8 @@ fun VodPlayerScreen(
     // The menu open above the buttons: "subtitles" (on/off, then Language and Style), its two
     // sub-menus "language" and "style", or "audio"; null when closed. menuIndex: the row under the remote.
     var menu by remember { mutableStateOf<String?>(null) }
+    // Seconds left before the next episode starts by itself; -1 while it is not offered.
+    var nextIn by remember { mutableIntStateOf(-1) }
     var menuIndex by remember { mutableIntStateOf(0) }
     // The subtitles' look (box or shadow), kept for both players.
     var subtitleBox by remember { mutableStateOf(Players.subtitleBox(context)) }
@@ -286,7 +293,7 @@ fun VodPlayerScreen(
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) failed = false
-                if (state == Player.STATE_ENDED) { savePosition(0L, 0L); controls = true }
+                if (state == Player.STATE_ENDED) { savePosition(0L, 0L); controls = true; if (next != null) nextIn = NextEpisodeSeconds }
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
             override fun onPlayerError(error: PlaybackException) { failed = true; buffering = false; controls = true; scrubTarget = null }
@@ -396,8 +403,12 @@ fun VodPlayerScreen(
             withFrameNanos { }
         }
     }
+    LaunchedEffect(nextIn) {
+        if (nextIn > 0) { delay(1_000); nextIn-- } else if (nextIn == 0) onNext()
+    }
     BackHandler {
         when {
+            nextIn >= 0 -> nextIn = -1
             menu == "language" || menu == "style" -> { menuIndex = if (menu == "language") 2 else 3; menu = "subtitles"; show() }
             (menu != null) -> { menu = null; show() }
             scrubTarget != null -> { scrubTarget = null; speedMode = false; speed = 0; show() }
@@ -416,6 +427,11 @@ fun VodPlayerScreen(
                         return@onPreviewKeyEvent event.key != Key.Back
                     }
                     val held = event.nativeKeyEvent.repeatCount > 0
+                    // While the next episode is offered: OK plays it now, Back stays here.
+                    if (nextIn >= 0 && event.key != Key.Back) {
+                        if (!held && event.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect)) onNext()
+                        return@onPreviewKeyEvent true
+                    }
                     // A menu takes every key while open: up/down move, OK picks, right opens a sub-menu,
                     // left or Back goes back up, Back on the first level closes.
                     if ((menu != null)) {
@@ -520,6 +536,26 @@ fun VodPlayerScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         VodTextButton(t("Back"), selected = failPick == 0)
                         VodTextButton(t("Retry"), selected = failPick != 0)
+                    }
+                }
+            }
+
+            if (nextIn >= 0 && next != null) {
+                Row(
+                    Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp).width(380.dp)
+                        .clip(RoundedCornerShape(24.dp)).background(ActivePalette.current.panel)
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp)).padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(52.dp).clip(CircleShape).background(VodWhite), contentAlignment = Alignment.Center) {
+                        Text(nextIn.toString(), color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(t("Next episode"), color = VodMuted, fontSize = 14.sp)
+                        Text(next.name, color = VodWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(4.dp))
+                        Text(t("OK: play now · Back: stay"), color = VodMuted, fontSize = 13.sp)
                     }
                 }
             }

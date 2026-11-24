@@ -168,6 +168,10 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     }
     // Where the next movie starts: 0, or the place it was left when "Resume" was chosen.
     var vodStart by remember { mutableLongStateOf(0L) }
+    // The episodes that follow the one playing, offered one by one at its end.
+    var upNext by remember { mutableStateOf<List<Channel>>(emptyList()) }
+    // Which title [upNext] follows: a film or episode opened another way gets no next episode.
+    var upNextFor by remember { mutableStateOf("") }
 
     // With no PIN set, hiding a channel or removing a playlist asks a plain yes/no question on the
     // back of the card instead; with a PIN, the card asks for the PIN and nothing else.
@@ -271,12 +275,23 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     if (state.playing && state.selected != null && state.selected.kind() != ChannelKind.Live) {
         // Movies and episodes get a real player: progress bar, seeking, pause, favourite; no zapping.
         val title = state.selected
-        VodPlayerScreen(
-            channel = title, favorite = state.favorites.hasFavorite(title), startAt = vodStart,
-            onFavorite = { model.toggleFavorite(title) },
-            onPosition = { position, duration -> model.savePosition(title, position, duration) },
-            onExit = model::stopPlaying
-        )
+        // A new screen for each title, so the next episode starts clean.
+        key(title.key) {
+            VodPlayerScreen(
+                channel = title, favorite = state.favorites.hasFavorite(title), startAt = vodStart,
+                onFavorite = { model.toggleFavorite(title) },
+                onPosition = { position, duration -> model.savePosition(title, position, duration) },
+                onExit = model::stopPlaying,
+                next = upNext.firstOrNull()?.takeIf { title.key == upNextFor },
+                onNext = {
+                    val coming = upNext.first()
+                    upNext = upNext.drop(1)
+                    upNextFor = coming.key
+                    vodStart = state.positions[coming.key]?.takeIf { it.first < it.second * 0.95 }?.first ?: 0L
+                    model.select(coming)
+                }
+            )
+        }
         // The start point is used once; anything opened later (from Search, say) starts from the top.
         LaunchedEffect(title.key) { vodStart = 0L }
         return
@@ -384,7 +399,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
         }, tabFocus) { topBarFocused = it }
         // The pages start right under the tab bar; the tab already says where you are.
         Spacer(Modifier.height(if (state.tab == "Live TV" || state.tab == "Movies" || state.tab == "Series") 18.dp else 30.dp))
-        val playTitle: (Channel, Long) -> Unit = { item, start -> vodStart = start; model.select(item) }
+        val playTitle: (Channel, Long, List<Channel>) -> Unit = { item, start, after -> vodStart = start; upNext = after; upNextFor = item.key; model.select(item) }
         when (state.tab) {
             // Movies and Series use the Live TV style of list for their menus.
             "Movies" -> LibraryContent(ChannelKind.Movie, state, model, movieUi, returnKey, { returnKey = null }, { returnKey = it }, playTitle, liveMenu = true)
@@ -673,7 +688,7 @@ private class LibraryUi {
 @Composable
 private fun LibraryContent(
     kind: ChannelKind, state: TvState, model: MainViewModel, ui: LibraryUi,
-    restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long) -> Unit,
+    restoreKey: String?, onRestored: () -> Unit, onReturn: (String) -> Unit, onPlay: (Channel, Long, List<Channel>) -> Unit,
     /** The menu looks like the Live TV list (plain rows, no glass card). */
     liveMenu: Boolean = false
 ) {
@@ -693,7 +708,7 @@ private fun LibraryContent(
     ui.details?.takeIf { kind == ChannelKind.Series && it.url.startsWith(com.streamtv.data.ShowScheme) }?.let { show ->
         SeriesDetails(
             show, state, model,
-            onPlay = { episode, start -> onPlay(episode, start) },
+            onPlay = { episode, start, after -> onPlay(episode, start, after) },
             onFavorite = { model.toggleFavorite(show) },
             onClose = { ui.details = null; onReturn(show.key) }
         )
@@ -703,7 +718,7 @@ private fun LibraryContent(
         TitleDetails(
             loadInfo = { model.titleInfo(it) },
             item, kind, titles, state,
-            onPlay = { start -> onPlay(item, start) },
+            onPlay = { start -> onPlay(item, start, emptyList()) },
             onFavorite = { model.toggleFavorite(item) },
             onOpen = { other -> ui.details = other },
             onClose = { ui.details = null; onReturn(item.key) }
@@ -1124,7 +1139,7 @@ private fun TitleDetails(
 @Composable
 private fun SeriesDetails(
     show: Channel, state: TvState, model: MainViewModel,
-    onPlay: (Channel, Long) -> Unit, onFavorite: () -> Unit, onClose: () -> Unit
+    onPlay: (Channel, Long, List<Channel>) -> Unit, onFavorite: () -> Unit, onClose: () -> Unit
 ) {
     BackHandler { onClose() }
     var seasons by remember(show.key) { mutableStateOf<List<Season>?>(null) }
@@ -1141,6 +1156,11 @@ private fun SeriesDetails(
         }
     }
     val all = seasons.orEmpty()
+    // The episodes after this one, through the following seasons: the player offers them in turn.
+    fun after(episode: Episode): List<Channel> {
+        val list = all.flatMap { it.episodes }
+        return list.drop(list.indexOfFirst { it.id == episode.id } + 1).map { Shows.playable(show, it) }
+    }
     // Known once the seasons came (the same answer from the server carries it).
     val showInfo = remember(show.key, seasons) { if (seasons == null) null else model.showInfo(show) }
     var seasonIndex by remember(show.key) { mutableStateOf(0) }
@@ -1200,7 +1220,7 @@ private fun SeriesDetails(
                                 val (episode, start) = next
                                 val label = (if (start > 0L) t("Resume") else t("Play")) + " " + code(episode)
                                 SmallRoundButton("▶\uFE0E", label, Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) {
-                                    onPlay(Shows.playable(show, episode), start)
+                                    onPlay(Shows.playable(show, episode), start, after(episode))
                                 }
                             }
                             failed != null -> SmallRoundButton("↻", t("Try again"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { attempt++ }
@@ -1293,7 +1313,7 @@ private fun SeriesDetails(
                                         onFocus = { rowFocus = index }
                                     ) {
                                         val start = saved?.takeIf { it.first < it.second * 0.95 }?.first ?: 0L
-                                        onPlay(playable, start)
+                                        onPlay(playable, start, after(episode))
                                     }
                                 }
                             }
