@@ -6,24 +6,20 @@ import org.junit.Test
 class ScrubStepTest {
     private val film = 2 * 60 * 60 * 1000L
 
-    @Test fun firstPressesMoveTenSeconds() {
-        assertEquals(10_000L, scrubStep(1, film))
-        assertEquals(10_000L, scrubStep(2, film))
+    @Test fun eachPressMovesTenSeconds() {
+        assertEquals(10_000L, scrubStep(held = false, durationMillis = film))
     }
 
-    @Test fun stepGrowsWhileTheRunGoesOn() {
-        assertEquals(30_000L, scrubStep(3, film))
-        assertEquals(60_000L, scrubStep(6, film))
-        assertEquals(120_000L, scrubStep(12, film))
-        assertEquals(300_000L, scrubStep(30, film))
+    @Test fun aHeldKeyMovesAtOneSteadyStepThatNeverGrows() {
+        assertEquals(30_000L, scrubStep(held = true, durationMillis = film))
     }
 
     @Test fun shortTitleKeepsSmallSteps() {
-        assertEquals(16_000L, scrubStep(30, 4 * 60 * 1000L))
-        assertEquals(10_000L, scrubStep(30, 60_000L))
+        assertEquals(16_000L, scrubStep(held = true, durationMillis = 4 * 60 * 1000L))
+        assertEquals(10_000L, scrubStep(held = true, durationMillis = 60_000L))
     }
 
     @Test fun unknownLengthIsNotCapped() {
-        assertEquals(300_000L, scrubStep(30, 0L))
+        assertEquals(30_000L, scrubStep(held = true, durationMillis = 0L))
     }
 }

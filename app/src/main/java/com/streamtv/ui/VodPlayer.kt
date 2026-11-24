@@ -100,9 +100,7 @@ private const val PreviewSeekMillis = 120L
 /** The preview player is kept this long after choosing ends, ready for the next time. */
 private const val PreviewKeepMillis = 15_000L
 /** While left/right is held, the place moves one step this often. */
-private const val HoldStepMillis = 80L
-/** A press within this time of the last one, in the same direction, keeps the run (and its speed). */
-private const val RunGapMillis = 1_200L
+private const val HoldStepMillis = 100L
 
 /** Light text over the picture keeps a soft shadow, so it reads on bright scenes too. */
 private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 8f), fontFamily = StvFont)
@@ -118,26 +116,15 @@ private val ScrubSpeeds = longArrayOf(0L, 10_000L, 30_000L, 60_000L, 120_000L, 3
 
 /** Left/right presses in one direction, close together: the longer the run, the bigger the step. */
 private class ScrubRun {
-    var direction = 0
-    var started = 0L
-    var last = 0L
     var lastStep = 0L
-    var steps = 0
 }
 
 /**
- * How far one left/right step moves, by the number of steps in the run: 10 s for the first two,
- * then 30 s, 1 min, 2 min and 5 min, so a held key crosses a whole film in a second or two.
- * A short title never moves more than a fifteenth of its length per step.
+ * How far one left/right step moves: 10 s for a press, and a steady 30 s per step while the key is
+ * held, which never speeds up. A short title never moves more than a fifteenth of its length per step.
  */
-internal fun scrubStep(steps: Int, durationMillis: Long): Long {
-    val step = when {
-        steps <= 2 -> 10_000L
-        steps <= 4 -> 30_000L
-        steps <= 8 -> 60_000L
-        steps <= 16 -> 120_000L
-        else -> 300_000L
-    }
+internal fun scrubStep(held: Boolean, durationMillis: Long): Long {
+    val step = if (held) 30_000L else 10_000L
     val cap = if (durationMillis > 0) (durationMillis / 15).coerceAtLeast(10_000L) else step
     return step.coerceAtMost(cap)
 }
@@ -213,7 +200,7 @@ fun VodPlayerScreen(
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     // The last subtitles turned on, so "On" brings them back.
     var lastSubtitle by remember { mutableIntStateOf(0) }
-    // Fast-forward (positive) or rewind (negative) at speed 1 to 5, set by repeated presses; the
+    // Fast-forward (positive) or rewind (negative) at speed 1 to 5, started by the ⏩ / ⏪ keys; the
     // place keeps moving on its own until OK plays it or Back drops it. 0: plain steps.
     var speed by remember { mutableIntStateOf(0) }
     var speedMode by remember { mutableStateOf(false) }
@@ -273,17 +260,13 @@ fun VodPlayerScreen(
         position = target
         show()
     }
-    /** One left/right step; [held] is true for the repeats of a key being held down. */
-    fun scrub(forward: Boolean, held: Boolean) {
+    /**
+     * One left/right step; [held] is true for the repeats of a key being held down. Only the
+     * fast-forward and rewind keys ([fast]) start speeds 1 to 5; left and right only ever step.
+     */
+    fun scrub(forward: Boolean, held: Boolean, fast: Boolean = false) {
         val now = SystemClock.uptimeMillis()
         val direction = if (forward) 1 else -1
-        if (run.direction != direction || now - run.last > RunGapMillis) {
-            run.direction = direction
-            run.started = now
-            run.steps = 0
-            run.lastStep = 0L
-        }
-        run.last = now
         if (speedMode) {
             // Each press changes the speed by one: the same way faster, the other way slower and
             // then backwards. A held key does nothing more; the place moves on its own.
@@ -291,18 +274,10 @@ fun VodPlayerScreen(
             show()
             return
         }
-        // A second quick press the same way (not a held key) starts fast-forward / rewind at speed 1.
-        if (!held && run.steps >= 1 && scrubTarget != null) {
-            speedMode = true
-            speed = direction
-            show()
-            return
-        }
         // A held key repeats very fast: one step every HoldStepMillis keeps the speed even.
         if (held && now - run.lastStep < HoldStepMillis) return
         run.lastStep = now
-        run.steps++
-        val step = scrubStep(run.steps, knownLength())
+        val step = scrubStep(held, knownLength())
         scrubTarget = clampPlace((scrubTarget ?: player.currentPosition) + direction * step)
         // A small silent player for the picture above the bar; it shows only once it has a picture.
         if (preview == null && !previewFailed) {
@@ -315,6 +290,7 @@ fun VodPlayerScreen(
                 prepare()
             }
         }
+        if (fast && !held) { speedMode = true; speed = direction }
         show()
     }
     fun togglePlay() {
@@ -515,8 +491,8 @@ fun VodPlayerScreen(
                     when (event.key) {
                         Key.Back -> false
                         Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> { if (!held) togglePlay(); true }
-                        Key.MediaFastForward -> { if (!failed) scrub(forward = true, held = held); true }
-                        Key.MediaRewind -> { if (!failed) scrub(forward = false, held = held); true }
+                        Key.MediaFastForward -> { if (!failed) scrub(forward = true, held = held, fast = true); true }
+                        Key.MediaRewind -> { if (!failed) scrub(forward = false, held = held, fast = true); true }
                         // Never zap to another title.
                         Key.ChannelUp, Key.ChannelDown -> true
                         Key.DirectionLeft, Key.DirectionRight -> {
@@ -642,7 +618,8 @@ fun VodPlayerScreen(
                         // The title (its year small above it) on the left, the round buttons on the right,
                         // both just above the bar.
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Column(Modifier.weight(1f)) {
+                            // Hidden while choosing a place, so the preview above the bar stands alone.
+                            Column(Modifier.weight(1f).graphicsLayer { alpha = if (scrubTarget != null) 0f else 1f }) {
                                 if (channel.year > 0) Text(channel.year.toString(), color = VodWhite.copy(alpha = .85f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = ShadowStyle)
                                 Text(
                                     channel.name, color = VodWhite, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
@@ -776,7 +753,7 @@ private fun ScrubPreview(preview: ExoPlayer, shown: Boolean) {
     // As on Apple TV: a rounded picture, nothing at all until the picture is there (no spinner).
     // It is laid out from the start, hidden, so the silent player has somewhere to draw.
     Box(
-        Modifier.width(224.dp).height(126.dp).graphicsLayer { alpha = if (shown) 1f else 0f }
+        Modifier.width(176.dp).height(99.dp).graphicsLayer { alpha = if (shown) 1f else 0f }
             .clip(RoundedCornerShape(12.dp)).background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
