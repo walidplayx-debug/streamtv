@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -1037,7 +1038,7 @@ private fun TitleDetails(
                             SmallRoundButton("▶\uFE0E", t("Play"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { onPlay(0L) }
                         }
                         SmallRoundButton(
-                            if (starred) "♥\uFE0E" else "♡", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            if (starred) "★\uFE0E" else "☆\uFE0E", t(if (starred) "Remove from favorites" else "Add to favorites"),
                             Modifier.weight(1f), { buttonLabel = it }
                         ) { onFavorite() }
                     }
@@ -1062,7 +1063,8 @@ private fun TitleDetails(
                     }
                     info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
                         Spacer(Modifier.height(8.dp))
-                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp),
+                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Content))
                     }
                     if (saved != null) {
                         Spacer(Modifier.height(10.dp))
@@ -1176,7 +1178,8 @@ private fun SeriesDetails(
         Column(
             Modifier.fillMaxSize()
                 .graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 48f }
-                .padding(horizontal = 24.dp, vertical = 12.dp)
+                // More room at the bottom: TVs crop the screen's edge, and the episode names sit there.
+                .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 28.dp)
         ) {
             // Compact, as on the film page: the poster with small round buttons under it (the
             // focused one's name under them), and beside it the name, pills and story, so the
@@ -1206,7 +1209,7 @@ private fun SeriesDetails(
                             failed != null -> SmallRoundButton("↻", t("Try again"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { attempt++ }
                         }
                         SmallRoundButton(
-                            if (starred) "♥\uFE0E" else "♡", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            if (starred) "★\uFE0E" else "☆\uFE0E", t(if (starred) "Remove from favorites" else "Add to favorites"),
                             Modifier.weight(1f).then(if (next == null && failed == null) Modifier.focusRequester(primary) else Modifier),
                             { buttonLabel = it }
                         ) { onFavorite() }
@@ -1232,7 +1235,8 @@ private fun SeriesDetails(
                     }
                     showInfo?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
                         Spacer(Modifier.height(8.dp))
-                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp))
+                        Text(plot, color = White.copy(alpha = .75f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 640.dp),
+                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Content))
                     }
                 }
             }
@@ -1265,8 +1269,8 @@ private fun SeriesDetails(
                         Text("${t("Season")} ${season.number}", color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                        // Pictures as tall as the room left allows, under their names.
-                        val imageHeight = (maxHeight - 70.dp).coerceIn(60.dp, 170.dp)
+                        // Pictures as tall as the room left allows, over their one-line names.
+                        val imageHeight = (maxHeight - 54.dp).coerceIn(60.dp, 200.dp)
                         key(seasonIndex) {
                             val rowState = rememberLazyListState()
                             var rowFocus by remember { mutableStateOf<Int?>(null) }
@@ -1312,7 +1316,7 @@ private fun SeriesDetails(
 private fun SmallRoundButton(mark: String, label: String, modifier: Modifier, onFocus: (String) -> Unit, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) .92f else if (focused) 1.1f else 1f, spring(stiffness = 430f), label = "smallButton")
+    val scale by animateFloatAsState(if (pressed) .92f else 1f, spring(stiffness = 430f), label = "smallButton")
     Box(
         modifier.height(34.dp).scale(scale).clip(CircleShape)
             .background(if (focused) White else White.copy(alpha = .14f))
@@ -1372,11 +1376,15 @@ private fun EpisodeCard(episode: Episode, fallback: String?, progress: Float?, m
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         val title = episode.title.ifBlank { "${t("Episode")} ${episode.number}" }
-        Text("${episode.number}. $title", color = if (focused) White else White.copy(alpha = .78f), fontSize = 14.sp,
-            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (episode.seconds > 0) Text(formatTime(episode.seconds * 1000L), color = Muted, fontSize = 12.sp, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // The name keeps its own direction, so a Latin one reads "1 · Name", number first.
+            Text("${episode.number} · $title", color = if (focused) White else White.copy(alpha = .9f), fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                style = LocalTextStyle.current.copy(textDirection = TextDirection.Content))
+            if (episode.seconds > 0) Text("  " + formatTime(episode.seconds * 1000L), color = Muted, fontSize = 12.sp, maxLines = 1)
+        }
     }
 }
 
