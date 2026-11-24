@@ -1824,17 +1824,6 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val backToBar = remember { booleanArrayOf(false) }
-    // Voice search through the TV's own speech recognizer, when it has one; the words fill the search.
-    val context = LocalContext.current
-    val speech = remember {
-        android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-    }
-    val canSpeak = remember { speech.resolveActivity(context.packageManager) != null }
-    val listen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { model.setSearchText(it) }
-    }
-    val prompt = t("Say a channel or a title")
     BackHandler(enabled = editing) { backToBar[0] = true; editing = false }
     LaunchedEffect(editing) {
         if (editing) {
@@ -1909,16 +1898,6 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                             SearchKey("⌫", Modifier.weight(1f), outlined = true) { model.setSearchText(text.dropLast(1)) }
                             SearchKey("✕", Modifier.weight(1f), outlined = true) { model.setSearchText("") }
                             SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
-                        }
-                        if (canSpeak) {
-                            Spacer(Modifier.height(6.dp))
-                            SearchKey("Voice search", Modifier.fillMaxWidth(), outlined = true) {
-                                runCatching {
-                                    listen.launch(android.content.Intent(speech)
-                                        .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, language)
-                                        .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, prompt))
-                                }
-                            }
                         }
                     }
                 }
