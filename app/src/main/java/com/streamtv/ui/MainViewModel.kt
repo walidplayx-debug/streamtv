@@ -394,7 +394,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
         }
     }
-    fun setEpgUrl(value: String) { _state.value = _state.value.copy(epgUrl = value) }
+    /** A guide address set by the viewer; it also turns the guide back on after a removal. */
+    fun setEpgUrl(value: String) {
+        _state.value = _state.value.copy(epgUrl = value)
+        viewModelScope.launch { preferences.saveEpgOff(false) }
+    }
+    /** Clears the TV guide and keeps it off until the viewer sets an address again. */
+    fun removeEpg() {
+        epgJob?.cancel()
+        _state.value = _state.value.copy(epgUrl = "", programs = emptyList())
+        viewModelScope.launch { preferences.saveEpg(""); preferences.saveEpgOff(true) }
+    }
     fun savePlaylistEntry() {
         val name = _state.value.playlistName.trim().ifBlank { "Playlist ${_state.value.playlists.size + 1}" }
         val url = _state.value.playlistUrl.trim()
@@ -710,7 +720,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 moveOldFavorites(channels)
                 preferences.savePlaylist(url)
                 dao.replaceAll(channels)
-                if (guide != null && _state.value.epgUrl.isBlank()) {
+                if (guide != null && _state.value.epgUrl.isBlank() && !preferences.epgOff()) {
                     _state.value = _state.value.copy(epgUrl = guide)
                     loadEpg(silent = true)
                 }

@@ -1,6 +1,7 @@
 package com.streamtv.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -44,6 +45,10 @@ class PlaylistPreferences(private val context: Context) {
         return raw.substringBeforeLast("\t", "") to (raw.substringAfterLast("\t", "").toLongOrNull() ?: 0L)
     }
     suspend fun saveEpg(url: String) { context.dataStore.edit { it[epgKey] = url } }
+    /** The viewer removed the TV guide: the playlist's own guide is not added again by itself. */
+    private val epgOffKey = booleanPreferencesKey("epg_off")
+    suspend fun epgOff(): Boolean = context.dataStore.data.first()[epgOffKey] == true
+    suspend fun saveEpgOff(off: Boolean) { context.dataStore.edit { it[epgOffKey] = off } }
     suspend fun saveFavorites(ids: Set<String>) { context.dataStore.edit { it[favoritesKey] = ids } }
     suspend fun savePlaylists(entries: Set<String>) { context.dataStore.edit { it[playlistsKey] = entries } }
     val recentKeys: Flow<List<String>> = context.dataStore.data.map { it[recentKey].orEmpty().split("\n").filter { key -> key.isNotBlank() } }

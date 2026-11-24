@@ -2047,6 +2047,8 @@ private fun SettingsContent(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         WhiteButton("Set guide address") { onEntry("epg") }
                         if (state.epgUrl.isNotBlank()) WhiteButton("Reload TV guide") { model.loadEpg() }
+                        // Off until an address is set again; the playlist's own guide does not come back by itself.
+                        if (state.epgUrl.isNotBlank()) WhiteButton("Remove TV guide") { model.removeEpg() }
                     }
                     state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
