@@ -407,6 +407,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(epgUrl = "", programs = emptyList())
         viewModelScope.launch { preferences.saveEpg(""); preferences.saveEpgOff(true) }
     }
+    /** The guide an Xtream account brought with it leaves with that account; one set by hand stays. */
+    private fun dropGuideOf(playlistUrl: String) {
+        if (!cameWithPlaylist(_state.value.epgUrl, playlistUrl)) return
+        epgJob?.cancel()
+        _state.value = _state.value.copy(epgUrl = "", programs = emptyList())
+        viewModelScope.launch { preferences.saveEpg("") }
+    }
     fun savePlaylistEntry() {
         val name = _state.value.playlistName.trim().ifBlank { "Playlist ${_state.value.playlists.size + 1}" }
         val url = _state.value.playlistUrl.trim()
@@ -424,6 +431,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val nothingLeft = updated.isEmpty()
         // A load still on its way would bring the channels of a removed playlist back.
         if (nothingLeft) playlistJob?.cancel()
+        if (nothingLeft) dropGuideOf(entry.url)
         _state.value = if (nothingLeft) {
             // No playlist left: drop its channels too, so the app goes back to the welcome screen.
             _state.value.copy(
@@ -448,6 +456,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!nothingLeft && wasActive) selectPlaylist(updated.first())
     }
     fun selectPlaylist(entry: PlaylistEntry) {
+        if (entry.url != _state.value.playlistUrl) dropGuideOf(_state.value.playlistUrl)
         _state.value = _state.value.copy(playlistName = entry.name, playlistUrl = entry.url)
         if (!entry.url.startsWith("local://")) {
             loadPlaylist(entry.url)
@@ -746,3 +755,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+
+/** True when [epgUrl] is the guide of the Xtream account behind [playlistUrl]. */
+internal fun cameWithPlaylist(epgUrl: String, playlistUrl: String): Boolean =
+    epgUrl.isNotBlank() && XtreamAccount.from(playlistUrl)?.guideUrl == epgUrl
