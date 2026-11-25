@@ -78,7 +78,7 @@ object M3uParser {
                     if (seen.add(id + "\u0000" + url)) {
                         // "#EXTINF:-1" is a channel; a running time of a minute or more is a film or episode.
                         val seconds = raw.substringAfter(':').trimStart().takeWhile { it.isDigit() || it == '.' || it == '-' }.toDoubleOrNull() ?: -1.0
-                        result += Channel(id, title, url, attrs["tvg-logo"], attrs["group-title"] ?: "Other",
+                        result += Channel(id, title, url, attrs["tvg-logo"], attrs["group-title"]?.takeUnless { it.equals("Undefined", true) } ?: "Other",
                             attrs["tvg-country"] ?: "", attrs["tvg-language"] ?: "", onDemand = seconds >= 60.0)
                     }
                     info = null

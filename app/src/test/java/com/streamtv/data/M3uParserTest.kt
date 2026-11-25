@@ -19,6 +19,7 @@ class M3uParserTest {
     @Test fun parsesAttributeWithSpaces() { assertEquals("World News", one("#EXTINF:-1 group-title=\"World News\",A").single().group) }
     @Test fun parsesChannelUrl() { assertEquals("https://example.test/live.m3u8", one("#EXTINF:-1,A").single().url) }
     @Test fun defaultsMissingGroup() { assertEquals("Other", one("#EXTINF:-1,A").single().group) }
+    @Test fun undefinedGroupIsOther() { assertEquals("Other", one("#EXTINF:-1 group-title=\"Undefined\",A").single().group) }
     @Test fun parsesMultipleChannels() {
         val result = M3uParser.parse("#EXTM3U\n#EXTINF:-1,A\nhttps://x/a\n#EXTINF:-1,B\nhttps://x/b\n")
         assertEquals(listOf("A", "B"), result.map { it.name })
