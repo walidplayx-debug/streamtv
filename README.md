@@ -1,5 +1,7 @@
 # STV
 
+![STV: live TV, movies and series, made for the remote](docs/stv_poster.png)
+
 A personal IPTV player for Android TV. It comes with no channels, playlists or other content:
 you add your own M3U/M3U8 link or Xtream login, and an XMLTV guide if you have one.
 
