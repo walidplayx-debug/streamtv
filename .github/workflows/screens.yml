@@ -1,5 +1,5 @@
 name: TV screenshots
-# Run by hand only: builds the debug app, opens it on an Android TV emulator with the test
+# Steps: "name:KEYS;..." and "restart:" to begin again from Live TV. Run by hand only: builds the debug app, opens it on an Android TV emulator with the test
 # playlist, walks the screens with the remote's keys and keeps a picture of each. Publishes nothing.
 on:
   workflow_dispatch:

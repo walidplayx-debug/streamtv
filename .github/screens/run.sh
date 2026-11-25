@@ -23,6 +23,8 @@ shot start
 IFS=';' read -ra STEPS <<< "$STEPS"
 for step in "${STEPS[@]}"; do
   name="${step%%:*}"; keys="${step#*:}"
+  # "restart" opens the app afresh (on Live TV), to start the next walk from a known place.
+  if [ "$name" = restart ]; then adb shell am force-stop $APP; adb shell am start -W -n $APP/com.streamtv.MainActivity; sleep 15; continue; fi
   key $keys
   shot "$name"
 done
