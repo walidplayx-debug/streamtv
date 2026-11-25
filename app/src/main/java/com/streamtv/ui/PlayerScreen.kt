@@ -530,7 +530,7 @@ fun PlayerScreen(
         // it never turns.
         if (overlayState != OverlayState.ChannelList) AnimatedVisibility(
             visible = overlayState == OverlayState.InfoBar,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).fillMaxWidth(.65f).height(80.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).fillMaxWidth(.65f).height(72.dp),
             enter = fadeIn(animationSpec = tween(260)) +
                 slideInVertically(animationSpec = spring(dampingRatio = .82f, stiffness = 360f)) { it / 2 },
             exit = fadeOut(animationSpec = tween(220)) +
