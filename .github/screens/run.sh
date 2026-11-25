@@ -17,7 +17,8 @@ adb shell am start -W -n $APP/com.streamtv.MainActivity
 sleep 40
 n=0
 shot() { n=$((n+1)); adb exec-out screencap -p > "shots/$(printf %02d $n)-$1.png"; }
-key() { for k in "$@"; do adb shell input keyevent "$k"; sleep 1.2; done; sleep 2; }
+# LONG_<KEY> holds the key, as "hold OK" does on a remote.
+key() { for k in "$@"; do if [ "${k#LONG_}" != "$k" ]; then adb shell input keyevent --longpress "${k#LONG_}"; else adb shell input keyevent "$k"; fi; sleep 1.2; done; sleep 2; }
 shot start
 # Steps from the workflow input: "name:KEY KEY ..;name:KEY ..". Keys are Android names (DPAD_UP, ENTER, BACK...).
 IFS=';' read -ra STEPS <<< "$STEPS"

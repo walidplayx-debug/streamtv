@@ -27,7 +27,8 @@ jobs:
         # The emulator is x86; the app itself ships ARM only, so x86 is added for this build alone.
         run: |
           sed -i 's/listOf("armeabi-v7a", "arm64-v8a")/listOf("armeabi-v7a", "arm64-v8a", "x86")/' app/build.gradle.kts
-          ./gradlew --no-daemon assembleDebug
+          # A version newer than any release, so no "update available" mark shows in the pictures.
+          GITHUB_RUN_NUMBER=999999 ./gradlew --no-daemon assembleDebug
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
