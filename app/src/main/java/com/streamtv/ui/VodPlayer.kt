@@ -337,6 +337,7 @@ fun VodPlayerScreen(
                 Lifecycle.Event.ON_STOP -> {
                     save()
                     stoppedInBackground[0] = true
+                    nextIn = -1
                     scrubTarget = null
                     speedMode = false
                     speed = 0
@@ -404,7 +405,7 @@ fun VodPlayerScreen(
         }
     }
     LaunchedEffect(nextIn) {
-        if (nextIn > 0) { delay(1_000); nextIn-- } else if (nextIn == 0) onNext()
+        if (nextIn > 0) { delay(1_000); nextIn-- } else if (nextIn == 0) { nextIn = -1; onNext() }
     }
     BackHandler {
         when {
@@ -429,7 +430,7 @@ fun VodPlayerScreen(
                     val held = event.nativeKeyEvent.repeatCount > 0
                     // While the next episode is offered: OK plays it now, Back stays here.
                     if (nextIn >= 0 && event.key != Key.Back) {
-                        if (!held && event.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect)) onNext()
+                        if (!held && event.key in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.ButtonSelect)) { nextIn = -1; onNext() }
                         return@onPreviewKeyEvent true
                     }
                     // A menu takes every key while open: up/down move, OK picks, right opens a sub-menu,
@@ -477,7 +478,7 @@ fun VodPlayerScreen(
                             when {
                                 failed -> { failPick = if (forward) 1 else 0; show() }
                                 !controls || row == 0 -> scrub(forward, held)
-                                else -> { button = (button + if (forward) 1 else -1).coerceIn(0, buttons.lastIndex); show() }
+                                else -> { if (buttons.isNotEmpty()) button = (button + if (forward) 1 else -1).coerceIn(0, buttons.lastIndex); show() }
                             }
                             true
                         }
@@ -489,7 +490,7 @@ fun VodPlayerScreen(
                                 failed -> if (failPick == 0) leave() else { failed = false; player.prepare(); player.play(); show() }
                                 scrubTarget != null -> commitScrub()
                                 !controls || row == 0 -> togglePlay()
-                                else -> press(buttons[button.coerceIn(0, buttons.lastIndex)])
+                                buttons.isNotEmpty() -> press(buttons[button.coerceIn(0, buttons.lastIndex)])
                             }
                             true
                         }

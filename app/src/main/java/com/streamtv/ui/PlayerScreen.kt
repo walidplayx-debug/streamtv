@@ -311,6 +311,7 @@ fun PlayerScreen(
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
                     stoppedInBackground[0] = true
+                    retryJob[0]?.cancel()
                     buffering = false
                     player.playWhenReady = false
                     player.stop()
