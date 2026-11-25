@@ -91,7 +91,7 @@ object Shows {
     }
 
     fun playable(show: Channel, episode: Episode): Channel {
-        val label = "%s S%02dE%02d".format(show.name, episode.season, episode.number) +
+        val label = "%s S%02dE%02d".format(java.util.Locale.US, show.name, episode.season, episode.number) +
             (episode.title.takeIf { it.isNotBlank() && !it.equals(show.name, true) }?.let { " - $it" } ?: "")
         return Channel("ep:${episode.id}", label, episode.url, episode.image ?: show.logo, show.group, onDemand = true)
     }

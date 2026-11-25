@@ -31,4 +31,15 @@ class ShowsTest {
         assertEquals("Caminandes S01E03 - Llamigos", playable.name)
         assertEquals(ChannelKind.Series, playable.kind())
     }
+
+    @Test fun episodeNumbersStayLatinOnAnArabicTv() {
+        val before = java.util.Locale.getDefault()
+        java.util.Locale.setDefault(java.util.Locale("ar", "EG"))
+        try {
+            val episode = Episode("7", 1, 3, "Llamigos", "http://h/series/u/p/7.mp4")
+            assertEquals("Caminandes S01E03 - Llamigos", Shows.playable(Shows.xtream("42", "Caminandes", null, "Animation"), episode).name)
+        } finally {
+            java.util.Locale.setDefault(before)
+        }
+    }
 }
