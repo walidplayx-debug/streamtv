@@ -52,13 +52,13 @@ jobs:
         with:
           name: screens
           path: shots/
-      # The pictures also go to a one-commit "screens" branch, readable with plain git.
-      - name: Keep the pictures on the screens branch
+      # The pictures also go to a hidden ref (not a branch), readable with: git fetch origin refs/screens/latest
+      - name: Keep the pictures on a hidden ref
         if: always()
         run: |
           cd shots
-          git init -q -b screens
+          git init -q
           git -c user.name=ci -c user.email=ci@stv add -A
           git -c user.name=ci -c user.email=ci@stv commit -qm "Screens of ${GITHUB_SHA::7}"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" screens
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/screens/latest
 
