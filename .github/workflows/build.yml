@@ -7,6 +7,8 @@ concurrency:
 on:
   push:
     branches: [main]
+    # The emulator screenshots tool is not part of the app; changing it publishes nothing.
+    paths-ignore: ['.github/screens/**', '.github/workflows/screens.yml']
   workflow_dispatch:
 permissions:
   contents: write
