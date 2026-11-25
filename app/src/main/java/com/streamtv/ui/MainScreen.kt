@@ -607,7 +607,7 @@ private fun LiveContent(state: TvState, model: MainViewModel, restoreKey: String
                     item { FocusRow("Favorites", live.count { state.favorites.hasFavorite(it) }.toString(), query == "__favorites") { model.setSearchQuery("__favorites") } }
                 }
                 item { FocusRow("All channels", live.size.toString(), query == "__all") { model.setSearchQuery("__all") } }
-                item { Text(t(mode.heading), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                item { Text(t(mode.heading), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                 items(sections, key = { it.token }) { item ->
                     val held = remember { booleanArrayOf(false) }
                     val lifted = moving == item.token
@@ -803,7 +803,7 @@ private fun LibraryContent(
                     if (favorites.isNotEmpty()) {
                         item { FocusRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
                     }
-                    item { Text(t("GENRES"), color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
+                    item { Text(t("GENRES"), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = 16.dp, bottom = 5.dp)) }
                     items(genres.toList()) { (genre, list) ->
                         FocusRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
                     }
@@ -834,7 +834,7 @@ private fun LibraryContent(
                 if (favorites.isNotEmpty()) {
                     item { MenuRow("Favorites", favorites.size.toString(), query.isEmpty() && section == "__favorites") { ui.search = ""; ui.section = "__favorites" } }
                 }
-                item { Text(t("GENRES"), color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)) }
+                item { Text(t("GENRES"), color = Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)) }
                 items(genres.toList()) { (genre, list) ->
                     MenuRow(genre, list.size.toString(), query.isEmpty() && section == genre) { ui.search = ""; ui.section = genre }
                 }
@@ -2057,7 +2057,7 @@ private fun SettingsContent(
                             .padding(horizontal = 18.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(t("NOW PLAYING FROM"), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         Spacer(Modifier.width(12.dp))
                         Text(activeName ?: t("Playlist"), color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Spacer(Modifier.width(12.dp))
