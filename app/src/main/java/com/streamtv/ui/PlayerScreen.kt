@@ -568,6 +568,8 @@ fun PlayerScreen(
                 Box(Modifier.width(1.dp).height(46.dp).background(PlayerWhite.copy(alpha = .22f)))
                 Spacer(Modifier.width(18.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    // The same room above as the progress line takes below, so the name and group sit in the middle.
+                    Spacer(Modifier.height(9.dp))
                     Text(channelDisplayName(channel.name), color = PlayerWhite, fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
