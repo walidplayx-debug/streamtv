@@ -2061,7 +2061,9 @@ private fun SettingsContent(
                         Spacer(Modifier.width(12.dp))
                         Text(activeName ?: t("Playlist"), color = White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Spacer(Modifier.width(12.dp))
-                        Text(t(playlistLabel(state.playlistUrl)), Modifier.weight(1f), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // An address is Latin text: laid out left to right, so an Arabic page does not shuffle or cut its words.
+                        Text(t(playlistLabel(state.playlistUrl)), Modifier.weight(1f), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Content))
                         Spacer(Modifier.width(12.dp))
                         Text(
                             if (state.loading) t("Loading…")
