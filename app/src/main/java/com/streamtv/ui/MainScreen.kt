@@ -2114,7 +2114,7 @@ private fun SettingsContent(
                     SettingItem("PIN", if (state.pinSet) "Set" else "Not set", if (state.pinSet) "Change PIN" else "Set PIN") { model.changePin() }
                     SettingItem("Locked channels", state.locked.size.toString())
                     if (state.hidden.isNotEmpty()) {
-                        SettingItem("Hidden channels", state.hidden.size.toString(), "Restore hidden channels") { model.restoreHidden() }
+                        SettingItem("Hidden channels", state.hidden.size.toString(), "Restore hidden channels") { model.protect { model.restoreHidden() } }
                     } else {
                         SettingItem("Hidden channels", state.hidden.size.toString())
                     }
