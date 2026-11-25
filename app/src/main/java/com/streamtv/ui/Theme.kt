@@ -8,8 +8,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.streamtv.R
-private val StreamColors = darkColorScheme(primary = Color(0xFF1E9C95), background = Color(0xFF070D0C),
-    surface = Color(0xFF182423), onBackground = Color(0xFFF6F2EE), onSurface = Color(0xFFF6F2EE))
+private val StreamColors = darkColorScheme(primary = Color(0xFFFF7A32), background = Color(0xFF07070B),
+    surface = Color(0xFF17151A), onBackground = Color(0xFFF6F2EE), onSurface = Color(0xFFF6F2EE))
 /**
  * IBM Plex Sans Arabic for Arabic letters. The files hold Arabic only, so Latin letters and digits
  * fall back to the system font and look as before.

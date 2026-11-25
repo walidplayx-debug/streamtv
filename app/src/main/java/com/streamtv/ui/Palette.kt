@@ -69,19 +69,17 @@ class StvPalette(
 object Palettes {
     /** The app's one look. */
     val Default = StvPalette(
-        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF8FA3A1), accent = Color(0xFF7FE3C9), glass = Color(0xFF1D2A29),
-        focus = listOf(Color(0xFF1E9C95), Color(0xFF127670)),
-        press = listOf(Color(0xFF9FE8DE), Color(0xFF6FCFC4)),
-        backdrop = listOf(Color(0xFF12201F), Color(0xFF0C1615), Color(0xFF070D0C)),
-        glassFill = listOf(Color(0xB31E2D2C), Color(0xB30F1817)),
-        tileFocused = listOf(Color(0xFF24403D), Color(0xFF172B29)),
-        tile = listOf(Color(0xFF1A2726), Color(0xFF111A19)),
-        listFocus = listOf(Color(0xFF1C918A), Color(0xFF116A65)),
-        welcomeTop = Color(0xFF102020),
-        panel = Color(0xF0182423),
-        onLit = Color(0xFF102020),
-        number = Color(0xFFC8E63C)
+        ink = Color(0xFF000000), text = Color(0xFFFFFFFF), muted = Color(0xFF99999E), accent = Color(0xFFD5DADF), glass = Color(0xFF29292C),
+        focus = listOf(Color(0xFF8290A6), Color(0xFF647187)),
+        press = listOf(Color(0xFFC6D1E3), Color(0xFF9FADC6)),
+        backdrop = listOf(Color(0xFF1A1D24), Color(0xFF111318), Color(0xFF0B0C0F)),
+        glassFill = listOf(Color(0xB3262931), Color(0xB3131519)),
+        tileFocused = listOf(Color(0xFF465064), Color(0xFF2B3240)),
+        tile = listOf(Color(0xFF252A33), Color(0xFF171B22)),
+        listFocus = listOf(Color(0xFF7C889D), Color(0xFF5F6B80)),
+        welcomeTop = Color(0xFF16161A)
     )
+
 }
 
 /** The colours in use; read by every screen. */
