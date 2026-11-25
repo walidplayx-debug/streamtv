@@ -177,7 +177,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.lockedKeys.collect { keys -> _state.value = _state.value.copy(locked = keys) } }
         viewModelScope.launch { preferences.channelNames.collect { names -> _state.value = _state.value.copy(names = names) } }
         viewModelScope.launch { preferences.channelLogos.collect { logos -> _state.value = _state.value.copy(logos = logos) } }
-        viewModelScope.launch { preferences.pin.collect { value -> pinCode = value; _state.value = _state.value.copy(pinSet = value.isNotBlank()) } }
+        // Until the viewer picks a PIN, 0000 is it, so locking and deleting always ask for one.
+        viewModelScope.launch { preferences.pin.collect { value -> pinCode = value; _state.value = _state.value.copy(pinSet = true) } }
     }
     init {
         viewModelScope.launch {
@@ -611,15 +612,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleLock(channel: Channel) {
         when {
             channel.key in _state.value.locked -> _state.value = _state.value.copy(pin = PinPrompt("unlock", channel), pinError = false)
-            pinCode.isBlank() -> _state.value = _state.value.copy(pin = PinPrompt("set", channel), pinError = false)
             // Locking asks for the PIN too, so nobody can lock channels by accident or as a prank.
             else -> _state.value = _state.value.copy(pin = PinPrompt("lock", channel), pinError = false)
         }
     }
-    /** Hiding asks for the PIN on the card, the same way locking does (a new PIN first if none is set). */
+    /** Hiding asks for the PIN on the card, the same way locking does. */
     fun requestHide(channel: Channel) {
         _state.value = _state.value.copy(
-            pin = if (pinCode.isBlank()) PinPrompt("set", channel, then = "hide") else PinPrompt("hide", channel),
+            pin = PinPrompt("hide", channel),
             pinError = false
         )
     }
@@ -628,11 +628,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.saveLocked(keys) }
     }
     fun changePin() {
-        _state.value = _state.value.copy(pin = PinPrompt(if (pinCode.isBlank()) "set" else "verify"), pinError = false)
+        _state.value = _state.value.copy(pin = PinPrompt("verify"), pinError = false)
     }
-    /** Runs [action] straight away when no PIN is set, otherwise only after the PIN is entered. */
+    /** Runs [action] only after the PIN (0000 until the viewer picks one) is entered. */
     fun protect(label: String? = null, reason: String? = null, action: () -> Unit) {
-        if (pinCode.isBlank()) { action(); return }
         pendingAction = action
         _state.value = _state.value.copy(pin = PinPrompt("confirm", label = label, reason = reason), pinError = false)
     }
@@ -664,7 +663,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             prompt.channel?.let { if (prompt.then == "hide") hideChannel(it) else setLocked(_state.value.locked + it.key) }
             return true
         }
-        if (value != pinCode) { _state.value = _state.value.copy(pinError = true); return false }
+        if (!pinMatches(value, pinCode)) { _state.value = _state.value.copy(pinError = true); return false }
         _state.value = _state.value.copy(pin = null, pinError = false)
         when (prompt.purpose) {
             "open" -> prompt.channel?.let { play(it, prompt.from, prompt.title) }
@@ -759,3 +758,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 /** True when [epgUrl] is the guide of the Xtream account behind [playlistUrl]. */
 internal fun cameWithPlaylist(epgUrl: String, playlistUrl: String): Boolean =
     epgUrl.isNotBlank() && XtreamAccount.from(playlistUrl)?.guideUrl == epgUrl
+
+/** The PIN a viewer has before choosing one. */
+internal const val DefaultPin = "0000"
+
+/** True when [typed] is the saved PIN, or 0000 while none has been saved. */
+internal fun pinMatches(typed: String, saved: String): Boolean = typed == saved.ifBlank { DefaultPin }
