@@ -1191,14 +1191,9 @@ private fun SeriesDetails(
         }
     }
     val starred = state.favorites.hasFavorite(show)
-    // Go on where the viewer stopped: the last episode started and not finished, else the first.
-    val byKey = remember(all) { all.flatMap { it.episodes }.associateBy { Shows.playable(show, it).key } }
-    val next: Pair<Episode, Long>? = remember(byKey, state.recentVod, state.positions) {
-        state.recentVod.firstNotNullOfOrNull { key ->
-            val episode = byKey[key] ?: return@firstNotNullOfOrNull null
-            val saved = state.positions[key] ?: return@firstNotNullOfOrNull null
-            if (saved.first < saved.second * 0.95) episode to saved.first else null
-        } ?: all.firstOrNull()?.episodes?.firstOrNull()?.let { it to 0L }
+    // Go on where the viewer stopped: the last episode watched, or the one after it once finished.
+    val next: Pair<Episode, Long>? = remember(all, state.recentVod, state.positions) {
+        Shows.resume(all.flatMap { it.episodes }, { Shows.playable(show, it).key }, state.recentVod, state.positions)
     }
     fun code(e: Episode) = "S${e.season} E${e.number}"
     val enter = remember(show.key) { Animatable(0f) }

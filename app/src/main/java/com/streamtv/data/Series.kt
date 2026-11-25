@@ -78,6 +78,18 @@ object Shows {
     }
 
     /** What the player gets for an episode: a playable entry named after the show and episode. */
+    /**
+     * Where a series page picks up: the newest episode watched goes on from its saved place, or the
+     * one after it once finished (a finished episode keeps no place); with nothing watched, the first.
+     */
+    fun <E> resume(episodes: List<E>, key: (E) -> String, recent: List<String>, positions: Map<String, Pair<Long, Long>>): Pair<E, Long>? {
+        val index = episodes.withIndex().associate { key(it.value) to it.index }
+        val last = recent.firstNotNullOfOrNull { index[it] } ?: return episodes.firstOrNull()?.let { it to 0L }
+        val saved = positions[key(episodes[last])]
+        if (saved != null && saved.first < saved.second * 0.95) return episodes[last] to saved.first
+        return (episodes.getOrNull(last + 1) ?: episodes.first()) to 0L
+    }
+
     fun playable(show: Channel, episode: Episode): Channel {
         val label = "%s S%02dE%02d".format(show.name, episode.season, episode.number) +
             (episode.title.takeIf { it.isNotBlank() && !it.equals(show.name, true) }?.let { " - $it" } ?: "")
