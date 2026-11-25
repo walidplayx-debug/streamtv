@@ -10,6 +10,8 @@ on:
       language:
         description: 'App language'
         default: 'ar'
+permissions:
+  contents: write
 jobs:
   screens:
     runs-on: ubuntu-latest
@@ -46,3 +48,13 @@ jobs:
         with:
           name: screens
           path: shots/
+      # The pictures also go to a one-commit "screens" branch, readable with plain git.
+      - name: Keep the pictures on the screens branch
+        if: always()
+        run: |
+          cd shots
+          git init -q -b screens
+          git -c user.name=ci -c user.email=ci@stv add -A
+          git -c user.name=ci -c user.email=ci@stv commit -qm "Screens of ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" screens
+
