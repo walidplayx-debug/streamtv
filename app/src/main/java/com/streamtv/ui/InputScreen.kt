@@ -143,7 +143,7 @@ fun TextEntryScreen(
             }
             message?.let {
                 Spacer(Modifier.height(10.dp))
-                Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t(it), color = ActivePalette.current.error, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -241,7 +241,7 @@ fun XtreamEntryScreen(onSave: (name: String, url: String) -> Unit, onCancel: () 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 EntryButton("Save & load", primary = true, modifier = Modifier.focusRequester(saveButton)) { submit() }
                 EntryButton("Cancel") { keyboard?.hide(); onCancel() }
-                message?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                message?.let { Text(t(it), color = ActivePalette.current.error, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -290,7 +290,7 @@ fun SingleFieldScreen(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 EntryButton(saveLabel, primary = true, modifier = Modifier.focusRequester(saveButton)) { keyboard?.hide(); onSave(value) }
                 EntryButton("Cancel") { keyboard?.hide(); onCancel() }
-                error?.let { Text(t(it), color = Color(0xFFFF8B7B), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                error?.let { Text(t(it), color = ActivePalette.current.error, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }

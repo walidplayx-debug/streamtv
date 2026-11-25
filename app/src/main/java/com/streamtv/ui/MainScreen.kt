@@ -1271,7 +1271,7 @@ private fun SeriesDetails(
             }
             Spacer(Modifier.height(12.dp))
             when {
-                failed != null -> Text(t(failed ?: ""), color = Color(0xFFFF8A80), fontSize = 16.sp, maxLines = 2)
+                failed != null -> Text(t(failed ?: ""), color = ActivePalette.current.error, fontSize = 16.sp, maxLines = 2)
                 seasons == null -> Text(t("Loading episodes…"), color = Muted, fontSize = 16.sp)
                 season == null -> Text(t("No episodes yet"), color = Muted, fontSize = 16.sp)
                 else -> {
@@ -1511,7 +1511,7 @@ private fun WelcomeScreen(
                     error != null -> t(error)
                     else -> " "
                 },
-                color = if (loading) Muted else Color(0xFFFF8B7B), fontSize = 16.sp, textAlign = TextAlign.Center, maxLines = 2
+                color = if (loading) Muted else ActivePalette.current.error, fontSize = 16.sp, textAlign = TextAlign.Center, maxLines = 2
             )
         }
     }

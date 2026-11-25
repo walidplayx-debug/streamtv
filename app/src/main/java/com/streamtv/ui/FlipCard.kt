@@ -358,7 +358,7 @@ private fun PinBack(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Text(if (face.error != null && digits.isEmpty()) t(face.error) else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
+            Text(if (face.error != null && digits.isEmpty()) t(face.error) else " ", color = ActivePalette.current.error, fontSize = 13.sp, maxLines = 1)
             Spacer(Modifier.height(6.dp))
             for (row in listOf("123", "456", "789", "<0x")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -393,7 +393,7 @@ private fun NumberBack(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(typed.ifEmpty { "–" }, color = ActivePalette.current.number, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(if (error != null) t(error) else " ", color = Color(0xFFFF8B7B), fontSize = 13.sp, maxLines = 1)
+            Text(if (error != null) t(error) else " ", color = ActivePalette.current.error, fontSize = 13.sp, maxLines = 1)
             Spacer(Modifier.height(6.dp))
             for (row in listOf("123", "456", "789", "<0>")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

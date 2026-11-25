@@ -547,7 +547,7 @@ fun PlayerScreen(
             val density = androidx.compose.ui.platform.LocalDensity.current.density
             val card = Modifier.fillMaxSize()
                 .clip(RoundedCornerShape(28.dp))
-                .background(Brush.linearGradient(listOf(Color(0xE626282D), Color(0xE6101115), Color(0xE6222429))))
+                .background(ActivePalette.current.panel)
                 .border(1.dp, PlayerWhite.copy(alpha = .16f), RoundedCornerShape(28.dp))
                 .padding(horizontal = 20.dp)
             Box(Modifier.fillMaxSize().graphicsLayer { rotationX = flip.value; cameraDistance = 16f * density }) {
