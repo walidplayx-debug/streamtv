@@ -1069,8 +1069,8 @@ private fun TitleDetails(
                             SmallRoundButton("▶\uFE0E", t("Play"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { onPlay(0L) }
                         }
                         SmallRoundButton(
-                            if (starred) "★\uFE0E" else "☆\uFE0E", t(if (starred) "Remove from favorites" else "Add to favorites"),
-                            Modifier.weight(1f), { buttonLabel = it }
+                            "", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            Modifier.weight(1f), { buttonLabel = it }, star = starred
                         ) { onFavorite() }
                     }
                     // What the focused button does, small under the buttons.
@@ -1240,9 +1240,9 @@ private fun SeriesDetails(
                             failed != null -> SmallRoundButton("↻", t("Try again"), Modifier.weight(1f).focusRequester(primary), { buttonLabel = it }) { attempt++ }
                         }
                         SmallRoundButton(
-                            if (starred) "★\uFE0E" else "☆\uFE0E", t(if (starred) "Remove from favorites" else "Add to favorites"),
+                            "", t(if (starred) "Remove from favorites" else "Add to favorites"),
                             Modifier.weight(1f).then(if (next == null && failed == null) Modifier.focusRequester(primary) else Modifier),
-                            { buttonLabel = it }
+                            { buttonLabel = it }, star = starred
                         ) { onFavorite() }
                     }
                     Text(buttonLabel, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -1344,7 +1344,7 @@ private fun SeriesDetails(
  * dark mark under the remote, see-through otherwise. [onFocus] gets its name, shown under the row.
  */
 @Composable
-private fun SmallRoundButton(mark: String, label: String, modifier: Modifier, onFocus: (String) -> Unit, onClick: () -> Unit) {
+private fun SmallRoundButton(mark: String, label: String, modifier: Modifier, onFocus: (String) -> Unit, star: Boolean? = null, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
     val scale by animateFloatAsState(if (pressed) .92f else 1f, spring(stiffness = 430f), label = "smallButton")
@@ -1355,7 +1355,9 @@ private fun SmallRoundButton(mark: String, label: String, modifier: Modifier, on
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
-        Text(mark, color = if (focused) Ink else White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        // The favourite star is cut into the button like the one on channel tiles; deeper once it is a favourite.
+        if (star != null) FavoriteStar(Modifier.size(18.dp), onLight = focused, deep = star)
+        else Text(mark, color = if (focused) Ink else White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -1765,7 +1767,7 @@ private fun ChannelCard(channel: Channel, favorite: Boolean, mark: String?, qual
 
 /** A favourite's mark: a star engraved into the tile itself, nothing laid over it. */
 @Composable
-private fun FavoriteStar(modifier: Modifier = Modifier) {
+private fun FavoriteStar(modifier: Modifier = Modifier, onLight: Boolean = false, deep: Boolean = false) {
     Canvas(modifier) {
         val cx = size.width / 2f
         val cy = size.height / 2f + size.height * .04f
@@ -1781,9 +1783,10 @@ private fun FavoriteStar(modifier: Modifier = Modifier) {
             close()
         }
         val lip = 1.dp.toPx()
-        drawPath(star(lip, lip), Color.White.copy(alpha = .22f))   // the lower lip catches the light
-        drawPath(star(-lip, -lip), Color.Black.copy(alpha = .35f)) // the upper lip is in shade
-        drawPath(star(0f, 0f), Color.White.copy(alpha = .28f))     // the cut itself, a shade of the tile
+        drawPath(star(lip, lip), Color.White.copy(alpha = if (onLight) .9f else .22f)) // the lower lip catches the light
+        drawPath(star(-lip, -lip), Color.Black.copy(alpha = .35f))                   // the upper lip is in shade
+        // The cut itself, a shade of the surface it is cut into.
+        drawPath(star(0f, 0f), if (onLight) Color.Black.copy(alpha = if (deep) .45f else .16f) else Color.White.copy(alpha = if (deep) .75f else .28f))
     }
 }
 
