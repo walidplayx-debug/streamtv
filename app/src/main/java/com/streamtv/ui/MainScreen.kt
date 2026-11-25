@@ -2044,7 +2044,7 @@ private fun SettingsContent(
                             color = White.copy(alpha = .86f), fontSize = 14.sp, maxLines = 1
                         )
                     }
-                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
+                    state.error?.let { Text(t(it), color = ActivePalette.current.error, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) }
                     if (state.playlists.isNotEmpty()) {
                         Spacer(Modifier.height(22.dp))
                         Text(t("Your playlists"), color = White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -2082,7 +2082,7 @@ private fun SettingsContent(
                         // Off until an address is set again; the playlist's own guide does not come back by itself.
                         if (state.epgUrl.isNotBlank()) WhiteButton("Remove TV guide") { model.removeEpg() }
                     }
-                    state.error?.let { Text(it, color = Color(0xFFFF8B7B), fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
+                    state.error?.let { Text(t(it), color = ActivePalette.current.error, fontSize = 16.sp, modifier = Modifier.padding(top = 14.dp)) }
                     Text("${state.programs.size} ${t("programmes loaded")}", color = Muted, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
                 }
                 // For tonight only: playback stops at the chosen time, with a warning a minute before.

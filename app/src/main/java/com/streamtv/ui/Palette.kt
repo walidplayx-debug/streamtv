@@ -48,6 +48,8 @@ class StvPalette(
     val onLit: Color = Color(0xFF1C1C1E),
     /** The big channel number in the player and the typed number. */
     val number: Color = Color(0xFFE8452F),
+    /** Error messages. */
+    val error: Color = Color(0xFFFF8B7B),
     /** Secondary text over video. */
     val overlayMuted: Color = Color(0xFFB5B5BA),
     /** The filled part of the film and episode time bar. */
