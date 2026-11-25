@@ -5,14 +5,11 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChannelDao {
-    // In the playlist's own order: rows are written in that order, so their row id keeps it.
-    @Query("SELECT * FROM channels ORDER BY rowid")
-    fun observeAll(): Flow<List<ChannelEntity>>
-    /** The cached playlist, read once (observing it kept a second copy of every channel alive). */
+    /** The cached playlist in its own order (rows are written in that order), read once:
+     *  observing it kept a second copy of every channel alive. */
     @Query("SELECT * FROM channels ORDER BY rowid")
     suspend fun getAll(): List<ChannelEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
