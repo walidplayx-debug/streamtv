@@ -79,6 +79,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -1794,8 +1796,8 @@ private fun channelGradient(name: String): List<Color> {
 private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: String?, onRestored: () -> Unit, onOptions: (Channel) -> Unit) {
     // The TV's own keyboard floats wherever it likes and covers the results, so Search has a
     // keyboard of its own: it stays on one side and the results fill the other.
-    val language = LocalAppLanguage.current
-    var arabicKeys by remember { mutableStateOf(language == "ar") }
+    // Most channel names are in English, so the keys always open in English; the globe key turns them Arabic.
+    var arabicKeys by remember { mutableStateOf(false) }
     var scope by remember { mutableStateOf("All") }
     val fieldSeen = remember { booleanArrayOf(false) }
     val text = state.searchText
@@ -1808,8 +1810,12 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
             else -> state.channels
         }
     }
-    val matches = remember(pool, q) {
-        if (q.isEmpty()) emptyList() else pool.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
+    // Before anything is typed, the page shows what was watched lately, so going back to it takes one press.
+    val matches = remember(pool, q, state.recent, state.recentVod) {
+        if (q.isEmpty()) {
+            val order = (state.recent + state.recentVod).withIndex().associate { it.value to it.index }
+            pool.filter { it.key in order }.sortedBy { order[it.key] }
+        } else pool.filter { it.name.contains(q, true) || it.group.contains(q, true) || it.country.contains(q, true) }
     }
     // The search bar is a real text field: OK on it opens the TV keyboard, so voice search and
     // typing or pasting from a phone remote app keep working. The keys below are for the D-pad.
@@ -1892,7 +1898,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                             SearchKey("space", Modifier.weight(2f), outlined = true) { if (text.isNotEmpty()) model.setSearchText("$text ") }
                             SearchKey("⌫", Modifier.weight(1f), outlined = true) { model.setSearchText(text.dropLast(1)) }
                             SearchKey("✕", Modifier.weight(1f), outlined = true) { model.setSearchText("") }
-                            SearchKey(if (arabicKeys) "ABC" else "عربي", Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
+                            SearchKey(GlobeKey, Modifier.weight(2f), outlined = true) { arabicKeys = !arabicKeys }
                         }
                     }
                 }
@@ -1910,7 +1916,7 @@ private fun SearchContent(state: TvState, model: MainViewModel, restoreKey: Stri
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text(if (q.isEmpty()) t("Start typing to search") else "${matches.size} ${t("results")}", color = Muted, fontSize = 16.sp, maxLines = 1)
+                Text(if (q.isNotEmpty()) "${matches.size} ${t("results")}" else if (matches.isNotEmpty()) t("Watch history") else t("Start typing to search"), color = Muted, fontSize = 16.sp, maxLines = 1)
             }
             Spacer(Modifier.height(10.dp))
             val posterState = rememberLazyGridState()
@@ -1952,8 +1958,24 @@ private fun SearchKey(label: String, modifier: Modifier = Modifier, outlined: Bo
             .clickable(onClick = press),
         contentAlignment = Alignment.Center
     ) {
-        Text(t(label), color = White.copy(alpha = if (focused) 1f else .8f), fontSize = if (outlined) 15.sp else 19.sp,
+        if (label == GlobeKey) Globe(White.copy(alpha = if (focused) 1f else .8f), Modifier.size(20.dp))
+        else Text(t(label), color = White.copy(alpha = if (focused) 1f else .8f), fontSize = if (outlined) 15.sp else 19.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
+    }
+}
+
+/** The key that switches the search letters between English and Arabic, shown as a globe like a phone's. */
+private const val GlobeKey = "globe"
+
+@Composable
+private fun Globe(tint: Color, modifier: Modifier) {
+    Canvas(modifier) {
+        val line = Stroke(1.6.dp.toPx())
+        val r = size.minDimension / 2f - line.width
+        drawCircle(tint, r, style = line)
+        drawOval(tint, topLeft = Offset(center.x - r * .45f, center.y - r), size = Size(r * .9f, r * 2f), style = line)
+        drawLine(tint, Offset(center.x - r, center.y), Offset(center.x + r, center.y), line.width)
+        drawLine(tint, Offset(center.x, center.y - r), Offset(center.x, center.y + r), line.width)
     }
 }
 
