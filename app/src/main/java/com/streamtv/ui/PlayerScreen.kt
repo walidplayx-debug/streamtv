@@ -559,10 +559,20 @@ fun PlayerScreen(
                     Modifier.widthIn(min = 64.dp).animateContentSize(spring(dampingRatio = .85f, stiffness = 420f)),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Ch", color = PlayerMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    Text("Ch", color = PlayerMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+                        style = androidx.compose.ui.text.TextStyle(platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)))
+                    Spacer(Modifier.height(4.dp))
                     // The number in the red of the logo's S: a touch of colour in the bar.
                     Text((currentChannelIndex + 1).toString(), color = ActivePalette.current.number, fontSize = 30.sp,
-                        lineHeight = 32.sp, fontWeight = FontWeight.Bold, style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"), maxLines = 1, softWrap = false)
+                        lineHeight = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false,
+                        // Digits have no tails: without the font's spare room above and below, "Ch" and the number sit in the middle of the bar.
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFeatureSettings = "tnum",
+                            platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+                            lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                                androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center, androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+                            )
+                        ))
                 }
                 Spacer(Modifier.width(14.dp))
                 Box(Modifier.width(1.dp).height(46.dp).background(PlayerWhite.copy(alpha = .22f)))
