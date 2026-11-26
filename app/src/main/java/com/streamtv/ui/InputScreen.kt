@@ -368,6 +368,9 @@ private fun EntryButton(
 @Composable
 fun LogoSearchScreen(
     name: String,
+    /** The channel's country and group in the playlist, so the search knows where it is from. */
+    country: String = "",
+    group: String = "",
     /** The viewer picked a logo before: "Original logo" puts the playlist's own back. */
     hasPicked: Boolean,
     onPick: (String) -> Unit,
@@ -397,7 +400,7 @@ fun LogoSearchScreen(
         status = "Searching…"
         val link = com.streamtv.data.LogoSearch.pastedPicture(context, value)
         status = if (link == null) "Searching…" else null
-        val found = if (link != null) listOf(link) else com.streamtv.data.LogoSearch.search(value)
+        val found = if (link != null) listOf(link) else com.streamtv.data.LogoSearch.search(value, country = country, group = group)
         results = found
         status = if (found.isEmpty()) "No logos found" else null
         // The first logo takes focus, so the remote is right on the choices.

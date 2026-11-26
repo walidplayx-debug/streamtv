@@ -200,7 +200,7 @@ fun MainScreen(state: TvState, model: MainViewModel) {
     var logoFor by remember { mutableStateOf<Channel?>(null) }
     logoFor?.let { target ->
         LogoSearchScreen(
-            name = target.name, hasPicked = target.key in state.logos,
+            name = target.name, country = target.country, group = target.group, hasPicked = target.key in state.logos,
             onPick = { url -> model.setChannelLogo(target, url); logoFor = null },
             onRestore = { model.setChannelLogo(target, null); logoFor = null },
             onCancel = { logoFor = null }

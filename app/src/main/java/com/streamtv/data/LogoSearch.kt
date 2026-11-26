@@ -23,17 +23,52 @@ object LogoSearch {
     /** The search sites answer an ordinary browser. */
     private const val Browser = "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-    suspend fun search(query: String, limit: Int = 10): List<String> = withContext(Dispatchers.IO) {
+    /** Country and language words of playlists ("UK", "AR", "French"...), as a search engine reads them. */
+    private val places = mapOf(
+        "uk" to "UK", "gb" to "UK", "us" to "USA", "usa" to "USA", "ca" to "Canada", "fr" to "France", "france" to "France",
+        "french" to "France", "be" to "Belgium", "nl" to "Netherlands", "de" to "Germany", "germany" to "Germany",
+        "german" to "Germany", "es" to "Spain", "spain" to "Spain", "it" to "Italy", "italy" to "Italy", "pt" to "Portugal",
+        "tr" to "Turkey", "turkey" to "Turkey", "turkish" to "Turkey", "in" to "India", "ar" to "Arabic", "arab" to "Arabic",
+        "arabic" to "Arabic", "ma" to "Morocco", "dz" to "Algeria", "tn" to "Tunisia", "eg" to "Egypt", "sa" to "Saudi Arabia",
+        "ae" to "UAE", "lb" to "Lebanon", "sy" to "Syria", "iq" to "Iraq", "kw" to "Kuwait", "qa" to "Qatar"
+    )
+    private val namePrefix = Regex("""^\s*[|\[(]?\s*([A-Za-z]{2,3})\s*[|\]):\-]+\s*""")
+    private val nameNoise = Regex("""[(\[].*?[)\]]|\b(hd|fhd|uhd|sd|4k|8k|hevc|h265|h264|backup|\d{3,4}p)\b""", RegexOption.IGNORE_CASE)
+
+    /**
+     * What is searched for a channel: its name without the playlist's extras ("AR: … FHD (1080p)"),
+     * said to be a TV channel's logo, with its country or language when the playlist tells it
+     * (its country, a prefix on the name, the first word of its group, or Arabic letters).
+     * "5Star" alone found hotels and stars; "5Star TV channel logo UK" finds the channel.
+     */
+    internal fun logoQuery(name: String, country: String, group: String): String {
+        val prefix = namePrefix.find(name)?.groupValues?.get(1)?.lowercase()?.takeIf { it in places }
+        val clean = (if (prefix != null) name.replaceFirst(namePrefix, "") else name)
+            .replace(nameNoise, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { name.trim() }
+        val place = places[country.trim().lowercase().split(Regex("""[^a-z]+""")).firstOrNull().orEmpty()]
+            ?: prefix?.let { places[it] }
+            ?: places[group.split('|', '-', ':', '/').first().trim().lowercase()]
+            ?: "Arabic".takeIf { name.any { it in '\u0600'..'\u06FF' } }
+        return listOfNotNull(clean, "TV channel logo", place).joinToString(" ")
+    }
+
+    /** True for a picture that is a PNG (often with a see-through background), by its address. */
+    private fun isPng(url: String) = url.substringBefore('?').endsWith(".png", ignoreCase = true)
+
+    suspend fun search(query: String, limit: Int = 10, country: String = "", group: String = ""): List<String> = withContext(Dispatchers.IO) {
         val name = query.trim()
         if (name.length < 2) return@withContext emptyList()
+        val web = logoQuery(name, country, group)
         coroutineScope {
-            val images = async { runCatching { duckDuckGo("$name logo", limit) }.getOrDefault(emptyList()) }
-            val bing = async { runCatching { bing("$name logo", limit) }.getOrDefault(emptyList()) }
+            val images = async { runCatching { duckDuckGo(web, limit) }.getOrDefault(emptyList()) }
+            val bing = async { runCatching { bing(web, limit) }.getOrDefault(emptyList()) }
             val wikis = listOf("commons.wikimedia.org", "en.wikipedia.org", "ar.wikipedia.org").map { host ->
                 async { runCatching { wiki(host, name, limit) }.getOrDefault(emptyList()) }
             }
             val found = LinkedHashSet<String>()
-            // The image search first; Bing only when DuckDuckGo gave nothing (they show the same pictures).
+            // The best iptv-org match first: its logos are kept up to date for the channel itself.
+            found += LogoIndex.search(name, 1)
+            // Then the image search; Bing only when DuckDuckGo gave nothing (they show the same pictures).
             found += images.await().take(limit)
             if (found.isEmpty()) found += bing.await().take(limit)
             // Then the logo databases, taken in turns so one does not fill every place.
@@ -159,15 +194,24 @@ object LogoSearch {
         val json = get("https://duckduckgo.com/i.js?l=wt-wt&o=json&q=$q&vqd=$vqd&f=,,,,,&p=1", Browser, "https://duckduckgo.com/")
             ?: return emptyList()
         val results = JSONObject(json).optJSONArray("results") ?: return emptyList()
-        val found = ArrayList<String>()
+        // A big PNG original keeps its see-through background and sharpness, so it comes first,
+        // itself; the rest as the small copy on Bing's own servers (a JPEG, but always reachable).
+        val found = ArrayList<Pair<Int, String>>()
         for (i in 0 until results.length()) {
             val item = results.optJSONObject(i) ?: continue
-            // The small copy on Bing's own servers: always reachable, unlike some original sites.
-            val picture = item.optString("thumbnail").ifBlank { item.optString("image") }
-            if (picture.startsWith("http")) found += picture
-            if (found.size >= limit) break
+            val original = item.optString("image")
+            val big = item.optInt("width") >= 200 && item.optInt("height") >= 100
+            val rank = when {
+                isPng(original) && big -> 0
+                isPng(original) -> 1
+                big -> 2
+                else -> 3
+            }
+            val picture = if (rank <= 1 && original.startsWith("https")) original
+                else item.optString("thumbnail").ifBlank { original }
+            if (picture.startsWith("http")) found += rank to picture
         }
-        return found
+        return found.sortedBy { it.first }.map { it.second }.take(limit)
     }
 
     private val bingThumb = Regex("""turl&quot;:&quot;(https?://[^&"]+)""")
