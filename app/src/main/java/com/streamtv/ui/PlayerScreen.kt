@@ -139,6 +139,27 @@ fun PlayerScreen(
     var autoRetries by remember { mutableIntStateOf(0) }
     var overlayState by remember { mutableStateOf(OverlayState.InfoBar) }
     var infoBarTick by remember { mutableIntStateOf(0) }
+    // The channel's sound tracks and subtitles, for the small buttons above the info bar: sound
+    // when there are two or more, subtitles when there are any. A second OK on the bar reaches them.
+    var liveSounds by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
+    var liveSubtitles by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
+    val trackButtons = listOfNotNull("audio".takeIf { liveSounds.size > 1 }, "subtitles".takeIf { liveSubtitles.isNotEmpty() })
+    // The button under the remote (-1: none), and the menu open above them ("audio", "subtitles" or null).
+    var trackButton by remember { mutableIntStateOf(-1) }
+    var trackMenu by remember { mutableStateOf<String?>(null) }
+    var trackMenuIndex by remember { mutableIntStateOf(0) }
+    /** Plays sound [index], or shows subtitles [index] (0: none, then the channel's subtitles). */
+    fun chooseTrack(menu: String, index: Int) {
+        val params = player.trackSelectionParameters.buildUpon()
+        if (menu == "audio") liveSounds.getOrNull(index)?.let {
+            params.setOverrideForType(androidx.media3.common.TrackSelectionOverride(it.mediaTrackGroup, 0))
+        } else if (index == 0) params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        else liveSubtitles.getOrNull(index - 1)?.let {
+            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(androidx.media3.common.TrackSelectionOverride(it.mediaTrackGroup, 0))
+        }
+        player.trackSelectionParameters = params.build()
+    }
     val playerFocusRequester = remember { FocusRequester() }
     val retryFocusRequester = remember { FocusRequester() }
     val currentChannelIndex = channels.indexOfFirst { it.key == channel.key }.coerceAtLeast(0)
@@ -258,6 +279,8 @@ fun PlayerScreen(
         retryJob[0]?.cancel()
         failed = false
         audioWarning = false
+        liveSounds = emptyList(); liveSubtitles = emptyList()
+        trackButton = -1; trackMenu = null
         buffering = true
         autoRetries = 0
         player.stop()
@@ -279,6 +302,8 @@ fun PlayerScreen(
                 } }
                 Log.i("STV-Audio", "${channel.name}: ${if (formats.isEmpty()) "no audio tracks" else formats.joinToString()}")
                 if (player.playbackState == Player.STATE_READY && audioGroups.isEmpty()) audioWarning = true
+                liveSounds = audioGroups.filter { it.isSupported }
+                liveSubtitles = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isSupported }
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -335,8 +360,10 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
-    LaunchedEffect(overlayState, infoBarTick) {
-        if (overlayState == OverlayState.InfoBar) {
+    // The bar stays up while the remote is on the sound/subtitle buttons or their menu.
+    val onTrackButtons = trackButton >= 0 || trackMenu != null
+    LaunchedEffect(overlayState, infoBarTick, onTrackButtons) {
+        if (overlayState == OverlayState.InfoBar && !onTrackButtons) {
             // With a guide the bar turns over to show it, so it stays two seconds longer.
             delay(if (current != null) InfoBarMillis + 2_000L else InfoBarMillis)
             if (overlayState == OverlayState.InfoBar) overlayState = OverlayState.None
@@ -382,6 +409,9 @@ fun PlayerScreen(
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastBack[0] < 300L) return
         lastBack[0] = now
+        // From the sound/subtitle menu back to its button, from the buttons back to the bar.
+        if (trackMenu != null) { trackMenu = null; return }
+        if (trackButton >= 0) { trackButton = -1; return }
         when (overlayState) {
             OverlayState.ChannelList -> backInList()
             OverlayState.InfoBar -> overlayState = OverlayState.None
@@ -405,7 +435,8 @@ fun PlayerScreen(
                             okShort[0] -> {
                                 okShort[0] = false
                                 // Short press only shows the info bar; favourites are in the hold-OK options.
-                                showInfoBar()
+                                // With the bar already up, it goes to the sound/subtitle buttons above it.
+                                if (overlayState == OverlayState.InfoBar && trackButtons.isNotEmpty()) trackButton = 0 else showInfoBar()
                                 true
                             }
                             else -> false
@@ -415,6 +446,33 @@ fun PlayerScreen(
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (listOpen) listTick++
+                // On the sound/subtitle buttons or their menu, the keys move there (Back goes through back()).
+                if (event.key != Key.Back && onTrackButtons) {
+                    val ok = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.ButtonSelect
+                    val first = event.nativeKeyEvent.repeatCount == 0
+                    val menu = trackMenu
+                    if (menu != null) {
+                        val rows = if (menu == "audio") liveSounds.size else liveSubtitles.size + 1
+                        when {
+                            event.key == Key.DirectionUp -> trackMenuIndex = (trackMenuIndex - 1).coerceAtLeast(0)
+                            event.key == Key.DirectionDown -> trackMenuIndex = (trackMenuIndex + 1).coerceAtMost((rows - 1).coerceAtLeast(0))
+                            ok && first -> { chooseTrack(menu, trackMenuIndex); trackMenu = null }
+                        }
+                    } else when {
+                        event.key == Key.DirectionLeft || event.key == Key.DirectionRight -> {
+                            val step = if ((event.key == Key.DirectionRight) != rtl) 1 else -1
+                            trackButton = (trackButton + step).coerceIn(0, (trackButtons.size - 1).coerceAtLeast(0))
+                        }
+                        ok && first -> trackButtons.getOrNull(trackButton)?.let { name ->
+                            trackMenu = name
+                            trackMenuIndex = if (name == "audio") liveSounds.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                                else liveSubtitles.indexOfFirst { it.isSelected } + 1
+                        }
+                        // Up or down leaves the buttons; channels change again from the next press.
+                        event.key == Key.DirectionUp || event.key == Key.DirectionDown -> trackButton = -1
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 when (event.key) {
                     // With the channel list open, CH+ / CH− page through it instead (handled by the list).
                     Key.ChannelUp -> if (listOpen) false else { zap(1, event.nativeKeyEvent.repeatCount > 0); true }
@@ -629,6 +687,42 @@ fun PlayerScreen(
                         Spacer(Modifier.width(14.dp))
                         ChannelLogo(channel.name, channel.logo, Modifier.size(width = 64.dp, height = 44.dp), fontSize = 18.sp)
                     }
+                    }
+                }
+            }
+        }
+
+        // Small see-through sound and subtitle buttons just above the bar, at its end; the menu
+        // of the one picked opens above them.
+        AnimatedVisibility(
+            visible = overlayState == OverlayState.InfoBar && trackButtons.isNotEmpty(),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 114.dp).fillMaxWidth(.65f),
+            enter = fadeIn(tween(220)), exit = fadeOut(tween(180))
+        ) {
+            val language = LocalAppLanguage.current
+            fun label(group: Tracks.Group, index: Int, word: String): String {
+                val format = group.getTrackFormat(0)
+                val code = format.language?.takeIf { it.isNotBlank() && it != "und" }
+                val name = format.label?.takeIf { it.isNotBlank() }
+                    ?: code?.let { java.util.Locale(it).getDisplayLanguage(java.util.Locale(language)).replaceFirstChar { c -> c.uppercase() } }
+                    ?: "$word ${index + 1}"
+                return if (group.type == C.TRACK_TYPE_AUDIO && format.channelCount >= 6) "$name 5.1" else name
+            }
+            val audioWord = t("Audio")
+            val subtitleWord = t("Subtitles")
+            Column(horizontalAlignment = Alignment.End) {
+                trackMenu?.let { menu ->
+                    if (menu == "audio") PlayerMenu(audioWord, liveSounds.mapIndexed { i, g -> MenuRow(label(g, i, audioWord), checked = g.isSelected) }, trackMenuIndex)
+                    else PlayerMenu(subtitleWord, listOf(MenuRow(t("Off"), checked = liveSubtitles.none { it.isSelected })) +
+                        liveSubtitles.mapIndexed { i, g -> MenuRow(label(g, i, subtitleWord), checked = g.isSelected) }, trackMenuIndex)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    trackButtons.forEachIndexed { index, name ->
+                        val lit = trackButton == index || trackMenu == name
+                        Box(Modifier.graphicsLayer { alpha = if (lit) 1f else .6f }) {
+                            RoundIconButton(name, selected = lit, on = name == "audio" || liveSubtitles.any { it.isSelected }, size = 30.dp)
+                        }
                     }
                 }
             }

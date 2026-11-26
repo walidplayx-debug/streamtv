@@ -105,7 +105,7 @@ private val ShadowStyle = TextStyle(shadow = Shadow(Color(0x99000000), Offset(0f
 private class TextTrack(val label: String, val language: String?, val group: androidx.media3.common.TrackGroup, val selected: Boolean)
 
 /** One row of a player menu: a choice (with a check mark when in use) or a way into a sub-menu. */
-private class MenuRow(val label: String, val detail: String? = null, val checked: Boolean = false, val opens: Boolean = false, val lineAbove: Boolean = false)
+internal class MenuRow(val label: String, val detail: String? = null, val checked: Boolean = false, val opens: Boolean = false, val lineAbove: Boolean = false)
 
 /** Fast-forward and rewind speeds 1 to 5: seconds of the title crossed per second. */
 private val ScrubSpeeds = longArrayOf(0L, 10_000L, 30_000L, 60_000L, 120_000L, 300_000L)
@@ -761,10 +761,10 @@ private fun sameLanguage(code: String?, app: String): Boolean {
  * subtitles. White with a dark mark while selected, an outlined ring otherwise.
  */
 @Composable
-private fun RoundIconButton(name: String, selected: Boolean, on: Boolean) {
+internal fun RoundIconButton(name: String, selected: Boolean, on: Boolean, size: androidx.compose.ui.unit.Dp = 40.dp) {
     val scale by animateFloatAsState(if (selected) 1.15f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "roundButton")
     val ink = if (selected) Color.Black else VodWhite
-    Canvas(Modifier.size(40.dp).scale(scale)) {
+    Canvas(Modifier.size(size).scale(scale)) {
         val w = size.width
         val h = size.height
         if (selected) drawCircle(VodWhite) else {
@@ -803,7 +803,7 @@ private fun RoundIconButton(name: String, selected: Boolean, on: Boolean) {
  * where in a long list it is.
  */
 @Composable
-private fun PlayerMenu(title: String, rows: List<MenuRow>, focused: Int) {
+internal fun PlayerMenu(title: String, rows: List<MenuRow>, focused: Int) {
     val visible = 5
     val start = (focused - visible / 2).coerceIn(0, (rows.size - visible).coerceAtLeast(0))
     Row(
