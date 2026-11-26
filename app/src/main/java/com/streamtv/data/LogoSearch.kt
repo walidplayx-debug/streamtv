@@ -37,9 +37,10 @@ object LogoSearch {
 
     /**
      * What is searched for a channel: its name without the playlist's extras ("AR: … FHD (1080p)"),
-     * said to be a TV channel's logo, with its country or language when the playlist tells it
+     * said to be a TV logo, with its country or language when the playlist tells it
      * (its country, a prefix on the name, the first word of its group, or Arabic letters).
-     * "5Star" alone found hotels and stars; "5Star TV channel logo UK" finds the channel.
+     * "5Star" alone found hotels and stars; "5Star TV logo UK" finds the channel. ("TV channel
+     * logo" brought made-up channel logos from picture banks instead.)
      */
     internal fun logoQuery(name: String, country: String, group: String): String {
         val prefix = namePrefix.find(name)?.groupValues?.get(1)?.lowercase()?.takeIf { it in places }
@@ -49,11 +50,8 @@ object LogoSearch {
             ?: prefix?.let { places[it] }
             ?: places[group.split('|', '-', ':', '/').first().trim().lowercase()]
             ?: "Arabic".takeIf { name.any { it in '\u0600'..'\u06FF' } }
-        return listOfNotNull(clean, "TV channel logo", place).joinToString(" ")
+        return listOfNotNull(clean, "TV logo", place).joinToString(" ")
     }
-
-    /** True for a picture that is a PNG (often with a see-through background), by its address. */
-    private fun isPng(url: String) = url.substringBefore('?').endsWith(".png", ignoreCase = true)
 
     suspend fun search(query: String, limit: Int = 10, country: String = "", group: String = ""): List<String> = withContext(Dispatchers.IO) {
         val name = query.trim()
@@ -66,9 +64,7 @@ object LogoSearch {
                 async { runCatching { wiki(host, name, limit) }.getOrDefault(emptyList()) }
             }
             val found = LinkedHashSet<String>()
-            // The best iptv-org match first: its logos are kept up to date for the channel itself.
-            found += LogoIndex.search(name, 1)
-            // Then the image search; Bing only when DuckDuckGo gave nothing (they show the same pictures).
+            // The image search first; Bing only when DuckDuckGo gave nothing (they show the same pictures).
             found += images.await().take(limit)
             if (found.isEmpty()) found += bing.await().take(limit)
             // Then the logo databases, taken in turns so one does not fill every place.
@@ -194,24 +190,15 @@ object LogoSearch {
         val json = get("https://duckduckgo.com/i.js?l=wt-wt&o=json&q=$q&vqd=$vqd&f=,,,,,&p=1", Browser, "https://duckduckgo.com/")
             ?: return emptyList()
         val results = JSONObject(json).optJSONArray("results") ?: return emptyList()
-        // A big PNG original keeps its see-through background and sharpness, so it comes first,
-        // itself; the rest as the small copy on Bing's own servers (a JPEG, but always reachable).
-        val found = ArrayList<Pair<Int, String>>()
+        val found = ArrayList<String>()
         for (i in 0 until results.length()) {
             val item = results.optJSONObject(i) ?: continue
-            val original = item.optString("image")
-            val big = item.optInt("width") >= 200 && item.optInt("height") >= 100
-            val rank = when {
-                isPng(original) && big -> 0
-                isPng(original) -> 1
-                big -> 2
-                else -> 3
-            }
-            val picture = if (rank <= 1 && original.startsWith("https")) original
-                else item.optString("thumbnail").ifBlank { original }
-            if (picture.startsWith("http")) found += rank to picture
+            // The small copy on Bing's own servers: always reachable, unlike some original sites.
+            val picture = item.optString("thumbnail").ifBlank { item.optString("image") }
+            if (picture.startsWith("http")) found += picture
+            if (found.size >= limit) break
         }
-        return found.sortedBy { it.first }.map { it.second }.take(limit)
+        return found
     }
 
     private val bingThumb = Regex("""turl&quot;:&quot;(https?://[^&"]+)""")
