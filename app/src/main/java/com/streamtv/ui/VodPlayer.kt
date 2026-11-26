@@ -761,10 +761,10 @@ private fun sameLanguage(code: String?, app: String): Boolean {
  * subtitles. White with a dark mark while selected, an outlined ring otherwise.
  */
 @Composable
-internal fun RoundIconButton(name: String, selected: Boolean, on: Boolean, size: androidx.compose.ui.unit.Dp = 40.dp) {
+internal fun RoundIconButton(name: String, selected: Boolean, on: Boolean, diameter: androidx.compose.ui.unit.Dp = 40.dp) {
     val scale by animateFloatAsState(if (selected) 1.15f else 1f, spring(dampingRatio = .7f, stiffness = 450f), label = "roundButton")
     val ink = if (selected) Color.Black else VodWhite
-    Canvas(Modifier.size(size).scale(scale)) {
+    Canvas(Modifier.size(diameter).scale(scale)) {
         val w = size.width
         val h = size.height
         if (selected) drawCircle(VodWhite) else {

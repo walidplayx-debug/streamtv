@@ -721,7 +721,7 @@ fun PlayerScreen(
                     trackButtons.forEachIndexed { index, name ->
                         val lit = trackButton == index || trackMenu == name
                         Box(Modifier.graphicsLayer { alpha = if (lit) 1f else .6f }) {
-                            RoundIconButton(name, selected = lit, on = name == "audio" || liveSubtitles.any { it.isSelected }, size = 30.dp)
+                            RoundIconButton(name, selected = lit, on = name == "audio" || liveSubtitles.any { it.isSelected }, diameter = 30.dp)
                         }
                     }
                 }
