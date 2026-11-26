@@ -132,7 +132,12 @@ fun PlayerScreen(
     val player = remember { Players.create(context) }
     // The sound in the app's language when a channel offers several (Arabic and English commentary, say).
     val soundLanguage = LocalAppLanguage.current
-    LaunchedEffect(player, soundLanguage) { Players.preferSound(player, soundLanguage) }
+    LaunchedEffect(player, soundLanguage) {
+        Players.preferSound(player, soundLanguage)
+        // Captions with no language (CEA-608) are always read, so the app knows whether any arrive;
+        // they show only once the viewer turns subtitles on.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().setSelectUndeterminedTextLanguage(true).build()
+    }
     var buffering by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var audioWarning by remember { mutableStateOf(false) }
@@ -142,7 +147,16 @@ fun PlayerScreen(
     // The channel's sound tracks and subtitles, for the small buttons above the info bar: sound
     // when there are two or more, subtitles when there are any. A second OK on the bar reaches them.
     var liveSounds by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
-    var liveSubtitles by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
+    var liveTextTracks by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
+    // Streams always list a caption slot (CEA-608), even with nothing in it: such a track counts
+    // only once text has really come on this channel. Tracks the stream names with a language count at once.
+    var captionsSeen by remember { mutableStateOf(false) }
+    val liveSubtitles = liveTextTracks.filter { group ->
+        val format = group.getTrackFormat(0)
+        captionsSeen || !format.label.isNullOrBlank() || format.language.let { !it.isNullOrBlank() && it != "und" }
+    }
+    // Subtitles on or off: the text is always read (see above), only shown when on. Kept between channels.
+    var subtitlesShown by remember { mutableStateOf(false) }
     val trackButtons = listOfNotNull("audio".takeIf { liveSounds.size > 1 }, "subtitles".takeIf { liveSubtitles.isNotEmpty() })
     // The button under the remote (-1: none), and the menu open above them ("audio", "subtitles" or null).
     var trackButton by remember { mutableIntStateOf(-1) }
@@ -153,8 +167,9 @@ fun PlayerScreen(
         val params = player.trackSelectionParameters.buildUpon()
         if (menu == "audio") liveSounds.getOrNull(index)?.let {
             params.setOverrideForType(androidx.media3.common.TrackSelectionOverride(it.mediaTrackGroup, 0))
-        } else if (index == 0) params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else if (index == 0) subtitlesShown = false
         else liveSubtitles.getOrNull(index - 1)?.let {
+            subtitlesShown = true
             params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                 .setOverrideForType(androidx.media3.common.TrackSelectionOverride(it.mediaTrackGroup, 0))
         }
@@ -279,7 +294,7 @@ fun PlayerScreen(
         retryJob[0]?.cancel()
         failed = false
         audioWarning = false
-        liveSounds = emptyList(); liveSubtitles = emptyList()
+        liveSounds = emptyList(); liveTextTracks = emptyList(); captionsSeen = false
         trackButton = -1; trackMenu = null
         buffering = true
         autoRetries = 0
@@ -300,6 +315,7 @@ fun PlayerScreen(
             // them off the side of the screen. Their lines are shown instead as one centred block,
             // wrapped, at the bottom, in the same size as on films. Pictures (DVB) are left as they are.
             override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
+                if (cueGroup.cues.any { !it.text.isNullOrBlank() || it.bitmap != null }) captionsSeen = true
                 val view = playerView[0]?.subtitleView ?: return
                 view.post {
                     val cues = player.currentCues.cues
@@ -317,7 +333,7 @@ fun PlayerScreen(
                 Log.i("STV-Audio", "${channel.name}: ${if (formats.isEmpty()) "no audio tracks" else formats.joinToString()}")
                 if (player.playbackState == Player.STATE_READY && audioGroups.isEmpty()) audioWarning = true
                 liveSounds = audioGroups.filter { it.isSupported }
-                liveSubtitles = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isSupported }
+                liveTextTracks = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isSupported }
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -374,6 +390,9 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
+    LaunchedEffect(subtitlesShown) {
+        playerView[0]?.subtitleView?.visibility = if (subtitlesShown) android.view.View.VISIBLE else android.view.View.GONE
+    }
     // Subtitles move up above the info bar (and its small buttons) while it shows.
     LaunchedEffect(overlayState) {
         playerView[0]?.subtitleView?.setBottomPaddingFraction(
@@ -486,7 +505,7 @@ fun PlayerScreen(
                         ok && first -> trackButtons.getOrNull(trackButton)?.let { name ->
                             trackMenu = name
                             trackMenuIndex = if (name == "audio") liveSounds.indexOfFirst { it.isSelected }.coerceAtLeast(0)
-                                else liveSubtitles.indexOfFirst { it.isSelected } + 1
+                                else if (subtitlesShown) liveSubtitles.indexOfFirst { it.isSelected } + 1 else 0
                         }
                         // Up or down leaves the buttons; channels change again from the next press.
                         event.key == Key.DirectionUp || event.key == Key.DirectionDown -> trackButton = -1
@@ -546,6 +565,7 @@ fun PlayerScreen(
             factory = {
                 PlayerView(it).apply {
                     playerView[0] = this
+                    subtitleView?.visibility = android.view.View.GONE
                     Players.styleSubtitles(this)
                     this.player = player
                     // The screen stays on while a channel is on screen, not while browsing menus.
@@ -734,15 +754,15 @@ fun PlayerScreen(
             Column(horizontalAlignment = Alignment.End) {
                 trackMenu?.let { menu ->
                     if (menu == "audio") PlayerMenu(audioWord, liveSounds.mapIndexed { i, g -> MenuRow(label(g, i, audioWord), checked = g.isSelected) }, trackMenuIndex)
-                    else PlayerMenu(subtitleWord, listOf(MenuRow(t("Off"), checked = liveSubtitles.none { it.isSelected })) +
-                        liveSubtitles.mapIndexed { i, g -> MenuRow(label(g, i, subtitleWord), checked = g.isSelected) }, trackMenuIndex)
+                    else PlayerMenu(subtitleWord, listOf(MenuRow(t("Off"), checked = !subtitlesShown)) +
+                        liveSubtitles.mapIndexed { i, g -> MenuRow(label(g, i, subtitleWord), checked = subtitlesShown && g.isSelected) }, trackMenuIndex)
                     Spacer(Modifier.height(8.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     trackButtons.forEachIndexed { index, name ->
                         val lit = trackButton == index || trackMenu == name
                         Box(Modifier.graphicsLayer { alpha = if (lit) 1f else .6f }) {
-                            RoundIconButton(name, selected = lit, on = name == "audio" || liveSubtitles.any { it.isSelected }, diameter = 30.dp)
+                            RoundIconButton(name, selected = lit, on = name == "audio" || subtitlesShown, diameter = 30.dp)
                         }
                     }
                 }
