@@ -23,43 +23,13 @@ object LogoSearch {
     /** The search sites answer an ordinary browser. */
     private const val Browser = "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-    /** Country and language words of playlists ("UK", "AR", "French"...), as a search engine reads them. */
-    private val places = mapOf(
-        "uk" to "UK", "gb" to "UK", "us" to "USA", "usa" to "USA", "ca" to "Canada", "fr" to "France", "france" to "France",
-        "french" to "France", "be" to "Belgium", "nl" to "Netherlands", "de" to "Germany", "germany" to "Germany",
-        "german" to "Germany", "es" to "Spain", "spain" to "Spain", "it" to "Italy", "italy" to "Italy", "pt" to "Portugal",
-        "tr" to "Turkey", "turkey" to "Turkey", "turkish" to "Turkey", "in" to "India", "ar" to "Arabic", "arab" to "Arabic",
-        "arabic" to "Arabic", "ma" to "Morocco", "dz" to "Algeria", "tn" to "Tunisia", "eg" to "Egypt", "sa" to "Saudi Arabia",
-        "ae" to "UAE", "lb" to "Lebanon", "sy" to "Syria", "iq" to "Iraq", "kw" to "Kuwait", "qa" to "Qatar"
-    )
-    private val namePrefix = Regex("""^\s*[|\[(]?\s*([A-Za-z]{2,3})\s*[|\]):\-]+\s*""")
-    private val nameNoise = Regex("""[(\[].*?[)\]]|\b(hd|fhd|uhd|sd|4k|8k|hevc|h265|h264|backup|\d{3,4}p)\b""", RegexOption.IGNORE_CASE)
-
-    /**
-     * What is searched for a channel: its name without the playlist's extras ("AR: … FHD (1080p)"),
-     * said to be a TV logo, with its country or language when the playlist tells it
-     * (its country, a prefix on the name, the first word of its group, or Arabic letters).
-     * "5Star" alone found hotels and stars; "5Star TV logo UK" finds the channel. ("TV channel
-     * logo" brought made-up channel logos from picture banks instead.)
-     */
-    internal fun logoQuery(name: String, country: String, group: String): String {
-        val prefix = namePrefix.find(name)?.groupValues?.get(1)?.lowercase()?.takeIf { it in places }
-        val clean = (if (prefix != null) name.replaceFirst(namePrefix, "") else name)
-            .replace(nameNoise, " ").replace(Regex("""\s+"""), " ").trim().ifBlank { name.trim() }
-        val place = places[country.trim().lowercase().split(Regex("""[^a-z]+""")).firstOrNull().orEmpty()]
-            ?: prefix?.let { places[it] }
-            ?: places[group.split('|', '-', ':', '/').first().trim().lowercase()]
-            ?: "Arabic".takeIf { name.any { it in '\u0600'..'\u06FF' } }
-        return listOfNotNull(clean, "TV logo", place).joinToString(" ")
-    }
-
-    suspend fun search(query: String, limit: Int = 10, country: String = "", group: String = ""): List<String> = withContext(Dispatchers.IO) {
+    suspend fun search(query: String, limit: Int = 10): List<String> = withContext(Dispatchers.IO) {
         val name = query.trim()
         if (name.length < 2) return@withContext emptyList()
-        val web = logoQuery(name, country, group)
         coroutineScope {
-            val images = async { runCatching { duckDuckGo(web, limit) }.getOrDefault(emptyList()) }
-            val bing = async { runCatching { bing(web, limit) }.getOrDefault(emptyList()) }
+            // "png" asks the image search for logo files (often see-through), not photos of the name.
+            val images = async { runCatching { duckDuckGo("$name logo png", limit) }.getOrDefault(emptyList()) }
+            val bing = async { runCatching { bing("$name logo png", limit) }.getOrDefault(emptyList()) }
             val wikis = listOf("commons.wikimedia.org", "en.wikipedia.org", "ar.wikipedia.org").map { host ->
                 async { runCatching { wiki(host, name, limit) }.getOrDefault(emptyList()) }
             }
