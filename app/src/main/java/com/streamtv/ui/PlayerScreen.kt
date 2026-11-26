@@ -292,8 +292,22 @@ fun PlayerScreen(
     // the newest versions of these (made for the channel now playing), not the first ones.
     val streamProblem by rememberUpdatedState(newValue = { onStreamProblem() })
     val restartNow by rememberUpdatedState(newValue = { restart() })
+    // The picture's view, for its subtitles.
+    val playerView = remember { arrayOfNulls<PlayerView>(1) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            // Live subtitles (CEA-608 above all) carry their own place, width and size, which threw
+            // them off the side of the screen. Their lines are shown instead as one centred block,
+            // wrapped, at the bottom, in the same size as on films. Pictures (DVB) are left as they are.
+            override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
+                val view = playerView[0]?.subtitleView ?: return
+                view.post {
+                    val cues = player.currentCues.cues
+                    if (cues.isNotEmpty() && cues.all { it.text != null }) view.setCues(listOf(
+                        androidx.media3.common.text.Cue.Builder().setText(cues.joinToString("\n") { it.text.toString().trim() }).build()
+                    ))
+                }
+            }
             override fun onTracksChanged(tracks: Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 val formats = audioGroups.flatMap { group -> (0 until group.length).map { index ->
@@ -360,6 +374,12 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
+    // Subtitles move up above the info bar (and its small buttons) while it shows.
+    LaunchedEffect(overlayState) {
+        playerView[0]?.subtitleView?.setBottomPaddingFraction(
+            if (overlayState == OverlayState.InfoBar) .29f else androidx.media3.ui.SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION
+        )
+    }
     // The bar stays up while the remote is on the sound/subtitle buttons or their menu.
     val onTrackButtons = trackButton >= 0 || trackMenu != null
     LaunchedEffect(overlayState, infoBarTick, onTrackButtons) {
@@ -525,6 +545,7 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = {
                 PlayerView(it).apply {
+                    playerView[0] = this
                     Players.styleSubtitles(this)
                     this.player = player
                     // The screen stays on while a channel is on screen, not while browsing menus.
