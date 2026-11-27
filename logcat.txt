@@ -1,0 +1,537 @@
+--------- beginning of main
+11-27 16:47:28.110  1123  4194 E native  : E0000 00:00:1795798048.110081    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:28.110  1123  4194 W native  : W0000 00:00:1795798048.110086    4194 state_manager_with_grpc_ipc.cc:74] IPC for StateManager.ReceiveStateUpdates closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:28.115  1123  4179 E chromium: [FTL:1123:4179:ERROR:action_processor.cc(537)] Module "feedback" tried to
+11-27 16:47:28.115  1123  4179 E chromium: shadow action_path "feedback.UPLOAD_CRASH_REPORT", but it is already registered
+11-27 16:47:28.115  1123  4179 E chromium: by "android_feedback"
+11-27 16:47:28.115  1123  4179 W chromium: [FTL:1123:4179:WARNING:publisher.cc(34)] No subscribers for event
+11-27 16:47:28.115  1123  4179 W chromium: "assistant.api.events.ConversationEvent" from publisher "S3Session"
+11-27 16:47:28.513  1123  1123 D RetryBindingHandler: Handle WHAT_RETRY_GET_LOCAL_CLOUDCAST_SERVICE_INFO message
+11-27 16:47:28.513  2398  2398 E cr_LocalGrpcAuthService: Calling package not allowed.
+11-27 16:47:28.514  1123  1123 E LocalGrpcAuthClientImpl: invalid message
+11-27 16:47:28.514  1123  1123 D RetryBindingHandler: retry get auth info
+11-27 16:47:28.514  1123  1123 D RetryBindingHandler: send message in 2000 ms
+11-27 16:47:28.514  1123  1123 E cr_AssistantManagerInternal$AssistantLocalGrpcAuthCallback: the port or token cannot be retrieved from local grpc client
+11-27 16:47:28.640  4144  4144 I dex2oat32: Explicit concurrent copying GC freed 213786(29MB) AllocSpace objects, 0(0B) LOS objects, 49% free, 3128KB/6257KB, paused 12us total 9.307ms
+11-27 16:47:28.666  4144  4144 W dex2oat32: Accessing hidden method Landroid/app/AppComponentFactory;-><clinit>()V (blacklist, linking, denied)
+11-27 16:47:28.666  4144  4144 W dex2oat32: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/Rect;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+11-27 16:47:28.666  4144  4144 W dex2oat32: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/RectF;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+11-27 16:47:28.667  4144  4144 W dex2oat32: Accessing hidden method Landroid/view/accessibility/AccessibilityNodeInfo;->setExtraRenderingInfo(Landroid/view/accessibility/AccessibilityNodeInfo$ExtraRenderingInfo;)V (blacklist, linking, denied)
+11-27 16:47:29.110  1123  4194 D BindingManager: with
+11-27 16:47:29.111  2398  2398 W cr_GrpcIpcUidPolicy: Signaure hash T3FWTW4FrfZGfnxVLvvYYYrf02Ws4NZTsvI808lwDxA= not in whitelisted signatures
+11-27 16:47:29.111  2398  2398 E cr_GrpcIpcUidPolicy: Unauthorized access attempt from com.google.android.katniss
+11-27 16:47:29.111  2398  2398 E cr_GrpcIpcSocketService: Calling package not allowed.
+11-27 16:47:29.111  1123  1123 E GrpcIpcSocketClientImpl: invalid message
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111280    4194 grpc_ipc_socket_client.cc:77] Error for usonia-ipc-socket
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111300    4194 android_grpc_builder.cc:149] Could not get a socket for binder:com.google.android.apps.mediashell:usonia-ipc-socket
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111311    4194 grpc_manager_impl.cc:634] GRPC[uri=]: Grpc cannot connect to host {UNDEFINED}
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111319    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111363    4194 grpc_auth_manager_with_grpc_ipc.cc:65] IPC for Auth.AuthReadyStreaming closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111372    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111376    4194 distributed_service_discovery_with_grpc_ipc.cc:150] IPC for DistributedServiceDiscovery.AddService closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111383    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111387    4194 distributed_service_discovery_with_grpc_ipc.cc:64] IPC for DistributedServiceDiscovery.UpdateObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111393    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111397    4194 distributed_service_discovery_with_grpc_ipc.cc:251] IPC for DistributedServiceDiscovery.GetIamMode closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111403    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111407    4194 metrics_recorder_with_grpc_ipc.cc:164] IPC for MetricsRecorder.RecordMetrics closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111412    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111416    4194 synchronous_sound_player_with_grpc_ipc.cc:173] IPC for SynchronousSoundPlayer.UpdateSound closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111422    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111426    4194 ipc_common.h:486] Error in fetching local device info: [error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111432    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111436    4194 directory_service_with_grpc_ipc.cc:123] IPC for DirectoryService.ObserveCommonTime closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111442    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111555    4194 directory_service_with_grpc_ipc.cc:277] IPC for DirectoryService.UpdateStateObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111565    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111570    4194 directory_service_with_grpc_ipc.cc:378] IPC for DirectoryService.UpdateMessageObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 E native  : E0000 00:00:1795798049.111575    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.111  1123  4194 W native  : W0000 00:00:1795798049.111580    4194 state_manager_with_grpc_ipc.cc:74] IPC for StateManager.ReceiveStateUpdates closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:29.178  3613  3676 I ChimeraSrvcProxy: NullBinder for com.google.android.gms.languageprofile.service.START triggering remote TransactionTooLargeException due to Service without Chimera impl
+11-27 16:47:29.187  1820  1917 E JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel size = 556)
+11-27 16:47:29.187  1820  1917 W GmsClient: IGmsServiceBroker.getService failed
+11-27 16:47:29.187  1820  1917 W GmsClient: android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.BinderProxy.transactNative(Native Method)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.BinderProxy.transact(BinderProxy.java:540)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at qjo.v(PG:14)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at qhf.run(PG:5)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.Handler.handleCallback(Handler.java:938)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.187  1820  1917 W GmsClient: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+11-27 16:47:29.250  4144  4144 I dex2oat32: dex2oat took 7.427s (10.568s cpu) (threads: 2) arena alloc=6687KB (6847784B) java alloc=3144KB (3220256B) native alloc=57MB (60576016B) free=33MB (34749280B)
+11-27 16:47:29.262   381   381 V installd: DexInv: --- END '/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/base.apk' (success) ---
+11-27 16:47:29.266   381   381 E installd: Couldn't opendir /data/app/vmdl574373908.tmp: No such file or directory
+11-27 16:47:29.266   381   381 E installd: Failed to delete /data/app/vmdl574373908.tmp: No such file or directory
+--------- beginning of system
+11-27 16:47:29.266   472   525 I ActivityManager: Force stopping com.android.vending appid=10056 user=0: pkg removed
+11-27 16:47:29.269  1169  1169 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.android.vending. Reason: package android.intent.action.PACKAGE_REMOVED
+11-27 16:47:29.269   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.impl.PackageMonitorReceiverImpl$RegisteredReceiver
+11-27 16:47:29.269   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemonitor.backgroundimpl.BackgroundPackageMonitorReceiverImpl$RegisteredReceiver
+11-27 16:47:29.269   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+11-27 16:47:29.269   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+11-27 16:47:29.269   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.tv/com.android.tv.receiver.PackageIntentsReceiver
+11-27 16:47:29.271   472   525 I ActivityManager: Force stopping com.android.vending appid=10056 user=0: pkg removed
+11-27 16:47:29.271   472   556 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+11-27 16:47:29.272   667   667 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_REMOVED
+11-27 16:47:29.290   472   509 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10056; state: DISABLED
+11-27 16:47:29.291  1169  1169 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.android.vending. Reason: package android.intent.action.PACKAGE_ADDED
+11-27 16:47:29.294   472   500 I RoleManagerService: Granting default roles...
+11-27 16:47:29.296   472   510 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10056; state: ENABLED
+11-27 16:47:29.297   472   556 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+11-27 16:47:29.299   667   667 V AvrcpMediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_ADDED
+11-27 16:47:29.299   667   667 D AvrcpMediaPlayerList: Name of package changed: com.android.vending
+11-27 16:47:29.301   263   263 D Zygote  : Forked child process 4229
+11-27 16:47:29.306   472   510 I ActivityManager: Start proc 4229:com.android.vending/u0a56 for broadcast {com.android.vending/com.google.android.finsky.packagemonitor.impl.PackageMonitorReceiverImpl$RegisteredReceiver}
+11-27 16:47:29.307   472   556 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS | 
+11-27 16:47:29.311   701   723 I PermissionControllerServiceImpl: Updating user sensitive for uid 10056
+11-27 16:47:29.318   472   508 W TextServicesManagerService: no available spell checker services found
+11-27 16:47:29.322  4229  4229 W android.vendin: Unexpected CPU variant for X86 using defaults: x86
+11-27 16:47:29.323  4229  4229 E android.vendin: Not starting debugger since process cannot load the jdwp agent.
+11-27 16:47:29.325   472   508 W Searchables: No web search activity found
+11-27 16:47:29.338  4229  4229 I android.vendin: The ClassLoaderContext is a special shared library.
+11-27 16:47:29.340  3613  4237 I PackageIntentOperation: Feature flags not enabled, skipping. [CONTEXT service_id=258 ]
+11-27 16:47:29.342   701  4239 W Role    : Cannot get ApplicationInfo for default holder: com.android.messaging
+11-27 16:47:29.345   701  4239 W Role    : Cannot get ApplicationInfo for default holder: com.android.gallery3d
+11-27 16:47:29.351  3613  4257 W SQLiteLog: (28) double-quoted string literal: "com.android.vending"
+11-27 16:47:29.353  4229  4229 I android.vendin: The ClassLoaderContext is a special shared library.
+11-27 16:47:29.353  4229  4229 D nativeloader: classloader namespace configured for unbundled vendor apk. library_path=/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/base.apk!/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/split_config.en.apk!/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/split_config.x86.apk!/lib/x86:/vendor/lib
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:2)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:7)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.373  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.376   472   508 W Searchables: No web search activity found
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.f(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nkk.a(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nkk.m(PG:1)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:20)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.377  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.379  3613  4274 I Auth    : [SupervisedAccountIntentOperation] onHandleIntent(): android.intent.action.PACKAGE_ADDED
+11-27 16:47:29.379  3613  4274 I PackageIntentOperation: Feature flags not enabled, skipping. [CONTEXT service_id=258 ]
+11-27 16:47:29.386  4229  4229 W android.vendin: JIT profile information will not be recorded: profile file does not exist.
+11-27 16:47:29.386  4229  4229 W android.vendin: JIT profile information will not be recorded: profile file does not exist.
+11-27 16:47:29.395  3613  3613 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.395  3613  3613 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:2)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.396  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:7)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.397  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: Source not found for package: com.netflix.ninja
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: android.content.pm.PackageManager$NameNotFoundException: com.netflix.ninja
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:206)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:178)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nkm.a(PG:4)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aogn.next(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:2)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.a(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aofv.hasNext(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.e(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at aogk.a(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.q(PG:6)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.f(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nkk.a(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nkk.m(PG:1)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at nko.p(PG:20)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at mua.handleMessage(PG:133)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Handler.dispatchMessage(Handler.java:106)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at android.os.Looper.loop(Looper.java:223)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at java.lang.reflect.Method.invoke(Native Method)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:592)
+11-27 16:47:29.398  1820  1820 W katniss_search_CloudSearchableSources: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:947)
+11-27 16:47:29.400  3613  3613 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.402  3613  3613 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.402  3613  3613 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.405  3613  3613 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+11-27 16:47:29.405  3613  4244 I PhoneskyRecoveryLogs: (REDACTED) No recent notifications shown - organic recovery
+11-27 16:47:29.410  4229  4229 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+11-27 16:47:29.410  4229  4229 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+11-27 16:47:29.417  4229  4229 I Finsky  : [2] Process created at version: 54.0.07-24 [8] [PR] 1014032237
+11-27 16:47:29.418  1336  4272 D DownloadManager: [1] Already finished; skipping
+11-27 16:47:29.434  3613  3623 I gle.android.gm: Background concurrent copying GC freed 31769(1558KB) AllocSpace objects, 14(472KB) LOS objects, 49% free, 8952KB/17MB, paused 16us total 156.879ms
+11-27 16:47:29.459  4229  4297 I Finsky  : [306] Finished reading experiment flags from file [0tGUNCGIkbk4o6-fQ335kUYSKwVj4lusnHT-A5Dsy08] numFlags=1103.
+11-27 16:47:29.461  4229  4296 W Finsky  : [305] Failed to get the task info for cold start.
+11-27 16:47:29.461  4229  4296 I Finsky  : [305] Process started for unknown session.
+11-27 16:47:29.469  4229  4297 I Finsky  : [306] Finished reading experiment flags from file [Se-xCc4LzNyh3UrKMIU2sUf-PUKz4oQEbpKZDMuaFno] numFlags=1507.
+11-27 16:47:29.473  1012  4235 I akwz    : Scheduling Phenotype for a PhenotypeSyncImmediately(7, com.google.android.gms.clearcut_client#com.android.vending) one off with window [1, 2] in seconds [CONTEXT service_id=51 ]
+11-27 16:47:29.473  3613  3670 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+11-27 16:47:29.496  4229  4229 I Finsky  : [2] Profiling: Starting up (0)
+11-27 16:47:29.499  3613  3640 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+11-27 16:47:29.502  3613  3704 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+11-27 16:47:29.508  3613  3640 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+11-27 16:47:29.508  3613  3640 I Icing   : Indexing com.google.android.gms-apps from com.google.android.gms
+11-27 16:47:29.533  4229  4296 I Finsky  : [305] Subscription detail: N/A
+11-27 16:47:29.535  4229  4296 I Finsky  : [305] thx - Registering in memory receiver for android.intent.action.PACKAGE_ADDED and android.intent.action.PACKAGE_REMOVED
+11-27 16:47:29.539  1012  1026 I .gms.persisten: Background concurrent copying GC freed 259684(11MB) AllocSpace objects, 11(384KB) LOS objects, 49% free, 8866KB/17MB, paused 83us total 109.672ms
+11-27 16:47:29.540  1012  1028 W System  : A resource failed to call close. 
+11-27 16:47:29.541  1012  1028 W System  : A resource failed to call end. 
+11-27 16:47:29.541  1012  1028 W System  : A resource failed to call close. 
+11-27 16:47:29.547  4229  4296 I Finsky  : [305] Diff system or version, clear token
+11-27 16:47:29.579  4229  4229 I Finsky  : [2] Scheduling 8 in onApplicationCreate
+11-27 16:47:29.581  4229  4229 I TetheringManager: registerTetheringEventCallback:com.android.vending
+11-27 16:47:29.581  4229  4229 W Settings: Setting download_manager_max_bytes_over_mobile has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+11-27 16:47:29.582  4229  4229 I Finsky  : [2] SettingNotFoundException for download_manager_max_bytes_over_mobile
+11-27 16:47:29.582  4229  4229 W Settings: Setting download_manager_recommended_max_bytes_over_mobile has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+11-27 16:47:29.582  4229  4229 I Finsky  : [2] SettingNotFoundException for download_manager_recommended_max_bytes_over_mobile
+11-27 16:47:29.587  4229  4258 I Finsky  : [301] This process start was not selected for Play memory metrics collection.
+11-27 16:47:29.590  4229  4229 I Finsky  : [2] SCH: Deleting scheduler db
+11-27 16:47:29.601  4229  4229 I Finsky  : [2] Resetting scheduler db
+11-27 16:47:29.601   472   514 E libprocessgroup: AddTidToCgroup failed to write '4321'; fd=112: Invalid argument
+11-27 16:47:29.601   472   514 E libprocessgroup: Failed to add task into cgroup
+11-27 16:47:29.601   472   514 W libprocessgroup: ExecuteForTask failed for aggregate profile: Invalid argument
+11-27 16:47:29.602  4229  4229 I Finsky  : [2] SCH: Received scheduling request: Id: 1-1337, Constraints: [{ L: 0, D: 37494135, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+11-27 16:47:29.603  4229  4229 I Finsky  : [2] thx - Received: android.intent.action.PACKAGE_REMOVED, [a8VgBSAH37RIbzeNtwhTjxcPdxI8hJhyAfR8ww2ZQWk]
+11-27 16:47:29.605  4229  4296 I Finsky  : [305] Diff app version, maybe clear cache
+11-27 16:47:29.605  4229  4296 I Finsky  : [305] CronetEngine is not present. Falling back to the OkHttp networking stack.
+11-27 16:47:29.608  4229  4296 I Finsky  : [305] playLoggingServerUrl: https://play.googleapis.com/play/log
+11-27 16:47:29.608  4229  4296 I Finsky  : [305] playLoggingServerTimestampUrl: https://play.googleapis.com/play/log/timestamp
+11-27 16:47:29.618  4229  4322 D Volley  : [328] aazp.b: Cache cleared.
+11-27 16:47:29.622  4229  4321 I Phlogger: Unable to retrieve flag snapshot for com.google.android.gms.gmscompliance_client#com.android.vending, using defaults.
+11-27 16:47:29.624  4229  4298 I Finsky  : [307] Initializing pausers from value store.
+11-27 16:47:29.625  4229  4258 W DynamiteModule: Local module descriptor class for com.google.android.gms.googlecertificates not found.
+11-27 16:47:29.641  3613  3640 I Icing   : Indexing done com.google.android.gms-apps
+11-27 16:47:29.642  4229  4229 I Finsky  : [2] VerifyApps: Setup app restrictions monitor
+11-27 16:47:29.642  3613  3640 I Icing   : Indexing com.google.android.gms-internal.3p:MobileApplication from com.google.android.gms
+11-27 16:47:29.643  4229  4296 I Finsky  : [305] CronetEngine is not present. Falling back to the OkHttp networking stack.
+11-27 16:47:29.643  3613  3640 I Icing   : Indexing done com.google.android.gms-internal.3p:MobileApplication
+11-27 16:47:29.643  4229  4229 I Finsky  : [2] VerifyApps: Device wide unknown source restriction updated
+11-27 16:47:29.644  4229  4333 D Volley  : [338] aazp.b: Cache cleared.
+11-27 16:47:29.650  4229  4311 I Finsky  : [320] Successfully cleared Stream data store DB via deleteDatabase: /data/user/0/com.android.vending/cache/streamdatastore/streamdatastore.db
+11-27 16:47:29.659  3613  3640 I Icing   : Indexing com.google.android.gms-apps from com.google.android.gms
+11-27 16:47:29.659  3613  3640 I Icing   : Indexing done com.google.android.gms-apps
+11-27 16:47:29.662  4229  4298 I Finsky  : [307] IQ::HLD: Callers (Pausers) in PauseUpdatesCallersValueStore: []
+11-27 16:47:29.663  4229  4229 I Finsky  : [2] VerifyApps: Updating ADI Warn Mode activity enabled state
+11-27 16:47:29.663  4229  4333 D Volley  : [338] aazp.b: Cache cleared.
+11-27 16:47:29.664  4229  4322 D Volley  : [328] aazp.b: Cache cleared.
+11-27 16:47:29.667  4229  4229 I Finsky  : [2] AIM: AppInfoCacheUpdater -> invalidating apps: [com.android.vending]
+11-27 16:47:29.667  4229  4229 I Finsky  : [2] AIM: AppInfoManager-Perf > Creating AppInfoManager ...
+11-27 16:47:29.678  4229  4258 I DynamiteModule: Considering local module com.google.android.gms.googlecertificates:0 and remote module com.google.android.gms.googlecertificates:7
+11-27 16:47:29.678  4229  4258 I DynamiteModule: Selected remote version of com.google.android.gms.googlecertificates, version >= 7
+11-27 16:47:29.681  4229  4229 I Finsky  : [2] AIM: AppInfoManager-Perf > getApps > called for 1 apps
+11-27 16:47:29.686  4229  4297 I Finsky  : [306] RECEIVER_PACKAGE_MONITOR#logWorkEndAndFinishGoAsync: SUCCESS
+11-27 16:47:29.689  4229  4311 I Finsky  : [320] VerifyApps: Resolving target for ADI Warn Mode activity
+11-27 16:47:29.690  4229  4311 I Finsky  : [320] VerifyApps: Feature flag disabled, ADI Warn Mode activity target not resolved
+11-27 16:47:29.690  4229  4309 I Finsky  : [318] Successfully cleared Stream data store DB via deleteDatabase: /data/user/0/com.android.vending/cache/streamdatastore/streamdatastore.db
+11-27 16:47:29.691  4229  4311 I Finsky  : [320] VerifyApps: Successfully updated the ADI Warn Mode activity to disabled
+11-27 16:47:29.691  4229  4311 I Finsky  : [320] VerifyApps: Successfully updated Oppo ADI Warn Mode aliases to default
+11-27 16:47:29.694  4229  4311 I Finsky  : [320] AIM: AppInfoManager-Perf > OnDeviceAppInfo > cacheHitCount=0, cacheMissCount=1. Missed  in cache (limit 10) : [com.android.vending]
+11-27 16:47:29.694  4229  4311 I Finsky  : [320] Enqueuing libraries load for 0
+11-27 16:47:29.695   472   766 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10056; state: DISABLED
+11-27 16:47:29.695   472   510 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10056; state: ENABLED
+11-27 16:47:29.700   263   263 D Zygote  : Forked child process 4350
+11-27 16:47:29.700   472   510 I ActivityManager: Start proc 4350:com.android.vending:background/u0a56 for service {com.android.vending/com.google.frameworks.client.data.android.server.play.BackgroundProcessEndpointService}
+11-27 16:47:29.703  4229  4296 E Finsky  : [305] Failed refreshing cache rebuild with error: java.lang.IllegalStateException: Trying to refresh recommendations for null or empty account.
+11-27 16:47:29.703  4350  4350 W ding:backgroun: Unexpected CPU variant for X86 using defaults: x86
+11-27 16:47:29.706  4350  4350 E ding:backgroun: Not starting debugger since process cannot load the jdwp agent.
+11-27 16:47:29.707  4229  4311 I Finsky  : [320] SCH: no pending jobs to schedule.
+11-27 16:47:29.708  4229  4320 I Finsky  : [326] SCH: Received scheduling request: Id: 12-1, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+11-27 16:47:29.709  4229  4309 I Finsky  : [318] Starting libraries load for 0
+11-27 16:47:29.710  4229  4315 I Finsky  : [321] Successfully cleared Stream data store DB via deleteDatabase: /data/user/0/com.android.vending/cache/streamdatastore/streamdatastore.db
+11-27 16:47:29.714  4350  4350 I ding:backgroun: The ClassLoaderContext is a special shared library.
+11-27 16:47:29.715  4350  4350 I ding:backgroun: The ClassLoaderContext is a special shared library.
+11-27 16:47:29.715  4350  4350 D nativeloader: classloader namespace configured for unbundled vendor apk. library_path=/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/base.apk!/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/split_config.en.apk!/lib/x86:/data/app/~~IZxaEPsUB3mklFBUOA3Gow==/com.android.vending-ZtLdPWjlS_YBvAbBK5a14A==/split_config.x86.apk!/lib/x86:/vendor/lib
+11-27 16:47:29.728  4350  4350 W ding:backgroun: JIT profile information will not be recorded: profile file does not exist.
+11-27 16:47:29.728  4350  4350 W ding:backgroun: JIT profile information will not be recorded: profile file does not exist.
+11-27 16:47:29.730  4350  4350 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+11-27 16:47:29.730  4350  4350 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+11-27 16:47:29.733  4229  4309 I Finsky  : [318] Finished loading 0 libraries.
+11-27 16:47:29.735  4229  4309 I Finsky  : [318] AIM: Got app ownership map. App counts: . Unique apps: 0
+11-27 16:47:29.736  4229  4309 E Finsky  : [318] [Counters] attempted to use a non-positive increment for: 4752
+11-27 16:47:29.739  4350  4350 I Finsky:background: [2] Process created at version: 54.0.07-24 [8] [PR] 1014032237
+11-27 16:47:29.742  4350  4350 I Finsky:background: [2] [BGP] Initializing early flags...
+11-27 16:47:29.742  4350  4350 I Finsky:background: [2] [BGP] Initializing Gservices...
+11-27 16:47:29.742  4350  4350 I Finsky:background: [2] [BGP] Initializing flags...
+11-27 16:47:29.744  4229  4296 E Finsky  : [305] Failed refreshing cache rebuild with error: java.lang.IllegalStateException: Trying to refresh recommendations for null or empty account.
+11-27 16:47:29.747  4350  4350 I Finsky:background: [2] Finished reading experiment flags from file [0tGUNCGIkbk4o6-fQ335kUYSKwVj4lusnHT-A5Dsy08] numFlags=1103.
+11-27 16:47:29.749  4229  4309 E Finsky  : [318] [Counters] attempted to use a non-positive increment for: 4753
+11-27 16:47:29.752  4229  4315 I Finsky  : [321] AIM: AppInfoManager-Perf > ItemModel > CacheSize=0, cacheHitCount=0, cacheMissCount=1, total appsWithNoServerDataCount=0. Missed  in cache (limit 10) : [com.android.vending]
+11-27 16:47:29.752  4229  4315 I Finsky  : [321] Created new item store.
+11-27 16:47:29.752  4229  4315 I Finsky  : [321] AIM: AppInfoManager-Perf > ItemModel > ItemStore Called 1 apps cacheOptions = REFRESH_LOCAL_CACHE
+11-27 16:47:29.764  4350  4350 I Finsky:background: [2] Finished reading experiment flags from file [Se-xCc4LzNyh3UrKMIU2sUf-PUKz4oQEbpKZDMuaFno] numFlags=1507.
+11-27 16:47:29.765  4350  4350 I Finsky:background: [2] [BGP] Initializing crash detector...
+11-27 16:47:29.766  4350  4350 I Finsky:background: [2] thn - Registering in memory receiver for android.intent.action.PACKAGE_ADDED and android.intent.action.PACKAGE_REMOVED
+11-27 16:47:29.769  4229  4315 I Finsky  : [321] ItemStore: Not cached: com.android.vending
+11-27 16:47:29.776  4350  4350 I Endpoint: Created gRPC endpoint for service class com.google.frameworks.client.data.android.server.play.BackgroundProcessEndpointService
+11-27 16:47:29.780  4350  4350 I Finsky:background: [2] This process start was not selected for Play memory metrics collection.
+11-27 16:47:29.783  4229  4305 I Finsky  : [314] WM::SCH: Logging work initialize for 1-1337
+11-27 16:47:29.787  4350  4350 I Finsky:background: [2] thn - Received: android.intent.action.PACKAGE_REMOVED, [a8VgBSAH37RIbzeNtwhTjxcPdxI8hJhyAfR8ww2ZQWk]
+11-27 16:47:29.795  4229  4311 I Finsky  : [320] SCH: Scheduling phonesky job Id: 1-1337, CT: 1795798049602, Constraints: [{ L: 0, D: 37494135, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }, { L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }]
+11-27 16:47:29.796  4229  4300 I Finsky  : [309] WM::SCH: Logging work initialize for 12-1
+11-27 16:47:29.819  4350  4382 I Finsky:background: [319] RECEIVER_PACKAGE_MONITOR_BACKGROUND#logWorkEndAndFinishGoAsync: SUCCESS
+11-27 16:47:29.819   472  1325 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.packageinstaller/com.android.packageinstaller.PackageInstalledReceiver
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.tv/com.android.tv.receiver.PackageIntentsReceiver
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+11-27 16:47:29.820   472   509 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED dat=package:com.android.vending flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+11-27 16:47:29.821  4229  4229 I Finsky  : [2] thx - Received: android.intent.action.MY_PACKAGE_REPLACED
+11-27 16:47:29.824  4229  4297 I Finsky  : [306] SCH: Received scheduling request: Id: 37-0, Constraints: [{ L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }]
+11-27 16:47:29.825  4229  4229 I Finsky  : [2] SU: Package has been replaced, self-update succeeded with install reason 19.
+11-27 16:47:29.826  4229  4296 I Finsky  : [305] RECEIVER_PACKAGE_MONITOR#logWorkEndAndFinishGoAsync: SUCCESS
+11-27 16:47:29.829  4350  4350 I Finsky:background: [2] thn - Received: android.intent.action.MY_PACKAGE_REPLACED
+11-27 16:47:29.829  4229  4311 I Finsky  : [320] SCH: Scheduling 2 system job(s)
+11-27 16:47:29.830  4350  4382 I Finsky:background: [319] RECEIVER_PACKAGE_MONITOR_BACKGROUND#logWorkEndAndFinishGoAsync: SUCCESS
+11-27 16:47:29.832  4229  4296 I Finsky  : [305] RECEIVER_SINGLE_USER_SETTINGS#logWorkEndAndFinishGoAsync: SUCCESS
+11-27 16:47:29.836  4229  4311 I Finsky  : [320] SCH: Scheduling system job Id: 9112, L: 0, D: 0, C: false, I: false, N: 0
+11-27 16:47:29.836  4350  4381 I Finsky:background: [318] IQ:PSL: skipping onPackageRemoved(replacing=true) for untracked package=com.android.vending
+11-27 16:47:29.839  4229  4315 I Finsky  : [321] AIM: ItemModel fetch - unauth(1), auth()
+11-27 16:47:29.840  4229  4301 I Finsky  : [310] WM::SCH: Logging work initialize for 37-0
+11-27 16:47:29.843  4229  4311 I Finsky  : [320] SCH: Scheduling system job Id: 9115, L: 0, D: 37493894, C: false, I: false, N: 1
+11-27 16:47:29.846  4229  4229 I Finsky  : [2] SCH: job service start with id 9112.
+11-27 16:47:29.847  4229  4229 I Finsky  : [2] SCH: job service start with id 9115.
+11-27 16:47:29.850  4350  4387 I TetheringManager: registerTetheringEventCallback:com.android.vending
+11-27 16:47:29.851  4350  4387 W Settings: Setting download_manager_max_bytes_over_mobile has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+11-27 16:47:29.851  4350  4387 I Finsky:background: [323] SettingNotFoundException for download_manager_max_bytes_over_mobile
+11-27 16:47:29.851  4350  4387 W Settings: Setting download_manager_recommended_max_bytes_over_mobile has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+11-27 16:47:29.852  4350  4387 I Finsky:background: [323] SettingNotFoundException for download_manager_recommended_max_bytes_over_mobile
+11-27 16:47:29.855  4229  4323 I Finsky  : [329] ApplicationRestrictions: {}
+11-27 16:47:29.855  4229  4311 I Finsky  : [320] SCH: Scheduling phonesky job Id: 12-1, CT: 1795798049708, Constraints: [{ L: 15000, D: 86400000, C: CHARGING_NONE, I: IDLE_NONE, N: NET_ANY, B: BATTERY_ANY }]
+11-27 16:47:29.858  4229  4311 I Finsky  : [320] SCH: Scheduling 0 system job(s)
+11-27 16:47:29.859  4229  4311 I Finsky  : [320] [ContentSync] finished, scheduled=true
+11-27 16:47:29.859  4229  4311 I Finsky  : [320] SCH: Scheduling phonesky job Id: 37-0, CT: 1795798049824, Constraints: [{ L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }, { L: 0, D: 0, C: CHARGING_NONE, I: IDLE_NONE, N: NET_NONE, B: BATTERY_ANY }]
+11-27 16:47:29.860  4350  4393 I Finsky:background: [327] Wrote row to frosting DB: 104
+11-27 16:47:29.860  4229  4320 I Finsky  : [326] SCH: Satisfied jobs for 9112 are: 1-1337, 37-0
+11-27 16:47:29.861  4229  4397 I Finsky  : [363] SCH: Job 1-1337 starting
+11-27 16:47:29.862  4229  4229 I Finsky  : [2] WM::SCH: Logging work start for 1-1337
+11-27 16:47:29.862  4229  4229 I Finsky  : [2] DailyHygiene Holdoff skipped
+11-27 16:47:29.862  4229  4320 I Finsky  : [326] SCH: Satisfied jobs for 9115 are: 1-1337
+11-27 16:47:29.863  4229  4311 I Finsky  : [320] SCH: Scheduling 0 system job(s)
+11-27 16:47:29.865  4229  4229 I Finsky  : [2] HC: Starting Hygiene for reason 8
+11-27 16:47:29.866  4229  4229 W Finsky  : [2] For unauth, use getDfeApiNonAuthenticated() instead!
+11-27 16:47:29.866  4229  4229 I Finsky  : [2] HC: Probe unauthenticated for hygiene pass
+11-27 16:47:29.871  4229  4311 I Finsky  : [320] [PLUS] Adding payload case=19
+11-27 16:47:29.871  4229  4311 I Finsky  : [320] [PLUS] Adding payload case=34
+11-27 16:47:29.871  4229  4311 I Finsky  : [320] [PLUS] Triggering sync due to NOW_EXCLUSIVE urgency payload
+11-27 16:47:29.873  4229  4311 I Finsky  : [320] [PLUS] Syncing for users with urgency above: NOW_EXCLUSIVE
+11-27 16:47:29.874  4350  4393 I Finsky:background: [327] Wrote row to frosting DB: 105
+11-27 16:47:29.875  4229  4397 I Finsky  : [363] SCH: Skip running other jobs while hygiene is running
+11-27 16:47:29.875   472  4314 D ConnectivityService: requestNetwork for uid/pid:10056/4350 NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Uid: 10056 AdministratorUids: [] RequestorUid: 10056 RequestorPackageName: com.android.vending] ]
+11-27 16:47:29.876   472   622 D ConnectivityService: NetReassign [31 : null → 100]
+11-27 16:47:29.875  4229  4397 I Finsky  : [363] SCH: Skip running other jobs while hygiene is running
+11-27 16:47:29.876   472   650 D Ethernet: got request NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Uid: 10056 AdministratorUids: [] RequestorUid: 10056 RequestorPackageName: com.android.vending] ] with score 60 and providerId 2
+11-27 16:47:29.876   472   618 D UntrustedWifiNetworkFactory: got request NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Uid: 10056 AdministratorUids: [] RequestorUid: 10056 RequestorPackageName: com.android.vending] ] with score 60 and providerId 2
+11-27 16:47:29.876   472   618 D WifiNetworkFactory: got request NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Uid: 10056 AdministratorUids: [] RequestorUid: 10056 RequestorPackageName: com.android.vending] ] with score 60 and providerId 2
+11-27 16:47:29.876  4350  4398 I Finsky:background: [330] IQ: Pruning inactive install requests
+11-27 16:47:29.877  4350  4386 I Finsky:background: [322] IQ: start evaluating install requests.
+11-27 16:47:29.877  4350  4386 I Finsky:background: [322] IQ: no jobs active. Skipping
+11-27 16:47:29.880  4350  4395 I Finsky:background: [328] registerListener
+11-27 16:47:29.880  4350  4395 I Finsky:background: [328] DFS: Listener added for nii@5b19791
+11-27 16:47:29.880  4350  4395 I Finsky:background: [328] registerListener
+11-27 16:47:29.881  4350  4395 I Finsky:background: [328] registerListener
+11-27 16:47:29.881  4350  4386 I Finsky:background: [322] IQ: 0 scheduled install statuses found to proceed. 
+11-27 16:47:29.881  4350  4395 I Finsky:background: [328] DFS: Listener added for vpz@b4e5bd0
+11-27 16:47:29.883  4350  4398 I Finsky:background: [330] SCH: Deleting scheduler db
+11-27 16:47:29.883  4350  4398 I Finsky:background: [330] Resetting scheduler db
+11-27 16:47:29.885  4229  4315 I Finsky  : [321] [PLUS] Syncing 1 train(s)
+11-27 16:47:29.885  4229  4315 I Finsky  : [321] [PLUS] Sending payloads for account: [2fKVkThB4QBVOwc88U06EJ4S6Yyqenathz2XlaLEUMg]
+11-27 16:47:29.897  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/ConscryptEngineSocket;->setUseSessionTickets(Z)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.897  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setUseSessionTickets(Z)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.897  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setUseSessionTickets(Z)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.898  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/ConscryptEngineSocket;->setHostname(Ljava/lang/String;)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setHostname(Ljava/lang/String;)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setHostname(Ljava/lang/String;)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.898  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setAlpnProtocols([B)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setAlpnProtocols([B)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/ConscryptEngineSocket;->setUseSessionTickets(Z)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setUseSessionTickets(Z)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setUseSessionTickets(Z)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/ConscryptEngineSocket;->setHostname(Ljava/lang/String;)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setHostname(Ljava/lang/String;)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setHostname(Ljava/lang/String;)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setAlpnProtocols([B)V (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.898  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->setAlpnProtocols([B)V (greylist-max-q, reflection, denied)
+11-27 16:47:29.902  4350  4395 I Finsky:background: [328] IV2: IQv2 is disabled. Recovering all active installs: []
+11-27 16:47:29.905  4350  4386 I Finsky:background: [322] CronetEngine is not present. Falling back to the OkHttp networking stack.
+11-27 16:47:29.909  4229  4416 I Finsky  : [369] SM: There are no stale sessions to be pruned
+11-27 16:47:29.911  4229  4229 I Finsky  : [2] Connecting InstallListener to SplitInstallService broadcaster...
+11-27 16:47:29.928  4350  4381 I Finsky:background: [318] SCH: no pending jobs to schedule.
+11-27 16:47:29.930  4350  4383 I Finsky:background: [320] IQ: start evaluating install requests.
+11-27 16:47:29.930  4350  4383 I Finsky:background: [320] IQ: no jobs active. Skipping
+11-27 16:47:29.930  4350  4381 I Finsky:background: [318] SSM: Start staged session task with 0 tracked staged sessions
+11-27 16:47:29.931  4350  4383 I Finsky:background: [320] IQ: 0 scheduled install statuses found to proceed. 
+11-27 16:47:29.931  4350  4386 I Finsky:background: [322] Subscription detail: N/A
+11-27 16:47:29.932  4350  4386 I Finsky:background: [322] PlayInstallAPI: Play install service listener is not bound in this flavor.
+11-27 16:47:29.938  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->getAlpnSelectedProtocol()[B (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.938  4229  4325 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->getAlpnSelectedProtocol()[B (greylist-max-q, reflection, denied)
+11-27 16:47:29.940  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->getAlpnSelectedProtocol()[B (greylist-max-q,core-platform-api, reflection, denied)
+11-27 16:47:29.940  4229  4323 W android.vendin: Accessing hidden method Lcom/android/org/conscrypt/AbstractConscryptSocket;->getAlpnSelectedProtocol()[B (greylist-max-q, reflection, denied)
+11-27 16:47:30.006  4229  4311 E Finsky  : [320] ItemStore: getItems RPC failed for item com.android.vending
+11-27 16:47:30.008  4229  4308 I Finsky  : [317] AIM: AppInfoManager-Perf > getApps > data collection finished
+11-27 16:47:30.008  4229  4308 I Finsky  : [317] AIM: AppInfoManager-Perf > maybeDestroyAppInfoManager is called. actives = 0
+11-27 16:47:30.111  1123  4194 D BindingManager: with
+11-27 16:47:30.112  2398  2398 W cr_GrpcIpcUidPolicy: Signaure hash T3FWTW4FrfZGfnxVLvvYYYrf02Ws4NZTsvI808lwDxA= not in whitelisted signatures
+11-27 16:47:30.113  2398  2398 E cr_GrpcIpcUidPolicy: Unauthorized access attempt from com.google.android.katniss
+11-27 16:47:30.113  2398  2398 E cr_GrpcIpcSocketService: Calling package not allowed.
+11-27 16:47:30.113  1123  1123 E GrpcIpcSocketClientImpl: invalid message
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113180    4194 grpc_ipc_socket_client.cc:77] Error for usonia-ipc-socket
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113205    4194 android_grpc_builder.cc:149] Could not get a socket for binder:com.google.android.apps.mediashell:usonia-ipc-socket
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113218    4194 grpc_manager_impl.cc:634] GRPC[uri=]: Grpc cannot connect to host {UNDEFINED}
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113226    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113233    4194 grpc_auth_manager_with_grpc_ipc.cc:65] IPC for Auth.AuthReadyStreaming closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113240    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113245    4194 distributed_service_discovery_with_grpc_ipc.cc:150] IPC for DistributedServiceDiscovery.AddService closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113251    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113255    4194 distributed_service_discovery_with_grpc_ipc.cc:64] IPC for DistributedServiceDiscovery.UpdateObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113261    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113265    4194 distributed_service_discovery_with_grpc_ipc.cc:251] IPC for DistributedServiceDiscovery.GetIamMode closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113271    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113275    4194 metrics_recorder_with_grpc_ipc.cc:164] IPC for MetricsRecorder.RecordMetrics closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113281    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113285    4194 synchronous_sound_player_with_grpc_ipc.cc:173] IPC for SynchronousSoundPlayer.UpdateSound closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113291    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113296    4194 ipc_common.h:486] Error in fetching local device info: [error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113302    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113306    4194 directory_service_with_grpc_ipc.cc:123] IPC for DirectoryService.ObserveCommonTime closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113312    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113317    4194 directory_service_with_grpc_ipc.cc:277] IPC for DirectoryService.UpdateStateObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113323    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113327    4194 directory_service_with_grpc_ipc.cc:378] IPC for DirectoryService.UpdateMessageObservers closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 E native  : E0000 00:00:1795798050.113364    4194 grpc_manager_impl.cc:782] GRPC[uri=]: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.113  1123  4194 W native  : W0000 00:00:1795798050.113369    4194 state_manager_with_grpc_ipc.cc:74] IPC for StateManager.ReceiveStateUpdates closed: status=[error_code=RESOURCE_EXHAUSTED, error_message=Cannot create a channel. Call to binder:com.google.android.apps.mediashell:usonia-ipc-socket ignored.]
+11-27 16:47:30.176  4229  4229 I Finsky  : [2] [PLUS] Received response
+11-27 16:47:30.181  4229  4300 I Finsky  : [309] [PLUS] Successfully updated PayloadValueStore
+11-27 16:47:30.181  4229  4309 I Finsky  : [318] [PLUS] Sync complete, number synced: 1, number failed: 0
+11-27 16:47:30.182  4229  4366 I Finsky  : [356] Phixit: Maybe start downgrading Phenotype database schema...
+11-27 16:47:30.182  4229  4309 I Finsky  : [318] Syncing device attributes was successful when fetching experiments.
+11-27 16:47:30.185  4229  4321 I Phlogger: Unable to retrieve flag snapshot for com.google.android.gms.phenotype, using defaults.
+11-27 16:47:30.185  4229  4366 I PhenotypeDbUpgradeHelpe: Upgrading CE database from version 28 to 32
+11-27 16:47:30.185  4229  4366 I PhenotypeDbUpgradeHelpe: Create StorageInfos table.
+11-27 16:47:30.185  4229  4366 I PhenotypeDbUpgradeHelpe: Add declarativeRegistrationInfo column to Packages table.
+11-27 16:47:30.185  4229  4366 E SQLiteLog: (1) no such column: declarativeRegistrationInfo in "SELECT declarativeRegistrationInfo FROM Packages"
+11-27 16:47:30.185  4229  4366 I PhenotypeDbUpgradeHelpe: Add AppWideProperties table.
+11-27 16:47:30.190  4229  4366 I Finsky  : [356] Phixit: Time (us): 7853
+11-27 16:47:30.191  4229  4385 I HeterodyneSyncer: Removed 0 invalid users
+11-27 16:47:30.200  4229  4385 I HeterodyneSyncer: Syncing with Heterodyne. Reason: 1
+11-27 16:47:30.200  4229  4385 I Finsky  : [359] Sending Heterodyne sync request for package com.android.vending
+11-27 16:47:30.207  4229  4298 I Finsky  : [307] Successfully loaded canaryId, saving to ValueStore.
+11-27 16:47:30.234  4229  4308 I Finsky  : [317] SysCUA: Set {com.android.vending/com.google.android.finsky.systemcomponentupdateui.common.SystemComponentUpdateActivity} enabled state to 0
+11-27 16:47:30.234  4229  4315 I Finsky  : [321] Set UnhibernateActivity enabled state to 1
+11-27 16:47:30.321  4229  4385 I Finsky  : [359] Received Heterodyne sync response. StatusCode=200
+11-27 16:47:30.328  4229  4385 I HeterodyneSyncer: Sync completed. fetchReason: PERIODIC, fetchPackageName: com.android.vending, syncErrorType: UNSET, individual sync errors: .
+11-27 16:47:30.328  4229  4385 I HeterodyneSyncer: Finished notifying packages after sync. syncLatency: 137
+11-27 16:47:30.328  4229  4366 I Finsky  : [356] Phixit: Maybe start upgrading Phenotype database schema...
+11-27 16:47:30.328  4229  4366 I PhenotypeDbUpgradeHelpe: Upgrading CE database from version 32 to 1036
+11-27 16:47:30.374  4229  4366 I PhenotypeDbUpgradeHelpe: Updating trigger increment_registration_generation.
+11-27 16:47:30.374  4229  4366 I PhenotypeDbUpgradeHelpe: Adding `source` column to flag_overrides table.
+11-27 16:47:30.374  4229  4366 E SQLiteLog: (1) no such column: source in "SELECT source FROM flag_overrides"
+11-27 16:47:30.375  4229  4366 I PhenotypeDbUpgradeHelpe: Dropping legacy schema tables.
+11-27 16:47:30.389  4229  4366 I Finsky  : [356] Phixit: Time (us): 60961
+11-27 16:47:30.391  4229  4366 I Finsky  : [356] System was updated or GL extensions were already cached.
+11-27 16:47:30.394  4229  4385 I Finsky  : [359] Triggered update for experiment package com.google.android.finsky.regular.
+11-27 16:47:30.398  4229  4298 I RegisterSyncOperation: Register sync called by com.android.vending, syncing since something changed
+11-27 16:47:30.398  4229  4298 I HeterodyneSyncer: Removed 0 invalid users
+11-27 16:47:30.406  4229  4298 I HeterodyneSyncer: Syncing with Heterodyne. Reason: 14
+11-27 16:47:30.406  4229  4298 I Finsky  : [307] Sending Heterodyne sync request for package com.google.android.finsky.regular
+11-27 16:47:30.514  1123  1123 D RetryBindingHandler: Handle WHAT_RETRY_GET_LOCAL_CLOUDCAST_SERVICE_INFO message
+11-27 16:47:30.515  2398  2398 E cr_LocalGrpcAuthService: Calling package not allowed.
+11-27 16:47:30.516  1123  1123 E LocalGrpcAuthClientImpl: invalid message
+11-27 16:47:30.516  1123  1123 D RetryBindingHandler: retry get auth info
+11-27 16:47:30.516  1123  1123 D RetryBindingHandler: send message in 4000 ms
+11-27 16:47:30.516  1123  1123 E cr_AssistantManagerInternal$AssistantLocalGrpcAuthCallback: the port or token cannot be retrieved from local grpc client
+11-27 16:47:30.756   283   330 D goldfish-address-space: claimShared: Ask to claim region [0x3f8970000 0x3f9159000]
+11-27 16:47:30.766   156   156 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device manifest.
+11-27 16:47:30.766  4426  4426 I Gralloc4: mapper 4.x is not supported
+11-27 16:47:30.773  4426  4426 D HostConnection: createUnique: call
+11-27 16:47:30.773  4426  4426 D HostConnection: HostConnection::get() New Host Connection established 0xed3c04e0, tid 4426
+11-27 16:47:30.773  4426  4426 D goldfish-address-space: allocate: Ask for block of size 0x100
+11-27 16:47:30.773  4426  4426 D goldfish-address-space: allocate: ioctl allocate returned offset 0x3f7ffe000 size 0x2000
+11-27 16:47:30.780  4426  4426 D HostConnection: HostComposition ext ANDROID_EMU_CHECKSUM_HELPER_v1 ANDROID_EMU_native_sync_v2 ANDROID_EMU_dma_v1 ANDROID_EMU_direct_mem ANDROID_EMU_host_composition_v1 ANDROID_EMU_host_composition_v2 ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_null_optional_strings ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_YUV_Cache ANDROID_EMU_vulkan_ignored_handles ANDROID_EMU_has_shared_slots_host_memory_allocator ANDROID_EMU_vulkan_free_memory_sync ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_sync_buffer_data ANDROID_EMU_vulkan_async_qsri ANDROID_EMU_read_color_buffer_dma ANDROID_EMU_hwc_color_transform ANDROID_EMU_hwc_display_power_mode GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object GL_KHR_texture_compression_astc_ldr ANDROID_EMU_host_side_tracing ANDROID_EMU_gles_max_version_3_0 
+11-27 16:47:30.918  4229  4298 I Finsky  : [307] Received Heterodyne sync response. StatusCode=200
+11-27 16:47:30.942  4229  4298 I SharedStorageWriter: Created directory
