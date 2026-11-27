@@ -495,18 +495,21 @@ private fun Clock() {
 private fun FocusPill(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val (pressed, press) = rememberPress(onClick)
-    val scale by animateFloatAsState(if (pressed) .95f else if (focused) 1.06f else 1f, spring(stiffness = 500f), label = "pillScale")
-    // No frame on any tab (a 0.dp border still drew a hairline round every pill): the open tab is a
-    // soft glass capsule, the tab under the remote the focus colour, a little larger, with a shadow.
+    val scale by animateFloatAsState(if (pressed) .95f else if (focused) 1.04f else 1f, spring(stiffness = 500f), label = "pillScale")
     Box(
-        modifier.scale(scale).shadow(if (focused) 14.dp else 0.dp, CircleShape).clip(CircleShape)
+        modifier.scale(scale).clip(CircleShape)
             .background(
                 when {
                     pressed -> PressBrush
                     focused -> FocusBrush
-                    selected -> SolidColor(White.copy(alpha = .16f))
-                    else -> SolidColor(Color.Transparent)
+                    selected -> Brush.verticalGradient(listOf(White.copy(alpha = .24f), White.copy(alpha = .14f)))
+                    else -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
                 }
+            )
+            .border(
+                width = if (focused) 1.dp else if (selected) 1.dp else 0.dp,
+                color = if (focused) White.copy(alpha = .48f) else White.copy(alpha = .16f),
+                shape = CircleShape
             )
             .onFocusChanged { focused = it.isFocused }
             .clickable(onClick = press).padding(horizontal = 15.dp, vertical = 11.dp),
