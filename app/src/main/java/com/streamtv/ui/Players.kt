@@ -34,13 +34,17 @@ object Players {
      * is kept for both players. Whatever the file asks for (colours, sizes) is ignored.
      */
     fun styleSubtitles(view: androidx.media3.ui.PlayerView) {
-        val boxed = subtitleBox(view.context)
-        view.subtitleView?.apply {
+        view.subtitleView?.let { styleSubtitles(it) }
+    }
+
+    fun styleSubtitles(subtitles: androidx.media3.ui.SubtitleView) {
+        val boxed = subtitleBox(subtitles.context)
+        subtitles.apply {
             setApplyEmbeddedStyles(false)
             setApplyEmbeddedFontSizes(false)
             setStyle(
                 if (boxed) androidx.media3.ui.CaptionStyleCompat(
-                    android.graphics.Color.WHITE, 0xA6000000.toInt(), android.graphics.Color.TRANSPARENT,
+                    android.graphics.Color.WHITE, 0x8C000000.toInt(), android.graphics.Color.TRANSPARENT,
                     androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.TRANSPARENT, null
                 ) else androidx.media3.ui.CaptionStyleCompat(
                     android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,

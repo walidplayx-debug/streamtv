@@ -307,22 +307,24 @@ fun PlayerScreen(
     // the newest versions of these (made for the channel now playing), not the first ones.
     val streamProblem by rememberUpdatedState(newValue = { onStreamProblem() })
     val restartNow by rememberUpdatedState(newValue = { restart() })
-    // The picture's view, for its subtitles.
+    // The picture's view, and the app's own subtitle view over it.
     val playerView = remember { arrayOfNulls<PlayerView>(1) }
+    val captionView = remember { arrayOfNulls<androidx.media3.ui.SubtitleView>(1) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             // Live subtitles (CEA-608 above all) carry their own place, width and size, which threw
             // them off the side of the screen. Their lines are shown instead as one centred block,
             // wrapped, at the bottom, in the same size as on films. Pictures (DVB) are left as they are.
+            // They go to the app's own subtitle view only: PlayerView also drew every update in its
+            // own view first, so captions shook, jumped around, blinked and sometimes showed twice.
             override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
                 if (cueGroup.cues.any { !it.text.isNullOrBlank() || it.bitmap != null }) captionsSeen = true
-                val view = playerView[0]?.subtitleView ?: return
-                view.post {
-                    val cues = player.currentCues.cues
-                    if (cues.isNotEmpty() && cues.all { it.text != null }) view.setCues(listOf(
-                        androidx.media3.common.text.Cue.Builder().setText(cues.joinToString("\n") { it.text.toString().trim() }).build()
-                    ))
-                }
+                val view = captionView[0] ?: return
+                val cues = cueGroup.cues
+                if (cues.isEmpty() || cues.any { it.text == null }) { view.setCues(cues); return }
+                // Roll-up captions repeat and pile lines: the last two different lines are enough.
+                val lines = cues.flatMap { it.text.toString().lines() }.map { it.trim() }.filter { it.isNotEmpty() }.distinct().takeLast(2)
+                view.setCues(if (lines.isEmpty()) emptyList() else listOf(androidx.media3.common.text.Cue.Builder().setText(lines.joinToString("\n")).build()))
             }
             override fun onTracksChanged(tracks: Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
@@ -391,11 +393,11 @@ fun PlayerScreen(
 
     LaunchedEffect(channel.key) { if (overlayState != OverlayState.ChannelList) showInfoBar() }
     LaunchedEffect(subtitlesShown) {
-        playerView[0]?.subtitleView?.visibility = if (subtitlesShown) android.view.View.VISIBLE else android.view.View.GONE
+        captionView[0]?.visibility = if (subtitlesShown) android.view.View.VISIBLE else android.view.View.GONE
     }
     // Subtitles move up above the info bar (and its small buttons) while it shows.
     LaunchedEffect(overlayState) {
-        playerView[0]?.subtitleView?.setBottomPaddingFraction(
+        captionView[0]?.setBottomPaddingFraction(
             if (overlayState == OverlayState.InfoBar) .29f else androidx.media3.ui.SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION
         )
     }
@@ -565,8 +567,8 @@ fun PlayerScreen(
             factory = {
                 PlayerView(it).apply {
                     playerView[0] = this
+                    // Never shown: subtitles are drawn by the app's own view below.
                     subtitleView?.visibility = android.view.View.GONE
-                    Players.styleSubtitles(this)
                     this.player = player
                     // The screen stays on while a channel is on screen, not while browsing menus.
                     keepScreenOn = true
@@ -577,6 +579,16 @@ fun PlayerScreen(
                 }
             },
             update = { it.player = player }
+        )
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                androidx.media3.ui.SubtitleView(it).apply {
+                    captionView[0] = this
+                    Players.styleSubtitles(this)
+                    visibility = if (subtitlesShown) android.view.View.VISIBLE else android.view.View.GONE
+                }
+            }
         )
 
         if (audioWarning) {
